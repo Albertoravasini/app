@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class VideoService {
-  final String backendUrl = 'http://localhost:3000';
+  final String backendUrl = 'http://167.99.131.91:3000';
 
   final Map<String, List<String>> topicKeywords = {
     'Finanza': ['finanza semplice playlist investiamo', 'channel:investiamo', 'pietro michelangeli','Rip'],
