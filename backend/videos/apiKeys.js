@@ -1,5 +1,5 @@
 const apiKeys = [
-    { key: 'AIzaSyCn_ljinSlIUIxIUJy2RurQ_Oo6wbphr7E', quota: 10000 }
+    { key: 'AIzaSyAG87ey3qFYA9nDsLgx6_Q3neAi0m7RekI', quota: 10000 }
   ];
   let currentKeyIndex = 0;
   

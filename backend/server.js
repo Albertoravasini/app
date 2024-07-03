@@ -33,7 +33,7 @@ app.post('/new_videos', async (req, res) => {
         let newVideos = data.videoDetails.filter(video => !viewedVideos.includes(video.id));
         if (newVideos.length === 0) {
           const { videoDetails, nextPageToken: newPageToken } = await fetchVideosFromYouTube([keyword], actualPageToken, topic);
-          await redisClient.setEx(cacheKey, 3600, JSON.stringify({ videoDetails, nextPageToken: newPageToken }));
+          await redisClient.setEx(cacheKey, 86400, JSON.stringify({ videoDetails, nextPageToken: newPageToken }));
           newVideos = videoDetails.filter(video => !viewedVideos.includes(video.id));
           nextPageToken = newPageToken;
         } else {
@@ -42,7 +42,7 @@ app.post('/new_videos', async (req, res) => {
         allVideos.push(...newVideos);
       } else {
         const { videoDetails, nextPageToken: newPageToken } = await fetchVideosFromYouTube([keyword], actualPageToken, topic);
-        await redisClient.setEx(cacheKey, 3600, JSON.stringify({ videoDetails, nextPageToken: newPageToken }));
+        await redisClient.setEx(cacheKey, 86400, JSON.stringify({ videoDetails, nextPageToken: newPageToken }));
         const newVideos = videoDetails.filter(video => !viewedVideos.includes(video.id));
         allVideos.push(...newVideos);
         nextPageToken = newPageToken;
