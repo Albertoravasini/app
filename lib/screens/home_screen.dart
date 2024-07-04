@@ -6,7 +6,7 @@ import '../services/auth_service.dart';
 import '../services/video_service.dart';
 import '../widgets/video_card.dart';
 import '../widgets/question_card.dart';
-import 'dart:math'; // Importazione corretta per Random
+import 'dart:math';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -32,9 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      setState(() {
-        viewedVideos = List<String>.from(doc.data()?['viewedVideos'] ?? []);
-      });
+      if (mounted) {
+        setState(() {
+          viewedVideos = List<String>.from(doc.data()?['viewedVideos'] ?? []);
+        });
+      }
       await _loadVideos();
     }
   }
@@ -61,10 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       // Shuffle the videos to ensure a mix of different topics
       allVideos.shuffle(Random());
-      setState(() {
-        videos.addAll(allVideos);
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          videos.addAll(allVideos);
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -76,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _markVideoAsViewed(String videoId) {
-    if (!viewedVideos.contains(videoId)) {
+    if (!viewedVideos.contains(videoId) && mounted) {
       setState(() {
         viewedVideos.add(videoId);
       });
@@ -119,10 +123,12 @@ class _HomeScreenState extends State<HomeScreen> {
           } else {
             _markVideoAsViewed(videos[index]['id']);
           }
-          setState(() {
-            currentIndex = index;
-            showQuestion = false; // Reset showQuestion when changing page
-          });
+          if (mounted) {
+            setState(() {
+              currentIndex = index;
+              showQuestion = false; // Reset showQuestion when changing page
+            });
+          }
           if (index < videos.length - 1) {
             await _prefetchVideo(index + 1); // Pre-fetch next video
           }
@@ -137,9 +143,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          setState(() {
-            showQuestion = !showQuestion; // Toggle between video and question
-          });
+          if (mounted) {
+            setState(() {
+              showQuestion = !showQuestion; // Toggle between video and question
+            });
+          }
         },
         child: Icon(showQuestion ? Icons.video_collection : Icons.quiz),
       ),
@@ -163,5 +171,10 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }
