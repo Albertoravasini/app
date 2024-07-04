@@ -2,8 +2,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const redis = require('redis');
 const { fetchVideosFromYouTube } = require('./videos/fetchVideos');
-const { extractVideoText } = require('./videos/extractVideoText');
-const { generateQuestionAndAnswer } = require('./questions/generateQuestions');
 const compression = require('compression');
 const admin = require('firebase-admin');
 
@@ -30,61 +28,63 @@ redisClient.on('connect', () => console.log('Connected to Redis'));
 app.post('/new_videos', async (req, res) => {
   const { keywords, viewedVideos, pageToken, topic } = req.body;
   const actualPageToken = pageToken || '';
-  const cacheKey = `videos_${keywords.join('_')}_${actualPageToken}`;
+
+  console.log(`Request received with keywords: ${keywords.join(', ')}, pageToken: ${actualPageToken}, topic: ${topic}`);
 
   try {
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
-      console.log(`Cache hit for keywords: ${keywords.join(', ')} with pageToken: ${actualPageToken}`);
-      const data = JSON.parse(cachedData);
-      let newVideos = data.videoDetails.filter(video => !viewedVideos.includes(video.id));
-      const nextPageToken = data.nextPageToken || '';
-      if (newVideos.length === 0) {
-        console.log(`Cache miss due to no new videos, fetching from YouTube for keywords: ${keywords.join(', ')} with pageToken: ${actualPageToken}`);
-        const { videoDetails, nextPageToken: newPageToken } = await fetchVideosFromYouTube(keywords, actualPageToken, topic);
-        console.log(`Fetched ${videoDetails.length} videos from YouTube`);
-        await redisClient.setEx(cacheKey, 86400, JSON.stringify({ videoDetails, nextPageToken: newPageToken || '' }));
-        console.log(`Stored ${videoDetails.length} videos in cache for keywords: ${keywords.join(', ')} with pageToken: ${actualPageToken}`);
-        newVideos = videoDetails.filter(video => !viewedVideos.includes(video.id));
-        res.json({ videos: newVideos, nextPageToken: newPageToken || '' });
+    // Step 1: Check cache for each keyword individually
+    const cachedDataPromises = keywords.map(keyword => redisClient.get(`videos_${keyword}_${actualPageToken}`));
+    const cachedDataResults = await Promise.all(cachedDataPromises);
+
+    // Step 2: Collect cached videos and identify keywords with cache miss
+    let cachedVideos = [];
+    let keywordsToFetch = [];
+
+    cachedDataResults.forEach((cachedData, index) => {
+      if (cachedData) {
+        console.log(`Cache hit for keyword: ${keywords[index]} with pageToken: ${actualPageToken}`);
+        const data = JSON.parse(cachedData);
+        cachedVideos = cachedVideos.concat(data.videoDetails.filter(video => !viewedVideos.includes(video.id)));
       } else {
-        console.log(`Returning ${newVideos.length} new videos with nextPageToken: ${nextPageToken}`);
-        res.json({ videos: newVideos, nextPageToken });
+        console.log(`Cache miss for keyword: ${keywords[index]} with pageToken: ${actualPageToken}`);
+        keywordsToFetch.push(keywords[index]);
+      }
+    });
+
+    // Step 3: Fetch videos for keywords with cache miss
+    if (keywordsToFetch.length > 0) {
+      for (const keyword of keywordsToFetch) {
+        console.log(`Fetching videos for keyword: ${keyword} from YouTube API`);
+        const result = await fetchVideosFromYouTube([keyword], actualPageToken, topic);
+        const videoDetails = result.videoDetails;
+        const nextPageToken = result.nextPageToken || '';
+
+        console.log(`Fetched ${videoDetails.length} videos for keyword: ${keyword}`);
+
+        // Store fetched videos in cache
+        redisClient.setEx(`videos_${keyword}_${actualPageToken}`, 86400, JSON.stringify({ videoDetails, nextPageToken }));
+        console.log(`Stored ${videoDetails.length} videos in cache for keyword: ${keyword} with pageToken: ${actualPageToken}`);
+
+        // Add fetched videos to cachedVideos
+        cachedVideos = cachedVideos.concat(videoDetails.filter(video => !viewedVideos.includes(video.id)));
       }
     } else {
-      console.log(`Cache miss for keywords: ${keywords.join(', ')} with pageToken: ${actualPageToken}`);
-      const { videoDetails, nextPageToken: newPageToken } = await fetchVideosFromYouTube(keywords, actualPageToken, topic);
-      console.log(`Fetched ${videoDetails.length} videos from YouTube`);
-      await redisClient.setEx(cacheKey, 86400, JSON.stringify({ videoDetails, nextPageToken: newPageToken || '' }));
-      console.log(`Stored ${videoDetails.length} videos in cache for keywords: ${keywords.join(', ')} with pageToken: ${actualPageToken}`);
-      const newVideos = videoDetails.filter(video => !viewedVideos.includes(video.id));
-      console.log(`Returning ${newVideos.length} new videos with nextPageToken: ${newPageToken || ''}`);
-      res.json({ videos: newVideos, nextPageToken: newPageToken || '' });
+      console.log(`All keywords were cache hits.`);
     }
+
+    // Shuffle videos to ensure a mix of topics
+    cachedVideos.sort(() => 0.5 - Math.random());
+    console.log(`Returning ${cachedVideos.length} videos to client.`);
+
+    // Step 4: Return combined videos and nextPageToken
+    res.json({ videos: cachedVideos, nextPageToken: '' });
   } catch (error) {
     console.error('Error fetching videos:', error);
     res.status(500).send('Error fetching videos');
   }
 });
 
-app.post('/generate_question', async (req, res) => {
-  const { videoUrl } = req.body;
-  try {
-    console.log(`Processing video URL: ${videoUrl}`);
-    const videoText = await extractVideoText(videoUrl);
-    console.log('Extracted video text:', videoText);
-    const questionAndAnswer = await generateQuestionAndAnswer(videoText);
-    res.json({ question: questionAndAnswer });
-  } catch (error) {
-    console.error('Error generating question:', error.message);
-    res.status(500).send('Error generating question');
-  }
-});
-
-// Include the admin routes
-const adminRoutes = require('./admin/routes/adminRoutes');
-app.use('/admin', adminRoutes);
-
+// Avvio del server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
