@@ -7,6 +7,7 @@ import '../services/video_service.dart';
 import '../widgets/video_card.dart';
 import '../widgets/question_card.dart';
 import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -29,25 +30,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadViewedVideos() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (mounted) {
-        setState(() {
-          viewedVideos = List<String>.from(doc.data()?['viewedVideos'] ?? []);
-        });
-      }
-      await _loadVideos();
-    }
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      viewedVideos = prefs.getStringList('viewedVideos') ?? [];
+    });
+    await _loadVideos();
   }
 
   Future<void> _saveViewedVideos() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'viewedVideos': viewedVideos,
-      });
-    }
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setStringList('viewedVideos', viewedVideos);
   }
 
   Future<void> _loadVideos({bool loadMore = false}) async {
@@ -56,18 +48,19 @@ class _HomeScreenState extends State<HomeScreen> {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
       List<String> topics = List<String>.from(doc.data()?['topics'] ?? []);
       final List<dynamic> allVideos = [];
-      for (String topic in topics) {
-        final response = await videoService.fetchNewVideos(topic, viewedVideos, nextPageToken: loadMore ? nextPageToken : null);
-        allVideos.addAll(response['videos']);
-        nextPageToken = response['nextPageToken'];
-      }
-      // Shuffle the videos to ensure a mix of different topics
+
+      print('Fetching new videos for topics: $topics');
+      final response = await videoService.fetchNewVideos(topics, viewedVideos, nextPageToken: loadMore ? nextPageToken : null);
+      allVideos.addAll(response['videos']);
+      nextPageToken = response['nextPageToken'];
+
       allVideos.shuffle(Random());
       if (mounted) {
         setState(() {
           videos.addAll(allVideos);
           isLoading = false;
         });
+        print('Loaded ${allVideos.length} videos.');
       }
     }
   }
@@ -85,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
         viewedVideos.add(videoId);
       });
       _saveViewedVideos();
+      print('Marked video as viewed: $videoId');
     }
   }
 
@@ -121,7 +115,9 @@ class _HomeScreenState extends State<HomeScreen> {
           if (index == videos.length) {
             await _loadVideos(loadMore: true);
           } else {
-            _markVideoAsViewed(videos[index]['id']);
+            if (index > 0) {
+              _markVideoAsViewed(videos[index - 1]['id']); // Segna il video precedente come visto
+            }
           }
           if (mounted) {
             setState(() {
