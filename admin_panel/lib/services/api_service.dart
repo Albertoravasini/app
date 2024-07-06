@@ -3,17 +3,18 @@ import 'package:http/http.dart' as http;
 import 'package:justlearnapp/models/user.dart';
 
 class ApiService {
-  final String baseUrl = 'http://167.99.131.91:3000/admin';
+  final String baseUrl = 'http://localhost:3000/admin';
 
   Future<List<UserModel>> getUsers() async {
-    final response = await http.get(Uri.parse('$baseUrl/users'));
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
-      return data.map((user) => UserModel.fromMap(user)).toList();
-    } else {
-      throw Exception('Failed to load users');
-    }
+  final response = await http.get(Uri.parse('$baseUrl/users'));
+  if (response.statusCode == 200) {
+    List<dynamic> data = json.decode(response.body);
+    return data.map((user) => UserModel.fromMap(user)).toList();
+  } else {
+    print('Error fetching users: ${response.statusCode} ${response.body}');
+    throw Exception('Failed to load users');
   }
+}
 
   Future<UserModel> getUserDetails(String id) async {
     final response = await http.get(Uri.parse('$baseUrl/users/$id'));

@@ -27,7 +27,7 @@ class _QuestionCardState extends State<QuestionCard> {
   Future<void> generateQuestion() async {
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:3000/generate_question'),
+        Uri.parse('http://167.99.131.91:3000/generate_question'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'videoUrl': 'https://www.youtube.com/watch?v=${widget.video['id']}'}),
       );

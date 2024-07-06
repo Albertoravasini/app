@@ -15,7 +15,6 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
   final List<String> topics = [
     'Finanza',
     'Legge',
-    'Business',
     'Crescita Personale',
     'Storia',
     'Lingue',
@@ -52,40 +51,74 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
     }
   }
 
+  Future<void> _saveSelectedTopics() async {
+    List<String> selectedTopicsList = selectedTopics.keys
+        .where((topic) => selectedTopics[topic]!)
+        .toList();
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.user.uid)
+        .update({
+      'topics': selectedTopicsList,
+    });
+  }
+
+  void _toggleAllTopics(bool selectAll) {
+    setState(() {
+      topics.forEach((topic) {
+        selectedTopics[topic] = selectAll;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Seleziona i Topic'),
       ),
-      body: ListView(
-        children: topics.map((topic) {
-          return CheckboxListTile(
+      body: Column(
+        children: [
+          CheckboxListTile(
             title: Text(
-              topic, 
-              style: Theme.of(context).textTheme.bodyLarge),
-            value: selectedTopics[topic],
+              'All',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            value: selectedTopics.values.every((selected) => selected),
             onChanged: (bool? value) {
-              setState(() {
-                selectedTopics[topic] = value!;
-              });
-            },checkColor: Colors.black,
+              if (value != null) {
+                _toggleAllTopics(value);
+              }
+            },
+            checkColor: Colors.black,
             activeColor: Colors.white,
-          );
-        }).toList(),
+          ),
+          Expanded(
+            child: ListView(
+              children: topics.map((topic) {
+                return CheckboxListTile(
+                  title: Text(
+                    topic, 
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  value: selectedTopics[topic],
+                  onChanged: (bool? value) {
+                    setState(() {
+                      selectedTopics[topic] = value!;
+                    });
+                  },
+                  checkColor: Colors.black,
+                  activeColor: Colors.white,
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          List<String> selectedTopicsList = selectedTopics.keys
-              .where((topic) => selectedTopics[topic]!)
-              .toList();
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(widget.user.uid)
-              .update({
-            'topics': selectedTopicsList,
-          });
-          Navigator.pushReplacementNamed(context, '/home');
+          await _saveSelectedTopics();
+          Navigator.pop(context, true); // Pop and indicate that we updated the topics
         },
         child: Icon(Icons.check),
       ),

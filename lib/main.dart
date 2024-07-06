@@ -5,6 +5,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/topic_selection_screen.dart';
+import 'screens/saved_videos_screen.dart'; // Importa la nuova schermata
 import 'services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -105,6 +106,7 @@ class MyApp extends StatelessWidget {
           '/login': (context) => LoginScreen(),
           '/register': (context) => RegisterScreen(),
           '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
+          '/saved_videos': (context) => SavedVideosScreen(savedVideos: {}), // Definisci la nuova rotta
         },
       ),
     );

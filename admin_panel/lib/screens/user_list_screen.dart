@@ -15,6 +15,7 @@ class _UserListScreenState extends State<UserListScreen> {
   List<UserModel> filteredUsers = [];
   bool isLoading = true;
   TextEditingController searchController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -32,15 +33,27 @@ class _UserListScreenState extends State<UserListScreen> {
       });
     } catch (e) {
       print('Failed to load users: $e');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnackBar('Failed to load users');
+      });
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   void _banUser(String id) async {
     try {
       await apiService.banUser(id);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('User banned')));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnackBar('User banned');
+      });
+      _fetchUsers(); // Refresh user list after banning a user
     } catch (e) {
       print('Failed to ban user: $e');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnackBar('Failed to ban user');
+      });
     }
   }
 
@@ -49,9 +62,15 @@ class _UserListScreenState extends State<UserListScreen> {
     if (duration != null) {
       try {
         await apiService.suspendUser(id, duration);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('User suspended')));
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showSnackBar('User suspended');
+        });
+        _fetchUsers(); // Refresh user list after suspending a user
       } catch (e) {
         print('Failed to suspend user: $e');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showSnackBar('Failed to suspend user');
+        });
       }
     }
   }
@@ -59,10 +78,23 @@ class _UserListScreenState extends State<UserListScreen> {
   void _deleteUser(String id) async {
     try {
       await apiService.deleteUser(id);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('User deleted')));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnackBar('User deleted');
+      });
+      _fetchUsers(); // Refresh user list after deleting a user
     } catch (e) {
       print('Failed to delete user: $e');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnackBar('Failed to delete user');
+      });
     }
+  }
+
+  void _showSnackBar(String message) {
+    final context = _scaffoldKey.currentContext!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<String> _showInputDialog(String title) async {
@@ -108,6 +140,7 @@ class _UserListScreenState extends State<UserListScreen> {
       return Center(child: CircularProgressIndicator());
     }
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Text('User List'),
         actions: [
@@ -161,7 +194,7 @@ class _UserListScreenState extends State<UserListScreen> {
                     ],
                   ),
                   onTap: () {
-                      Navigator.push(
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => UserDetailsScreen(userId: user.uid),

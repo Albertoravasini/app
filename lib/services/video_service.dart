@@ -6,11 +6,10 @@ class VideoService {
   final String backendUrl = 'http://167.99.131.91:3000';
 
   final Map<String, List<String>> topicKeywords = {
-    'Finanza': ['finanza semplice playlist investiamo', 'channel:investiamo', 'pietro michelangeli','Rip'],
+    'Finanza': ['finanza semplice', 'Investiamo', 'pietro michelangeli','mr Rip','starting finance'],
     'Legge': ['Angelo Greco'],
-    'Business': [],
-    'Crescita Personale': ['valutainment', 'alex homozi'],
-    'Storia': ['barbero', 'storia antica', 'storia attuale'],
+    'Crescita Personale': ['valutainment', 'alex homozi', 'TEDx Talks'],
+    'Storia': ['Alessandro Barbero - La Storia siamo Noi', 'Beginning To Now', 'History Matters'],
     'Lingue': ['lezioni francese','inglese', 'joEnglish'],
     'Attualità': ['fanpage', 'Limes rivista italiana di geopolitica', 'valutainment', 'Breaking Italy'],
   };
@@ -29,8 +28,27 @@ class VideoService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      final List<dynamic> videos = data['videos'];
+
+      for (var video in videos) {
+        final snippet = video['snippet'];
+        final title = snippet['title'].toLowerCase();
+        final description = snippet['description'].toLowerCase();
+        String category = 'Uncategorized';
+
+        for (var topic in topics) {
+          final keywords = topicKeywords[topic] ?? [];
+          if (keywords.any((keyword) => title.contains(keyword.toLowerCase()) || description.contains(keyword.toLowerCase()))) {
+            category = topic;
+            break;
+          }
+        }
+
+        video['snippet']['category'] = category;
+      }
+
       return {
-        'videos': data['videos'],
+        'videos': videos,
         'nextPageToken': data['nextPageToken'],
       };
     } else {

@@ -1,17 +1,15 @@
 const axios = require('axios');
-const { getCurrentApiKey } = require('./apiKeys');
+const { getCurrentApiKey, updateApiKeyUsage } = require('./apiKeys');
 
 const fetchVideosFromYouTube = async (keywords, pageToken = '', topic) => {
-  const apiKey = getCurrentApiKey();
+  let apiKey = getCurrentApiKey();
 
-  // Log the API request details
   console.log(`Fetching videos from YouTube for keywords: ${keywords.join(', ')} with pageToken: ${pageToken}`);
 
-  // Process each keyword individually
   const videoDetailsPromises = keywords.map(async (keyword) => {
     const params = {
       part: 'snippet',
-      q: keyword, // Query for a single keyword
+      q: keyword,
       key: apiKey,
       maxResults: 50,
       type: 'video',
@@ -22,7 +20,22 @@ const fetchVideosFromYouTube = async (keywords, pageToken = '', topic) => {
       params.publishedAfter = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     }
 
-    const response = await axios.get('https://www.googleapis.com/youtube/v3/search', { params });
+    let response;
+    try {
+      response = await axios.get('https://www.googleapis.com/youtube/v3/search', { params });
+      updateApiKeyUsage(response.data.items.length); // Aggiorna l'uso della chiave API
+    } catch (error) {
+      if (error.response && error.response.status === 403) {
+        // Se la chiave API ha raggiunto il limite, commuta a una nuova chiave
+        apiKey = getCurrentApiKey();
+        params.key = apiKey;
+        response = await axios.get('https://www.googleapis.com/youtube/v3/search', { params });
+        updateApiKeyUsage(response.data.items.length);
+      } else {
+        throw error;
+      }
+    }
+
     console.log(`Fetched ${response.data.items.length} items from YouTube search for keyword: ${keyword}`);
 
     const videoDetailsPromises = response.data.items.map(async (item) => {
@@ -45,9 +58,8 @@ const fetchVideosFromYouTube = async (keywords, pageToken = '', topic) => {
   const allVideoDetails = await Promise.all(videoDetailsPromises);
   const combinedVideoDetails = allVideoDetails.flat();
 
-  // Filtrare i video non utili prima di inviare la risposta
   const filteredVideoDetails = combinedVideoDetails.filter(video => {
-    return video.statistics.viewCount > 1000; // Esempio: solo video con più di 1000 visualizzazioni
+    return video.statistics.viewCount > 1000;
   });
 
   console.log(`Filtered ${filteredVideoDetails.length} useful videos out of ${combinedVideoDetails.length} videos retrieved`);

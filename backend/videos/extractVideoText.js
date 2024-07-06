@@ -7,7 +7,7 @@ const extractVideoText = (videoUrl) => {
   return new Promise((resolve, reject) => {
     const outputDir = path.resolve(__dirname, '../subtitles');
     if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir);
+      fs.mkdirSync(outputDir, { recursive: true });
     }
     const outputFileName = `${uuidv4()}.en.vtt`;
     const outputFilePath = path.resolve(outputDir, outputFileName);
@@ -24,7 +24,7 @@ const extractVideoText = (videoUrl) => {
           return reject(new Error('Subtitle download error'));
         }
       }
-      const finalOutputFilePath = `${outputFilePath}.en.vtt`;
+      const finalOutputFilePath = `${outputFilePath}`;
       console.log(`Output file path: ${finalOutputFilePath}`);
       fs.access(finalOutputFilePath, fs.constants.F_OK, (err) => {
         if (err) {

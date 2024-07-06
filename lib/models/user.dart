@@ -3,27 +3,32 @@ class UserModel {
   final String email;
   final String name;
   final List<String> topics;
-  final List<VideoWatched> videosWatched;
+  final Map<String, List<VideoWatched>> savedVideosByTopic;
 
   UserModel({
     required this.uid,
     required this.email,
     required this.name,
     required this.topics,
-    required this.videosWatched,
+    required this.savedVideosByTopic,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> data) {
-    var videosWatchedFromData = data['videosWatched'] as List<dynamic>? ?? [];
-    List<VideoWatched> videosWatchedList = videosWatchedFromData.map((videoData) => VideoWatched.fromMap(videoData)).toList();
+    var savedVideosFromData = data['savedVideosByTopic'] as Map<String, dynamic>? ?? {};
+    Map<String, List<VideoWatched>> savedVideosByTopic = savedVideosFromData.map((topic, videoList) {
+      List<VideoWatched> videosWatchedList = (videoList as List).map((videoData) => VideoWatched.fromMap(videoData)).toList();
+      return MapEntry(topic, videosWatchedList);
+    });
     return UserModel(
       uid: data['uid'],
       email: data['email'],
       name: data['name'],
       topics: List<String>.from(data['topics']),
-      videosWatched: videosWatchedList,
+      savedVideosByTopic: savedVideosByTopic,
     );
   }
+
+  get videosWatched => null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -31,7 +36,7 @@ class UserModel {
       'email': email,
       'name': name,
       'topics': topics,
-      'videosWatched': videosWatched.map((video) => video.toMap()).toList(),
+      'savedVideosByTopic': savedVideosByTopic.map((topic, videos) => MapEntry(topic, videos.map((video) => video.toMap()).toList())),
     };
   }
 }

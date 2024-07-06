@@ -3,8 +3,14 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class VideoCard extends StatefulWidget {
   final dynamic video;
+  final bool isChecked;
+  final Function(bool?)? onCheckChanged;
 
-  VideoCard({required this.video});
+  VideoCard({
+    required this.video,
+    required this.isChecked,
+    required this.onCheckChanged,
+  });
 
   @override
   _VideoCardState createState() => _VideoCardState();
@@ -100,18 +106,40 @@ class _VideoCardState extends State<VideoCard> {
           padding: const EdgeInsets.all(16.0),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16.0),
-              child: YoutubePlayer(
-                controller: _controller,
-                showVideoProgressIndicator: true,
-                onReady: () {
-                  setState(() {
-                    _isControllerReady = true;
-                  });
-                  _controller.play();
-                },
-              ),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16.0),
+                  child: YoutubePlayer(
+                    controller: _controller,
+                    showVideoProgressIndicator: true,
+                    onReady: () {
+                      setState(() {
+                        _isControllerReady = true;
+                      });
+                      _controller.play();
+                    },
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () {
+                      widget.onCheckChanged?.call(!widget.isChecked);
+                    },
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                        color: widget.isChecked ? Colors.white : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -153,7 +181,7 @@ class _VideoCardState extends State<VideoCard> {
                         ),
                         SizedBox(width: 5),
                         Text(
-                          '${abbreviateNumber(viewCount)} views',
+                          '· ${abbreviateNumber(viewCount)} views ·',
                           style: TextStyle(color: Colors.grey, fontSize: 14),
                         ),
                         SizedBox(width: 5),
