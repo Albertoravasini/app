@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:justlearnapp/models/user.dart';
 
 class ApiService {
-  final String baseUrl = 'http://localhost:3000/admin';
+  final String baseUrl = 'http://167.99.131.91:3000/admin';
 
   Future<List<UserModel>> getUsers() async {
   final response = await http.get(Uri.parse('$baseUrl/users'));

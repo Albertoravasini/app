@@ -5,11 +5,15 @@ class VideoCard extends StatefulWidget {
   final dynamic video;
   final bool isChecked;
   final Function(bool?)? onCheckChanged;
+  final double initialPosition;
+  final Function(double) onVideoPositionChanged;
 
   VideoCard({
     required this.video,
     required this.isChecked,
     required this.onCheckChanged,
+    required this.initialPosition,
+    required this.onVideoPositionChanged,
   });
 
   @override
@@ -33,6 +37,7 @@ class _VideoCardState extends State<VideoCard> {
           mute: false,
         ),
       )..addListener(_listener);
+      _controller.seekTo(Duration(seconds: widget.initialPosition.toInt()));
     }
   }
 
@@ -47,6 +52,7 @@ class _VideoCardState extends State<VideoCard> {
       setState(() {
         _currentSliderValue = _controller.value.position.inSeconds.toDouble();
       });
+      widget.onVideoPositionChanged(_currentSliderValue);
     }
   }
 
@@ -181,7 +187,7 @@ class _VideoCardState extends State<VideoCard> {
                         ),
                         SizedBox(width: 5),
                         Text(
-                          '· ${abbreviateNumber(viewCount)} views ·',
+                          '${abbreviateNumber(viewCount)} views',
                           style: TextStyle(color: Colors.grey, fontSize: 14),
                         ),
                         SizedBox(width: 5),
@@ -192,8 +198,9 @@ class _VideoCardState extends State<VideoCard> {
                       ],
                     ),
                   ],
+              
+                  ),
                 ),
-              ),
             ],
           ),
         ),
