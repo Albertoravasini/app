@@ -1,5 +1,5 @@
 const apiKeys = [
-  { key: 'AIzaSyD-rKsZ17kf3Ei-WnMs1wuHN8XpyjjEDqA', quota: 10000, used: 0 },
+  { key: 'AIzaSyCVhnUS_EZhObiGUd5hpGpo6AwP9o5DUi4', quota: 10000, used: 0 },
   { key: 'AIzaSyAG87ey3qFYA9nDsLgx6_Q3neAi0m7RekI', quota: 10000, used: 0 },
   { key: 'AIzaSyCn_ljinSlIUIxIUJy2RurQ_Oo6wbphr7E', quota: 10000, used: 0 },
   // Aggiungi altre chiavi API qui
