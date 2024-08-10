@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/auth_service.dart';
-import '../services/video_service.dart';
-import '../widgets/video_card.dart';
-import '../widgets/question_card.dart';
-import 'dart:math';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'level_screen.dart';
+import '../models/level.dart';
 import '../models/user.dart';
-import 'topic_selection_screen.dart';
-import '../styles/colors.dart';
+import 'login_screen.dart';
+import '../services/level_service.dart';
+import 'video_list_screen.dart'; // Importa la nuova schermata
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -18,374 +15,492 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final VideoService videoService = VideoService();
-  List<String> viewedVideos = [];
-  List<dynamic> videos = [];
-  int currentIndex = 0;
-  bool isLoading = true;
-  String? nextPageToken;
-  bool showQuestion = false;
-  Map<String, List<dynamic>> savedVideos = {};
-  bool isSaving = false;
+  int _selectedIndex = 1; // Indice selezionato del BottomNavigationBar
+
   String? selectedTopic;
-  int _selectedIndex = 0;
-  PageController _pageController = PageController();
-  String? currentVideoId;
-  double currentVideoPosition = 0.0;
+  bool isLoading = true;
+  List<Level> levels = [];
+  UserModel? currentUser;
+  List<String> allTopics = [];
+  bool _levelsInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _loadViewedVideos();
-    _loadSavedVideos();
-    _loadCurrentVideoState();
+    _loadTopicsAndUser();
+    _initializeLevels();
   }
 
-  Future<void> _loadViewedVideos() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      viewedVideos = prefs.getStringList('viewedVideos') ?? [];
-    });
-    await _loadVideos();
-  }
-
-  Future<void> _saveViewedVideos() async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setStringList('viewedVideos', viewedVideos);
-  }
-
-  Future<void> _loadSavedVideos() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        final savedVideosData = data['savedVideosByTopic'] as Map<String, dynamic>? ?? {};
-        setState(() {
-          savedVideos = savedVideosData.map((topic, videos) {
-            return MapEntry(topic, List<dynamic>.from(videos));
-          });
-        });
-      }
-    }
-  }
-
-  Future<void> _saveVideo(String topic, dynamic video) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        isSaving = true;
-      });
-
-      final category = video['snippet']['category'] ?? 'Uncategorized';
-
-      if (!savedVideos.containsKey(category)) {
-        savedVideos[category] = [];
-      }
-
-      savedVideos[category]!.add(video);
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'savedVideosByTopic': savedVideos.map((key, value) => MapEntry(key, value.map((video) => video).toList())),
-      });
-
-      setState(() {
-        isSaving = false;
-        savedVideos = Map.from(savedVideos);
-      });
-    }
-  }
-
-  Future<void> _removeSavedVideo(String topic, dynamic video) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        isSaving = true;
-      });
-
-      savedVideos[topic]?.removeWhere((v) => v['id'] == video['id']);
-      if (savedVideos[topic]?.isEmpty ?? false) {
-        savedVideos.remove(topic);
-      }
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'savedVideosByTopic': savedVideos,
-      });
-
-      setState(() {
-        isSaving = false;
-        savedVideos = Map.from(savedVideos);
-
-        if (selectedTopic != null && (savedVideos[selectedTopic]?.isEmpty ?? true)) {
-          _clearSelectedTopic();
-        }
-      });
-    }
-  }
-
-  Future<void> _loadVideos({bool loadMore = false}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      List<String> topics = List<String>.from(doc.data()?['topics'] ?? []);
-      final List<dynamic> allVideos = [];
-
-      print('Fetching new videos for topics: $topics');
-      final response = await videoService.fetchNewVideos(topics, viewedVideos, nextPageToken: loadMore ? nextPageToken : null);
-      allVideos.addAll(response['videos']);
-      nextPageToken = response['nextPageToken'];
-
-      allVideos.shuffle(Random());
+  Future<void> _initializeLevels() async {
+    if (!_levelsInitialized) {
+      await createLevels();
       if (mounted) {
         setState(() {
-          videos = allVideos;
-          isLoading = false;
+          _levelsInitialized = true;
         });
-        print('Loaded ${allVideos.length} videos.');
       }
     }
   }
 
-  Future<void> _prefetchVideo(int index) async {
-    if (index < videos.length) {
-      final video = videos[index];
-      await videoService.prefetchVideo(video['id'], 'sd');
-    }
-  }
-
-  void _markVideoAsViewed(String videoId) {
-    if (!viewedVideos.contains(videoId) && mounted) {
-      setState(() {
-        viewedVideos.add(videoId);
-      });
-      _saveViewedVideos();
-      print('Marked video as viewed: $videoId');
-    }
-  }
-
-  void _toggleTopic(String topic) {
-    if (selectedTopic == topic) {
-      _clearSelectedTopic();
+  Future<void> _loadTopicsAndUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          if (userData != null) {
+            final userModel = UserModel.fromMap(userData);
+            await _updateConsecutiveDays(userModel);
+            if (mounted) {
+              setState(() {
+                currentUser = userModel;
+                selectedTopic = userModel.topics.isNotEmpty ? userModel.topics.first : null;
+              });
+            }
+          }
+        } else {
+          _redirectToLogin();
+        }
+      } catch (e) {
+        print('Error loading user: $e');
+        _redirectToLogin();
+      }
     } else {
-      _selectTopic(topic);
+      _redirectToLogin();
     }
+    await _loadAllTopics();
   }
 
-  void _selectTopic(String topic) {
-    setState(() {
-      selectedTopic = topic;
-      videos = savedVideos[selectedTopic] ?? [];
-      currentIndex = 0;
-    });
+  Future<void> _updateConsecutiveDays(UserModel user) async {
+    final now = DateTime.now();
+    final lastAccess = user.lastAccess;
+    final difference = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(lastAccess.year, lastAccess.month, lastAccess.day))
+        .inDays;
+
+    if (difference == 1) {
+      user.consecutiveDays += 1;
+    } else if (difference > 1) {
+      user.consecutiveDays = 1;
+    }
+
+    user.lastAccess = now;
+
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).update(user.toMap());
   }
 
-  void _clearSelectedTopic() async {
-    setState(() {
-      selectedTopic = null;
-      currentIndex = 0;
-      isLoading = true;
-    });
-    await _loadVideos();
-    setState(() {
-      isLoading = false;
-    });
-  }
-
-  Future<void> _navigateToTopicSelectionScreen() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
-      ),
-    );
-
-    if (result == true) {
+  Future<void> _loadAllTopics() async {
+    final querySnapshot = await FirebaseFirestore.instance.collection('topics').get();
+    if (mounted) {
       setState(() {
-        isLoading = true;
+        allTopics = querySnapshot.docs.map((doc) => doc.id).toList();
+        isLoading = false;
       });
-      await _loadVideos();
+    }
+    await _loadLevels();
+  }
+
+  Future<void> _loadLevels() async {
+    if (selectedTopic == null) return;
+    final levelsCollection = FirebaseFirestore.instance.collection('levels');
+    final querySnapshot = await levelsCollection
+        .where('topic', isEqualTo: selectedTopic)
+        .orderBy('levelNumber') // Ordina per levelNumber
+        .get();
+    final fetchedLevels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
+    if (mounted) {
+      setState(() {
+        levels = fetchedLevels;
+        isLoading = false;
+      });
     }
   }
 
-  Future<void> _saveCurrentVideoState() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (currentVideoId != null) {
-      prefs.setString('currentVideoId', currentVideoId!);
-      prefs.setDouble('currentVideoPosition', currentVideoPosition);
+  Future<void> updateLevelCompletion(String topic, int levelNumber) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final doc = await docRef.get();
+      if (doc.exists) {
+        final userData = doc.data();
+        if (userData != null) {
+          final userModel = UserModel.fromMap(userData);
+          final completedLevels = userModel.completedLevelsByTopic[topic] ?? [];
+          if (!completedLevels.contains(levelNumber)) {
+            completedLevels.add(levelNumber);
+            userModel.completedLevelsByTopic[topic] = completedLevels;
+            await docRef.update(userModel.toMap());
+            setState(() {
+              currentUser = userModel; // Aggiorna lo stato corrente dell'utente
+            });
+          }
+        }
+      }
     }
   }
 
-  Future<void> _loadCurrentVideoState() async {
-    final prefs = await SharedPreferences.getInstance();
+  void onLevelCompleted(String topic, int levelNumber) async {
+    await updateLevelCompletion(topic, levelNumber);
+    await _loadLevels();
+    if (mounted) {
+      setState(() {}); // Forza l'aggiornamento della UI per riflettere il completamento del livello
+    }
+  }
+
+  void _selectTopic(String? newTopic) async {
+    if (newTopic != null && newTopic != selectedTopic) {
+      if (mounted) {
+        setState(() {
+          selectedTopic = newTopic;
+          isLoading = true;
+        });
+      }
+      await _loadLevels();
+    }
+  }
+
+  void _redirectToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+    );
+  }
+
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    _redirectToLogin();
+  }
+
+  void _onItemTapped(int index) {
     setState(() {
-      currentVideoId = prefs.getString('currentVideoId');
-      currentVideoPosition = prefs.getDouble('currentVideoPosition') ?? 0.0;
+      _selectedIndex = index;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<User?>(context);
-
-    if (user == null) {
-      return Center(child: CircularProgressIndicator());
-    }
-
     if (isLoading) {
-      return Center(child: CircularProgressIndicator());
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Caricamento...'),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
 
-    final displayedVideos = selectedTopic != null
-        ? savedVideos[selectedTopic] ?? []
-        : videos;
+    Map<String, List<Level>> levelsBySubtopic = {};
+    for (var level in levels) {
+      levelsBySubtopic.putIfAbsent(level.subtopic, () => []).add(level);
+    }
 
     return Scaffold(
-      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('Home Page'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout),
-            onPressed: () async {
-              await context.read<AuthService>().signOut();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: displayedVideos.isEmpty
-                ? Center(child: Text('No videos saved', style: TextStyle(color: Colors.white)))
-                : PageView.builder(
-                  key: ValueKey<String?>(selectedTopic),
-                    scrollDirection: Axis.vertical,
-                    itemCount: displayedVideos.length,
-                    controller: _pageController,
-                    onPageChanged: (index) async {
-                      if (index == displayedVideos.length - 1 && selectedTopic == null) {
-                        await _loadVideos(loadMore: true);
-                      } else {
-                        if (index > 0) {
-                          _markVideoAsViewed(displayedVideos[index - 1]['id']);
-                        }
-                      }
-                      if (mounted) {
-                        setState(() {
-                          currentIndex = index;
-                          showQuestion = false;
-                          currentVideoId = displayedVideos[index]['id'];
-                          currentVideoPosition = 0.0;
-                        });
-                        _saveCurrentVideoState();
-                      }
-                      if (index < displayedVideos.length - 1) {
-                        await _prefetchVideo(index + 1);
-                      }
-                    },
-                    itemBuilder: (context, index) {
-                      final video = displayedVideos[index];
-                                            final topic = video['snippet']['category'] ?? 'Uncategorized';
-                      final isChecked = savedVideos[topic]?.any((v) => v['id'] == video['id']) ?? false;
-
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          showQuestion
-                              ? QuestionCard(video: video)
-                              : VideoCard(
-                                  video: video,
-                                  isChecked: isChecked,
-                                  onCheckChanged: (bool? value) async {
-                                    if (value == true) {
-                                      await _saveVideo(topic, video);
-                                    } else {
-                                      await _removeSavedVideo(topic, video);
-                                    }
-                                    setState(() {});
-                                  },
-                                  initialPosition: (video['id'] == currentVideoId) ? currentVideoPosition : 0.0,
-                                  onVideoPositionChanged: (position) {
-                                    if (video['id'] == currentVideoId) {
-                                      setState(() {
-                                        currentVideoPosition = position;
-                                      });
-                                      _saveCurrentVideoState();
-                                    }
-                                  },
-                                ),
-                        ],
-                      );
-                    },
-                  ),
-          ),
-          if (savedVideos.isNotEmpty)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.symmetric(vertical: 5.0),
-                color: Colors.black,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: savedVideos.keys.map((topic) {
-                      final isSelected = selectedTopic == topic;
-                      return GestureDetector(
-                        onTap: () => _toggleTopic(topic),
-                        child: Container(
-                          margin: EdgeInsets.symmetric(horizontal: 4.0),
-                          padding: EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                          decoration: BoxDecoration(
-                            color: isSelected ? Colors.white : Colors.black,
-                            border: Border.all(color: Colors.white, width: 1),
-                            borderRadius: BorderRadius.circular(20.0),
-                          ),
-                          child: Text(
-                            topic,
-                            style: TextStyle(
-                              color: isSelected ? Colors.black : Colors.white,
-                            ),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: Text('Seleziona Topic'),
+                        content: Container(
+                          width: double.maxFinite,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: allTopics.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              return ListTile(
+                                title: Text(allTopics[index]),
+                                onTap: () {
+                                  _selectTopic(allTopics[index]);
+                                  Navigator.of(context).pop();
+                                },
+                              );
+                            },
                           ),
                         ),
                       );
-                    }).toList(),
-                  ),
+                    },
+                  );
+                },
+                child: Row(
+                  children: [
+                    Text(
+                      selectedTopic ?? 'Topic',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w800,
+                        height: 1.0,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
+                  ],
                 ),
               ),
             ),
-        ],
+            Row(
+              children: [
+                Icon(Icons.local_fire_department, color: Colors.white, size: 25),
+                const SizedBox(width: 5),
+                Text(
+                  '${currentUser?.consecutiveDays ?? 0}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                    letterSpacing: 0.66,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.logout),
+                  color: Colors.white,
+                  onPressed: _logout,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (mounted) {
-            setState(() {
-              showQuestion = !showQuestion;
-            });
-          }
-        },
-        child: Icon(showQuestion ? Icons.video_collection : Icons.quiz),
-      ),
+      body: _selectedIndex == 0 ? _buildLevelsView(levelsBySubtopic) : VideoListScreen(), // Mostra la schermata dei video se l'indice è 1
       bottomNavigationBar: BottomNavigationBar(
-        items: [
+        items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(Icons.assistant_rounded),
+            label: 'Livelli',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: 'Topics',
+            icon: Icon(Icons.video_library),
+            label: 'Videos',
           ),
         ],
-        onTap: (index) {
-          if (index == 0) {
-            _clearSelectedTopic();
-          } else if (index == 1) {
-            _navigateToTopicSelectionScreen();
-          }
-        },
+        currentIndex: _selectedIndex,
+        selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
+        onTap: _onItemTapped,
+      ),
+    );
+  }
+
+  Widget _buildLevelsView(Map<String, List<Level>> levelsBySubtopic) {
+    return ListView.builder(
+      itemCount: levelsBySubtopic.keys.length,
+      itemBuilder: (context, index) {
+        String subtopic = levelsBySubtopic.keys.elementAt(index);
+        List<Level> subtopicLevels = levelsBySubtopic[subtopic]!;
+        return Container(
+          margin: EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 343,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+                  decoration: ShapeDecoration(
+                    color: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    subtopic,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 24,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w800,
+                      height: 1.2,
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              ...subtopicLevels.map((level) {
+                bool isCompleted = currentUser?.completedLevelsByTopic[selectedTopic]?.contains(level.levelNumber) ?? false;
+                bool isCurrentLevel = !isCompleted && (currentUser?.completedLevelsByTopic[selectedTopic]?.length == level.levelNumber - 1);
+                bool isLocked = !isCompleted && !isCurrentLevel && level.levelNumber != 1; // Assicurati che il primo livello sia sempre sbloccato
+                return Column(
+                  children: [
+                    LevelCard(
+                      level: level,
+                      isLeft: levels.indexOf(level) % 2 == 0,
+                      isCurrentLevel: isCurrentLevel,
+                      isLocked: isLocked,
+                      onTap: isLocked
+                          ? null
+                          : () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => LevelScreen(
+                                    level: level,
+                                    onLevelCompleted: () => onLevelCompleted(selectedTopic!, level.levelNumber),
+                                  ),
+                                ),
+                              );
+
+                              if (result == true) {
+                                if (mounted) {
+                                  setState(() {
+                                    _loadLevels();
+                                  });
+                                }
+                              }
+                            },
+                    ),
+                    if (levels.indexOf(level) < levels.length - 1)
+                      Container(
+                        height: 110,
+                        child: Center(
+                          child: SvgPicture.asset(
+                            levels.indexOf(level) % 2 == 0
+                                ? isCompleted
+                                    ? 'assets/Vector_fatto_sx.svg'
+                                    : 'assets/vector_futuro_sx.svg'
+                                : isCompleted
+                                    ? 'assets/Vector_fatto_dx.svg'
+                                    : 'assets/vector_futuro_dx.svg',
+                            width: 150,
+                            height: 150,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class LevelCard extends StatelessWidget {
+  final Level level;
+  final bool isLeft;
+  final bool isCurrentLevel;
+  final bool isLocked;
+  final VoidCallback? onTap;
+
+  const LevelCard({
+    Key? key,
+    required this.level,
+    required this.isLeft,
+    required this.isCurrentLevel,
+    required this.isLocked,
+    this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 343,
+      height: 120,
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          Container(
+            width: 343,
+            height: 96,
+            padding: isLeft
+                ? const EdgeInsets.only(top: 5, left: 5, right: 92, bottom: 5)
+                : const EdgeInsets.only(top: 3, left: 93, right: 4, bottom: 3),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: isLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (isLeft)
+                  GestureDetector(
+                    onTap: onTap,
+                    child: buildImageContainer(level, isLocked, isCurrentLevel),
+                  ),
+                if (isLeft) const SizedBox(width: 21),
+                Expanded(
+                  child: buildTextContainer(level, isLeft, isCurrentLevel, isLocked),
+                ),
+                if (!isLeft) const SizedBox(width: 21),
+                if (!isLeft)
+                  GestureDetector(
+                    onTap: onTap,
+                    child: buildImageContainer(level, isLocked, isCurrentLevel),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Container buildTextContainer(Level level, bool isLeft, bool isCurrentLevel, bool isLocked) {
+    bool isHighlighted = isCurrentLevel || !isLocked;
+    return Container(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: isLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
+        crossAxisAlignment: isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        children: [
+          SizedBox(
+            width: 117,
+            child: Text(
+              level.title,
+              textAlign: isLeft ? TextAlign.left : TextAlign.right,
+              softWrap: true,
+              overflow: TextOverflow.visible,
+              style: TextStyle(
+                color: isHighlighted ? Colors.white : Color(0xFF7D7D7D),
+                fontSize: 16,
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+                letterSpacing: 0.48,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildImageContainer(Level level, bool isLocked, bool isCurrentLevel) {
+    return Container(
+      width: 108,
+      height: 86,
+      decoration: ShapeDecoration(
+        shape: RoundedRectangleBorder(
+          side: BorderSide(
+            width: isLocked ? 2 : 4,
+            strokeAlign: BorderSide.strokeAlignOutside,
+            color: isLocked ? Color(0xFF7D7D7D) : Colors.white,
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Transform.scale(
+          scale: 1.4, // Adjust this value to zoom in/out
+          child: Image.network(
+            level.steps[0].thumbnailUrl ?? "https://via.placeholder.com/108x86",
+            fit: BoxFit.cover,
+          ),
+        ),
       ),
     );
   }

@@ -4,6 +4,7 @@ const redis = require('redis');
 const { fetchVideosFromYouTube } = require('./videos/fetchVideos');
 const compression = require('compression');
 const admin = require('firebase-admin');
+const { extractVideoText } = require('./videos/extractVideoText'); // Aggiungi questa linea
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -73,6 +74,18 @@ app.post('/new_videos', async (req, res) => {
   } catch (error) {
     console.error('Error fetching videos:', error);
     res.status(500).send('Error fetching videos');
+  }
+});
+
+app.post('/extract_video_text', async (req, res) => {
+  const { videoUrl } = req.body;
+
+  try {
+    const subtitles = await extractVideoText(videoUrl);
+    res.json({ subtitles });
+  } catch (error) {
+    console.error('Error extracting video text:', error);
+    res.status(500).json({ error: 'Failed to extract video text' });
   }
 });
 

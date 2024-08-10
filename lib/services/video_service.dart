@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class VideoService {
-  final String backendUrl = 'http://167.99.131.91:3000';
+  final String backendUrl = 'http://localhost:3000';
 
   final Map<String, List<String>> topicKeywords = {
     'Finanza': ['finanza semplice', 'Investiamo', 'pietro michelangeli','mr Rip','starting finance'],
@@ -66,6 +66,21 @@ class VideoService {
       await prefs.setStringList('cachedVideos', cachedVideos);
     } else {
       print('Video already cached: $videoId');
+    }
+  }
+
+  Future<List<dynamic>> fetchVideoText(String videoUrl) async {
+    final response = await http.post(
+      Uri.parse('$backendUrl/extract_video_text'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'videoUrl': videoUrl}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['subtitles'];
+    } else {
+      throw Exception('Failed to fetch video text');
     }
   }
 }

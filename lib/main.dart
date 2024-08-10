@@ -1,3 +1,5 @@
+import 'package:Just_Learn/models/user.dart';
+import 'package:Just_Learn/screens/welcome_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -5,17 +7,43 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/topic_selection_screen.dart';
-import 'screens/saved_videos_screen.dart'; // Importa la nuova schermata
 import 'services/auth_service.dart';
+import 'admin_panel/admin_panel_screen.dart';
+import './admin_panel/user_management_screen.dart.dart';
+import './admin_panel/level_management_screen.dart.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'screens/video_list_screen.dart'; // Importa la nuova schermata
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  try {
+    await createTopics();
+  } catch (e) {
+    print('Error creating topics: $e');
+  }
   runApp(MyApp());
+}
+
+Future<void> createTopics() async {
+  final topics = ['Finanza'];
+  final topicsCollection = FirebaseFirestore.instance.collection('topics');
+  
+  try {
+    for (var topic in topics) {
+      final doc = await topicsCollection.doc(topic).get();
+      if (!doc.exists) {
+        await topicsCollection.doc(topic).set({});
+      }
+    }
+  } catch (e) {
+    print('Error while accessing Firestore: $e');
+    throw e;
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -49,7 +77,7 @@ class MyApp extends StatelessWidget {
               color: Colors.white,
             ),
             iconTheme: IconThemeData(
-              color: Colors.white, // Imposta il colore delle icone nell'AppBar
+              color: Colors.white,
             ),
           ),
           floatingActionButtonTheme: FloatingActionButtonThemeData(
@@ -97,7 +125,33 @@ class MyApp extends StatelessWidget {
             if (user == null) {
               return LoginScreen();
             } else {
-              return HomeScreen();
+              return FutureBuilder<DocumentSnapshot>(
+                future: FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Scaffold(body: Center(child: CircularProgressIndicator()));
+                  } else if (snapshot.hasError) {
+                    return Scaffold(
+                      body: Center(
+                        child: Text('Errore: ${snapshot.error}'),
+                      ),
+                    );
+                  } else if (snapshot.hasData && snapshot.data != null) {
+                    final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                    if (userData == null) {
+                      return LoginScreen();
+                    }
+                    final userModel = UserModel.fromMap(userData);
+                    if (userModel.role == 'admin') {
+                      return AdminPanelScreen();
+                    } else {
+                      return HomeScreen();
+                    }
+                  } else {
+                    return LoginScreen();
+                  }
+                },
+              );
             }
           },
         ),
@@ -106,7 +160,11 @@ class MyApp extends StatelessWidget {
           '/login': (context) => LoginScreen(),
           '/register': (context) => RegisterScreen(),
           '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
-          '/saved_videos': (context) => SavedVideosScreen(savedVideos: {}), // Definisci la nuova rotta
+          '/admin': (context) => AdminPanelScreen(),
+          '/admin/users': (context) => UserManagementScreen(),
+          '/admin/levels': (context) => LevelManagementScreen(),
+          '/welcome': (context) => WelcomeScreen(),
+          '/videos': (context) => VideoListScreen(), // Aggiungi la rotta per la nuova schermata
         },
       ),
     );

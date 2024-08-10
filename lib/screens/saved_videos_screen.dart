@@ -1,38 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
-class SavedVideosScreen extends StatelessWidget {
+class SavedVideosScreen extends StatefulWidget {
   final Map<String, List<dynamic>> savedVideos;
 
   SavedVideosScreen({required this.savedVideos});
 
   @override
-  Widget build(BuildContext context) {
-    final List<dynamic> allSavedVideos = savedVideos.values.expand((videos) => videos).toList();
+  _SavedVideosScreenState createState() => _SavedVideosScreenState();
+}
 
+class _SavedVideosScreenState extends State<SavedVideosScreen> {
+  List<dynamic> allSavedVideos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSavedVideos();
+  }
+
+  void _fetchSavedVideos() async {
+    // Fetch saved videos from the database
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        if (userData != null) {
+          final savedVideos = (userData['savedVideosByTopic'] as Map<String, dynamic>).cast<String, List<dynamic>>();
+          setState(() {
+            allSavedVideos = savedVideos.values.expand((videos) => videos).toList();
+            allSavedVideos.shuffle(); // Shuffle videos to display randomly
+          });
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     if (allSavedVideos.isEmpty) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Saved Videos'),
+          title: Text('Video Salvati'),
         ),
         body: Center(
-          child: Text('No saved videos available.'),
+          child: Text('Nessun video salvato disponibile.'),
         ),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Saved Videos'),
+        title: Text('Video Salvati'),
       ),
       body: ListView.builder(
         itemCount: allSavedVideos.length,
-        reverse: true, // Imposta questo a true per mostrare il più recente in alto
         itemBuilder: (context, index) {
           final video = allSavedVideos[index];
           return ListTile(
             title: Text(
-              video['snippet']['title'],
+              video['title'],
               style: TextStyle(color: Colors.white),
             ),
             onTap: () {
@@ -57,9 +87,9 @@ class VideoDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final videoId = video['id'];
-    final videoTitle = video['snippet']['title'];
-    final videoDescription = video['snippet']['description'];
+    final videoId = video['videoId'];
+    final videoTitle = video['title'];
+    final videoDescription = video['description'];
 
     return Scaffold(
       appBar: AppBar(

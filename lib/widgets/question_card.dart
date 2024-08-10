@@ -1,101 +1,175 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import '../models/level.dart';
 
 class QuestionCard extends StatefulWidget {
-  final dynamic video;
+  final LevelStep step;
+  final Function(bool) onAnswered;
 
-  QuestionCard({required this.video});
+  QuestionCard({required this.step, required this.onAnswered});
 
   @override
   _QuestionCardState createState() => _QuestionCardState();
 }
 
 class _QuestionCardState extends State<QuestionCard> {
-  String? question;
-  List<String>? choices;
-  String? correctAnswer;
-  bool loading = true;
-  String errorMessage = '';
+  String? selectedChoice;
 
-  @override
-  void initState() {
-    super.initState();
-    generateQuestion();
+  void handleChoice(String choice) {
+    setState(() {
+      selectedChoice = choice;
+    });
+
+    bool isCorrect = choice == widget.step.correctAnswer;
+    widget.onAnswered(isCorrect);
   }
 
-  Future<void> generateQuestion() async {
-    try {
-      final response = await http.post(
-        Uri.parse('http://167.99.131.91:3000/generate_question'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'videoUrl': 'https://www.youtube.com/watch?v=${widget.video['id']}'}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['question'] != null && data['question']['question'] != null && data['question']['choices'] != null) {
-          if (mounted) {
-            setState(() {
-              question = data['question']['question'];
-              choices = List<String>.from(data['question']['choices']);
-              correctAnswer = data['question']['correctAnswer'];
-              loading = false;
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              loading = false;
-              errorMessage = 'Failed to generate question: invalid response data';
-            });
-          }
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            loading = false;
-            errorMessage = 'Failed to generate question: ${response.statusCode} ${response.reasonPhrase}';
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          loading = false;
-          errorMessage = 'Failed to generate question: $e';
-        });
-      }
+  @override
+  void didUpdateWidget(QuestionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.step != oldWidget.step) {
+      setState(() {
+        selectedChoice = null;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return Center(child: CircularProgressIndicator());
-    }
-    if (errorMessage.isNotEmpty) {
-      return Center(child: Text(errorMessage));
-    }
-    return Padding(
+    return Container(
       padding: const EdgeInsets.all(16.0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            question ?? 'No question available',
-            style: TextStyle(color: Colors.white, fontSize: 18),
+            widget.step.content,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 36,
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          ...choices?.map((choice) => ElevatedButton(
-            onPressed: () {
-              if (choice == correctAnswer) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Correct!')));
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Wrong!')));
-              }
-            },
-            child: Text(choice),
-          )) ?? [],
+          const SizedBox(height: 24),
+          if (selectedChoice == null)
+            Expanded(
+              child: ListView(
+                children: widget.step.choices!.map((choice) => GestureDetector(
+                  onTap: () => handleChoice(choice),
+                  child: Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 24),
+                    decoration: ShapeDecoration(
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(width: 1, color: Colors.white),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      color: Colors.white,
+                    ),
+                    child: Text(
+                      choice,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.48,
+                      ),
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                )).toList(),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 24),
+                    decoration: ShapeDecoration(
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(width: 1, color: Colors.white),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      color: selectedChoice == widget.step.correctAnswer ? Colors.white : Colors.black,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            selectedChoice!,
+                            style: TextStyle(
+                              color: selectedChoice == widget.step.correctAnswer ? Colors.black : Colors.white,
+                              fontSize: 16,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.48,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          selectedChoice == widget.step.correctAnswer ? Icons.check : Icons.close,
+                          color: selectedChoice == widget.step.correctAnswer ? Colors.black : Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (selectedChoice != widget.step.correctAnswer)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 24),
+                      decoration: ShapeDecoration(
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(width: 1, color: Colors.white),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.step.correctAnswer!,
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.48,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.check,
+                            color: Colors.black,
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    child: Text(
+                      widget.step.explanation!,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.48,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
