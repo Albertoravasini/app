@@ -8,7 +8,7 @@ async function extractVideoText(videoUrl) {
         console.log(`Extracting video text for URL: ${videoUrl}`);
 
         // Modifica per scaricare i sottotitoli in italiano (codice lingua "it")
-        const command = `yt-dlp --write-auto-sub --sub-lang it --sub-format vtt --skip-download --output "%(id)s.%(ext)s" ${videoUrl}`;
+        const command = `yt-dlp --cookies cookies.txt --write-auto-sub --sub-lang it --sub-format vtt --skip-download --output "%(id)s.%(ext)s" ${videoUrl}`;
         console.log(`Executing command: ${command}`);
         await execPromise(command);
 
