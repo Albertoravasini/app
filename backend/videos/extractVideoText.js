@@ -2,13 +2,17 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const execPromise = promisify(exec);
 const fs = require('fs');
+const path = require('path');
 
 async function extractVideoText(videoUrl) {
     try {
         console.log(`Extracting video text for URL: ${videoUrl}`);
 
-        // Comando con le credenziali per bypassare l'errore di login
-        const command = `yt-dlp --username "albertoravasini@gmail.com" --password "Ravatheking03" --write-auto-sub --sub-lang it --sub-format vtt --skip-download --output "%(id)s.%(ext)s" ${videoUrl}`;
+        // Assumendo che tu abbia salvato i cookie in un file chiamato 'youtube_cookies.txt'
+        const cookieFilePath = path.resolve(__dirname, 'youtube_cookies.txt');
+
+        // Modifica il comando per usare i cookie
+        const command = `yt-dlp --cookies "${cookieFilePath}" --write-auto-sub --sub-lang it --sub-format vtt --skip-download --output "%(id)s.%(ext)s" ${videoUrl}`;
         console.log(`Executing command: ${command}`);
         
         const { stdout, stderr } = await execPromise(command);
@@ -72,7 +76,6 @@ function processSubtitles(subtitles) {
         } else if (currentSubtitle && currentSubtitle.start && currentSubtitle.end) {
             const cleanLine = line.replace(/<\/?c>|<\/?[^>]+(>|$)/g, '').trim();
 
-            // Controlla se la linea è già stata elaborata in precedenza
             if (previousLine !== cleanLine) {
                 currentSubtitle.text += `${cleanLine} `;
                 previousLine = cleanLine;
@@ -106,7 +109,7 @@ function processSubtitles(subtitles) {
                 }
 
                 currentSubtitle = {};
-                lastWordsSet.clear(); // Svuota il set alla fine di ogni blocco di sottotitoli
+                lastWordsSet.clear(); 
             }
         }
     }
