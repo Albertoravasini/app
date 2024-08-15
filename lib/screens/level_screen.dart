@@ -163,67 +163,6 @@ class _LevelScreenState extends State<LevelScreen> {
     }
   }
 
-  Widget buildCheckpointBar() {
-    return Container(
-      width: 377,
-      height: 18,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(),
-      child: Stack(
-        children: [
-          Positioned(
-            left: 0,
-            top: 4,
-            child: Container(
-              width: 377,
-              height: 11,
-              clipBehavior: Clip.antiAlias,
-              decoration: ShapeDecoration(
-                color: Color(0xFF7D7D7D),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 4,
-            child: Container(
-              width: 377 * videoProgress,
-              height: 11,
-              clipBehavior: Clip.antiAlias,
-              decoration: ShapeDecoration(
-                color: Color(0xFF4EFF5F),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-              ),
-            ),
-          ),
-          for (int i = 0; i < 5; i++)
-            Positioned(
-              left: (i * 89.25).toDouble(),
-              top: 0,
-              child: Container(
-                width: 18,
-                height: 18,
-                clipBehavior: Clip.antiAlias,
-                decoration: ShapeDecoration(
-                  color: 377 * videoProgress >= (i * 89.25)
-                      ? Color(0xFF4EFF5F)
-                      : Color(0xFF7D7D7D),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   void handleAnswer(bool correct) {
     setState(() {
       isAnswered = true;
@@ -274,12 +213,6 @@ class _LevelScreenState extends State<LevelScreen> {
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
             SizedBox(height: 10),
-            currentStep.type == 'video'
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: buildCheckpointBar(),
-                  )
-                : Container(),
             Expanded(
               child: Center(
                 child: currentStep.type == 'video'
@@ -296,7 +229,7 @@ class _LevelScreenState extends State<LevelScreen> {
                                 controller: _scrollController,
                                 child: Text(
                                   displayedText,
-                                                                    style: TextStyle(
+                                  style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
                                   ),
@@ -339,7 +272,7 @@ class _LevelScreenState extends State<LevelScreen> {
                         style: TextStyle(
                           color: Colors.black,
                           fontSize: 16,
-                          fontFamily: 'Montserrat',
+                                                    fontFamily: 'Montserrat',
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.48,
                         ),

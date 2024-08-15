@@ -1,143 +1,121 @@
 const { exec } = require('child_process');
 const { promisify } = require('util');
-const execPromise = promisify(exec);
+const execPromise = promisify(exec); // Correzione dell'importazione di execPromise
+const puppeteer = require('puppeteer');
 const fs = require('fs');
-const path = require('path');
 
 async function extractVideoText(videoUrl) {
-    try {
-        console.log(`Extracting video text for URL: ${videoUrl}`);
+  try {
+    console.log(`Extracting video text for URL: ${videoUrl}`);
 
-        // Assumendo che tu abbia salvato i cookie in un file chiamato 'youtube_cookies.txt'
-        const cookieFilePath = path.resolve(__dirname, 'youtube_cookies.txt');
+    const browser = await puppeteer.launch({
+      headless: true, // Imposta a false per debug visuale
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
 
-        // Modifica il comando per usare i cookie
-        const command = `yt-dlp --cookies "${cookieFilePath}" --write-auto-sub --sub-lang it --sub-format vtt --skip-download --output "%(id)s.%(ext)s" ${videoUrl}`;
-        console.log(`Executing command: ${command}`);
-        
-        const { stdout, stderr } = await execPromise(command);
+    const page = await browser.newPage();
 
-        console.log('Command executed successfully');
-        console.log('stdout:', stdout);
-        console.log('stderr:', stderr);
+    // Naviga verso la pagina del video su YouTube
+    await page.goto(videoUrl, { waitUntil: 'networkidle2' });
 
-        if (stderr.includes('Sign in to confirm you’re not a bot')) {
-            throw new Error('Failed to bypass login requirement.');
-        }
+    // Aspetta che l'elemento del video o dei sottotitoli sia presente
+    await page.waitForSelector('video', { timeout: 60000 });
 
-        const videoId = videoUrl.split('v=')[1];
-        const subtitleFile = `${videoId}.it.vtt`;
+    // Verifica se è richiesto il login e, se necessario, esegui l'accesso
+    const loginButton = await page.$('a[href*="accounts.google.com"]');
+    if (loginButton) {
+      console.log('Login required, performing login...');
+      await page.click('a[href*="accounts.google.com"]');
 
-        if (!fs.existsSync(subtitleFile)) {
-            console.error('Subtitle file not found');
-            throw new Error('Subtitle file not found');
-        }
-
-        console.log(`Reading subtitle file: ${subtitleFile}`);
-        const subtitles = fs.readFileSync(subtitleFile, 'utf8');
-        console.log('Subtitle file read successfully');
-
-        const subtitleData = processSubtitles(subtitles);
-
-        fs.unlinkSync(subtitleFile);
-        console.log(`Deleted subtitle file: ${subtitleFile}`);
-
-        return subtitleData;
-    } catch (error) {
-        console.error('Error extracting subtitles:', error);
-        throw error;
+      // Inserisci qui il codice per gestire il login tramite Puppeteer
+      // Dovrai utilizzare le credenziali di Google e completare il processo di autenticazione
+      // Potresti anche voler gestire eventuali captcha qui
     }
+
+    // Controlla la presenza di captcha e gestiscilo se necessario
+    const captcha = await page.$('iframe[src*="recaptcha"]');
+    if (captcha) {
+      console.log('Captcha detected, solving...');
+      // Gestisci il captcha qui, ad esempio utilizzando servizi esterni o automazione
+    }
+
+    // Ora esegui lo scraping dei sottotitoli utilizzando `yt-dlp`
+    const videoId = videoUrl.split('v=')[1];
+    const command = `yt-dlp --write-auto-sub --sub-lang it --sub-format vtt --skip-download --output "${videoId}.%(ext)s" ${videoUrl}`;
+    await execPromise(command);
+
+    // Leggi il file dei sottotitoli
+    const subtitleFile = `${videoId}.it.vtt`;
+    if (!fs.existsSync(subtitleFile)) {
+      console.error('Subtitle file not found');
+      throw new Error('Subtitle file not found');
+    }
+
+    const subtitles = fs.readFileSync(subtitleFile, 'utf8');
+    const lines = subtitles.split('\n');
+    const subtitleData = parseSubtitles(lines);
+
+    fs.unlinkSync(subtitleFile); // Elimina il file dei sottotitoli
+
+    await browser.close();
+    return subtitleData;
+  } catch (error) {
+    console.error('Error extracting subtitles:', error);
+    throw error;
+  }
 }
 
-function processSubtitles(subtitles) {
-    const lines = subtitles.split('\n');
-    const subtitleData = [];
-    let currentSubtitle = {};
-    let lastWordsSet = new Set();
-    let previousLine = ''; // Per controllare frasi ripetute
+function parseSubtitles(lines) {
+  const subtitleData = [];
+  let currentSubtitle = {};
+  let lastWordsSet = new Set();
+  let previousLine = '';
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        console.log(`Processing line ${i + 1}: ${line}`);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
 
-        if (line === '' || line.startsWith('WEBVTT') || line.match(/^\d+$/)) {
-            console.log(`Skipping line ${i + 1}: ${line}`);
-            continue;
-        }
+    if (line === '' || line.startsWith('WEBVTT') || line.match(/^\d+$/)) continue;
 
-        if (line.includes('-->')) {
-            const [start, end] = line.split(' --> ');
-            if (start && end) {
-                console.log(`Found timestamp: start=${start}, end=${end}`);
-                currentSubtitle = { start, end, text: '' };
-            } else {
-                console.warn(`Invalid timestamp format on line ${i + 1}: ${line}`);
-            }
-        } else if (currentSubtitle && currentSubtitle.start && currentSubtitle.end) {
-            const cleanLine = line.replace(/<\/?c>|<\/?[^>]+(>|$)/g, '').trim();
+    if (line.includes('-->')) {
+      const [start, end] = line.split(' --> ');
+      if (start && end) {
+        currentSubtitle = { start, end, text: '' };
+      }
+    } else if (currentSubtitle && currentSubtitle.start && currentSubtitle.end) {
+      const cleanLine = line.replace(/<\/?[^>]+(>|$)/g, '').trim();
+      if (previousLine !== cleanLine) {
+        currentSubtitle.text += `${cleanLine} `;
+        previousLine = cleanLine;
+      }
 
-            if (previousLine !== cleanLine) {
-                currentSubtitle.text += `${cleanLine} `;
-                previousLine = cleanLine;
-            }
+      if (lines[i + 1].trim() === '') {
+        const words = currentSubtitle.text.trim().split(/\s+/);
+        const startTime = parseTimestamp(currentSubtitle.start);
+        const endTime = parseTimestamp(currentSubtitle.end);
+        const wordDuration = (endTime - startTime) / words.length;
 
-            console.log(`Appending text to subtitle: ${currentSubtitle.text}`);
+        words.forEach((word, index) => {
+          if (!lastWordsSet.has(word) && word.length > 0) {
+            const timestamp = startTime + index * wordDuration;
+            subtitleData.push({ word, timestamp });
+            lastWordsSet.add(word);
+          }
+        });
 
-            if (lines[i + 1].trim() === '') {
-                const words = currentSubtitle.text.trim().split(/\s+/);
-                const startTime = parseTimestamp(currentSubtitle.start);
-                const endTime = parseTimestamp(currentSubtitle.end);
-
-                if (!isNaN(startTime) && !isNaN(endTime)) {
-                    console.log(`Processing words with startTime=${startTime}, endTime=${endTime}`);
-                    const wordDuration = (endTime - startTime) / words.length;
-
-                    for (let index = 0; index < words.length; index++) {
-                        const word = words[index];
-                        if (!lastWordsSet.has(word) && word.length > 0) {
-                            const timestamp = startTime + index * wordDuration;
-                            subtitleData.push({
-                                word: word,
-                                timestamp: timestamp
-                            });
-                            lastWordsSet.add(word);
-                            console.log(`Added word "${word}" with timestamp ${timestamp}`);
-                        }
-                    }
-                } else {
-                    console.warn(`Invalid timestamps for subtitle: start=${currentSubtitle.start}, end=${currentSubtitle.end}`);
-                }
-
-                currentSubtitle = {};
-                lastWordsSet.clear(); 
-            }
-        }
+        currentSubtitle = {};
+        lastWordsSet.clear();
+      }
     }
-
-    console.log('Subtitle processing complete');
-    console.log(`Total words processed: ${subtitleData.length}`);
-
-    return subtitleData;
+  }
+  return subtitleData;
 }
 
 function parseTimestamp(timestamp) {
-    if (!timestamp) {
-        console.warn('Empty timestamp encountered');
-        return NaN;
-    }
-
-    const cleanTimestamp = timestamp.split(' ')[0];
-    const parts = cleanTimestamp.split(':');
-    if (parts.length !== 3) {
-        console.warn(`Invalid timestamp format: ${timestamp}`);
-        return NaN;
-    }
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    const seconds = parseFloat(parts[2].replace(',', '.'));
-    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
-    console.log(`Parsed timestamp "${cleanTimestamp}" to ${totalSeconds} seconds`);
-    return totalSeconds;
+  const parts = timestamp.split(':');
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const seconds = parseFloat(parts[2].replace(',', '.'));
+  return hours * 3600 + minutes * 60 + seconds;
 }
 
 module.exports = { extractVideoText };
