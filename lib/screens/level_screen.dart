@@ -1,11 +1,13 @@
 import 'package:Just_Learn/widgets/question_card.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/level.dart';
 import '../models/user.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/video_service.dart';
+import 'package:flutter_web_auth/flutter_web_auth.dart';
 
 class LevelScreen extends StatefulWidget {
   final Level level;
@@ -151,17 +153,66 @@ class _LevelScreenState extends State<LevelScreen> {
     }
   }
 
-  Future<void> _fetchVideoText(String videoId) async {
-    try {
-      final videoUrl = 'https://www.youtube.com/watch?v=$videoId';
-      final subtitlesData = await VideoService().fetchVideoText(videoUrl);
-      setState(() {
-        subtitles = subtitlesData.map<Map<String, dynamic>>((subtitle) => subtitle as Map<String, dynamic>).toList();
-      });
-    } catch (e) {
-      print('Failed to fetch video text: $e');
+
+  void _requestSubtitlesWithAuth() async {
+  final authUrl = Uri.https('accounts.google.com', '/o/oauth2/auth', {
+  'client_id': '666035353608-51dreihqbgdcbk17ga7ijs5c1sv8rb9q.apps.googleusercontent.com',
+  'redirect_uri': 'justlearnapp://justlearnapp.com/oauth2callback',  // URI di reindirizzamento configurato
+  'response_type': 'token',  // Puoi usare 'code' per authorization code flow, 'token' per implicit flow
+  'scope': 'https://www.googleapis.com/auth/youtube.readonly',
+  'state': 'iphne',  // Stato per prevenzione CSRF
+  'include_granted_scopes': 'true',
+  'access_type': 'offline',  // Facoltativo, utile per ottenere un refresh token
+}); // URL di autenticazione OAuth con i parametri appropriati
+  final callbackUrlScheme = 'justlearnapp';  // Lo schema configurato per il deep linking
+
+  try {
+    // Avvia il flusso OAuth
+    final result = await FlutterWebAuth.authenticate(
+      url: authUrl.toString(),
+      callbackUrlScheme: 'justlearnapp',
+    );
+
+    // Estrai il token di accesso dall'URL di callback
+    final token = Uri.parse(result).queryParameters['access_token'];
+
+    // Utilizza il token di accesso per scaricare i sottotitoli
+    if (token != null) {
+      print("Token ricevuto: $token");
+      // Aggiungi qui la logica per usare il token
     }
+  } catch (e) {
+    print('Errore durante l\'autenticazione: $e');
   }
+}
+
+Future<void> _fetchVideoText(String videoId) async {
+  try {
+    final videoUrl = 'https://www.youtube.com/watch?v=$videoId';
+    final subtitlesData = await VideoService().fetchVideoText(videoUrl);
+    setState(() {
+      subtitles = subtitlesData.map<Map<String, dynamic>>((subtitle) => subtitle as Map<String, dynamic>).toList();
+    });
+  } catch (e) {
+    print('Failed to fetch video text: $e');
+    // Mostra il pulsante "Attiva Sottotitoli" se fallisce
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Attiva Sottotitoli'),
+          content: Text('Per abilitare i sottotitoli, è necessaria l\'autenticazione.'),
+          actions: [
+            TextButton(
+              onPressed: _requestSubtitlesWithAuth,
+              child: Text('Attiva Sottotitoli'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
 
   void handleAnswer(bool correct) {
     setState(() {

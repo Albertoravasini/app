@@ -1,4 +1,5 @@
 import 'package:Just_Learn/models/user.dart';
+import 'package:Just_Learn/screens/Privacy_Policy_Screen.dart';
 import 'package:Just_Learn/screens/welcome_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -156,16 +157,17 @@ class MyApp extends StatelessWidget {
           },
         ),
         routes: {
-          '/home': (context) => HomeScreen(),
-          '/login': (context) => LoginScreen(),
-          '/register': (context) => RegisterScreen(),
-          '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
-          '/admin': (context) => AdminPanelScreen(),
-          '/admin/users': (context) => UserManagementScreen(),
-          '/admin/levels': (context) => LevelManagementScreen(),
-          '/welcome': (context) => WelcomeScreen(),
-          '/videos': (context) => VideoListScreen(), // Aggiungi la rotta per la nuova schermata
-        },
+  '/home': (context) => HomeScreen(),
+  '/login': (context) => LoginScreen(),
+  '/register': (context) => RegisterScreen(),
+  '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
+  '/admin': (context) => AdminPanelScreen(),
+  '/admin/users': (context) => UserManagementScreen(),
+  '/admin/levels': (context) => LevelManagementScreen(),
+  '/welcome': (context) => WelcomeScreen(),
+  '/videos': (context) => VideoListScreen(),
+  '/privacy-policy': (context) => PrivacyPolicyScreen(), // Aggiungi questa linea
+},
       ),
     );
   }

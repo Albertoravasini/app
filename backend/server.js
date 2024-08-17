@@ -4,14 +4,11 @@ const redis = require('redis');
 const { fetchVideosFromYouTube } = require('./videos/fetchVideos');
 const compression = require('compression');
 const admin = require('firebase-admin');
-const { extractVideoText } = require('./videos/extractVideoText'); // Aggiungi questa linea
+const { extractVideoText } = require('./videos/extractVideoText');
+const { OAuth2Client } = require('google-auth-library');
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.send('Hello, this is the main page');
-});
 
 const serviceAccount = require('./serviceAccountKey.json');
 admin.initializeApp({
@@ -28,6 +25,34 @@ redisClient.on('connect', () => console.log('Connected to Redis'));
 (async () => {
   await redisClient.connect();
 })();
+
+// Configurazione OAuth2
+const CLIENT_ID = '666035353608-51dreihqbgdcbk17ga7ijs5c1sv8rb9q.apps.googleusercontent.com';
+const CLIENT_SECRET = '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';
+const REDIRECT_URL = 'https://justlearnapp.com/oauth2callback';
+
+const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URL);
+
+app.get('/auth', (req, res) => {
+  const authUrl = oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['https://www.googleapis.com/auth/youtube.force-ssl']
+  });
+  res.redirect(authUrl);
+});
+
+app.get('/oauth2callback', async (req, res) => {
+  const code = req.query.code;
+  try {
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+    // Salva i token in una sessione o nel database per futuri utilizzi
+    res.redirect(`/extract_video_text?accessToken=${tokens.access_token}`);
+  } catch (error) {
+    console.error('Error during OAuth2 callback:', error);
+    res.status(500).send('Authentication failed');
+  }
+});
 
 app.post('/new_videos', async (req, res) => {
   const { keywords, viewedVideos, pageToken, topic } = req.body;
@@ -82,10 +107,10 @@ app.post('/new_videos', async (req, res) => {
 });
 
 app.post('/extract_video_text', async (req, res) => {
-  const { videoUrl } = req.body;
+  const { videoUrl, accessToken } = req.body;
 
   try {
-    const subtitles = await extractVideoText(videoUrl);
+    const subtitles = await extractVideoText(videoUrl, accessToken);
     res.json({ subtitles });
   } catch (error) {
     console.error('Error extracting video text:', error);
