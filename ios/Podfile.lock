@@ -1022,7 +1022,7 @@ PODS:
   - flutter_inappwebview/Core (0.0.1):
     - Flutter
     - OrderedSet (~> 5.0)
-  - flutter_web_auth (0.3.2):
+  - flutter_web_auth (0.5.0):
     - Flutter
   - google_sign_in_ios (0.0.1):
     - AppAuth (>= 1.7.4)
@@ -1255,7 +1255,7 @@ SPEC CHECKSUMS:
   FirebaseSharedSwift: 48de4aec81a6b79bb30404e5e6db43ea74848fed
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_inappwebview: 3d32228f1304635e7c028b0d4252937730bbc6cf
-  flutter_web_auth: 16bc97b544d14c399d4db60bfc3a85320d200cb3
+  flutter_web_auth: c25208760459cec375a3c39f6a8759165ca0fa4d
   google_sign_in_ios: 07375bfbf2620bc93a602c0e27160d6afc6ead38
   GoogleSignIn: d4281ab6cf21542b1cfaff85c191f230b399d2db
   GoogleUtilities: ea963c370a38a8069cc5f7ba4ca849a60b6d7d15

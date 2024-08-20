@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import './user_management_screen.dart.dart';
 import './level_management_screen.dart.dart';
 import '../services/auth_service.dart';
-import '../screens/login_screen.dart';
+import '../screens/access/login_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   @override

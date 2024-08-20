@@ -45,32 +45,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-
-	<!-- Configurazione del deep linking per iOS -->
-	<key>CFBundleURLTypes</key>
-	<array>
-	  <dict>
-	    <key>CFBundleURLName</key>
-	    <string>com.justlearnapp</string> <!-- Sostituisci con il tuo bundle ID -->
-	    <key>CFBundleURLSchemes</key>
-	    <array>
-	      <string>justlearnapp</string> <!-- Custom Scheme -->
-	    </array>
-	  </dict>
-	</array>
-
-	<!-- Aggiungi queste righe per consentire l'apertura di URL con schemi http e https -->
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>http</string>
-		<string>https</string>
-	</array>
-
-	<!-- Permessi di rete opzionali, non strettamente necessari per url_launcher ma raccomandati -->
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
 </dict>
 </plist>

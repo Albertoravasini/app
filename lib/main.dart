@@ -1,13 +1,14 @@
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/Privacy_Policy_Screen.dart';
-import 'package:Just_Learn/screens/welcome_screen.dart';
+import 'package:Just_Learn/screens/access/welcome_screen.dart';
+import 'package:Just_Learn/screens/guest_register_prompt_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/topic_selection_screen.dart';
+import 'screens/access/login_screen.dart';
+import 'screens/access/register_screen.dart';
+import 'screens/access/topic_selection_screen.dart';
 import 'services/auth_service.dart';
 import 'admin_panel/admin_panel_screen.dart';
 import './admin_panel/user_management_screen.dart.dart';
@@ -167,6 +168,7 @@ class MyApp extends StatelessWidget {
   '/welcome': (context) => WelcomeScreen(),
   '/videos': (context) => VideoListScreen(),
   '/privacy-policy': (context) => PrivacyPolicyScreen(), // Aggiungi questa linea
+  '/guest_register_prompt': (context) => GuestRegisterPromptScreen(),
 },
       ),
     );

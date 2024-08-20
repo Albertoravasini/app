@@ -34,23 +34,55 @@ const REDIRECT_URL = 'https://justlearnapp.com/oauth2callback';
 const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URL);
 
 app.get('/auth', (req, res) => {
+  console.log('Redirecting to Google OAuth2...');
   const authUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: ['https://www.googleapis.com/auth/youtube.force-ssl']
+      access_type: 'offline',
+      scope: ['https://www.googleapis.com/auth/youtube.force-ssl'],
+      prompt: 'consent',  // Chiede all'utente di selezionare un account ogni volta
   });
   res.redirect(authUrl);
 });
 
 app.get('/oauth2callback', async (req, res) => {
   const code = req.query.code;
+  console.log('Received OAuth2 callback with code:', code);
+
   try {
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
-    // Salva i token in una sessione o nel database per futuri utilizzi
-    res.redirect(`/extract_video_text?accessToken=${tokens.access_token}`);
+      const { tokens } = await oauth2Client.getToken(code);
+      console.log('Tokens received:', tokens);
+
+      oauth2Client.setCredentials(tokens);
+      // Redirecta con il token di accesso in una query string
+      res.redirect(`/subtitles?accessToken=${tokens.access_token}`);
   } catch (error) {
-    console.error('Error during OAuth2 callback:', error);
-    res.status(500).send('Authentication failed');
+      console.error('Error during OAuth2 callback:', error);
+      res.status(500).send('Authentication failed');
+  }
+});
+
+app.get('/subtitles', (req, res) => {
+  const accessToken = req.query.accessToken;
+  if (!accessToken) {
+      console.error('No access token found in query string');
+      return res.status(400).send('Access token missing');
+  }
+  console.log('Redirecting back to the app with access token:', accessToken);
+
+  // Questo URL dovrebbe corrispondere a quello configurato per l'app mobile.
+  res.redirect(`justlearnapp://subtitles?accessToken=${accessToken}`);
+});
+
+app.post('/extract_video_text', async (req, res) => {
+  const { videoUrl, accessToken } = req.body;
+  console.log('Received request to extract video text for URL:', videoUrl);
+
+  try {
+      const subtitles = await extractVideoText(videoUrl, accessToken);
+      console.log('Subtitles extracted successfully');
+      res.json({ subtitles });
+  } catch (error) {
+      console.error('Failed to extract subtitles:', error);
+      res.status(500).json({ error: 'Failed to extract video text' });
   }
 });
 

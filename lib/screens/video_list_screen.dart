@@ -23,7 +23,8 @@ class _VideoListScreenState extends State<VideoListScreen> {
     final querySnapshot = await levelsCollection.get();
     final levels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
 
-    final videoSteps = levels.expand((level) => level.steps.where((step) => step.type == 'video')).toList();
+    // Filtra i video per escludere quelli che sono contrassegnati come shorts
+    final videoSteps = levels.expand((level) => level.steps.where((step) => step.type == 'video' && (step.isShort == null || !step.isShort))).toList();
 
     setState(() {
       allVideoSteps = videoSteps;

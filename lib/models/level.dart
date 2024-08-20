@@ -44,6 +44,7 @@ class LevelStep {
   final String? correctAnswer;
   final String? explanation;
   final String? thumbnailUrl;
+  final bool isShort;  // Nuovo campo aggiunto
 
   LevelStep({
     required this.type,
@@ -52,6 +53,7 @@ class LevelStep {
     this.correctAnswer,
     this.explanation,
     this.thumbnailUrl,
+    this.isShort = false, // Imposta false come valore predefinito
   });
 
   factory LevelStep.fromMap(Map<String, dynamic> data) {
@@ -60,8 +62,9 @@ class LevelStep {
       content: data['content'] ?? '',
       choices: List<String>.from(data['choices'] ?? []),
       correctAnswer: data['correctAnswer'],
-      explanation: data['explanation'], // Aggiungi spiegazione qui
+      explanation: data['explanation'],
       thumbnailUrl: data['thumbnailUrl'],
+      isShort: data['isShort'] ?? false,  // Recupera il valore dal database
     );
   }
 
@@ -71,8 +74,9 @@ class LevelStep {
       'content': content,
       'choices': choices,
       'correctAnswer': correctAnswer,
-      'explanation': explanation, // Aggiungi spiegazione qui
+      'explanation': explanation,
       'thumbnailUrl': thumbnailUrl,
+      'isShort': isShort,  // Salva il valore nel database
     };
   }
 }

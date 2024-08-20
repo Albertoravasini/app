@@ -1,3 +1,4 @@
+import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,9 +6,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'level_screen.dart';
 import '../models/level.dart';
 import '../models/user.dart';
-import 'login_screen.dart';
+import './access/login_screen.dart';
 import '../services/level_service.dart';
-import 'video_list_screen.dart'; // Importa la nuova schermata
+import 'video_list_screen.dart'; // Importa la schermata dei video
+import 'shorts_screen.dart'; // Importa la schermata degli short
+import 'settings_screen.dart'; // Importa la nuova schermata delle impostazioni
+import 'guest_register_prompt_screen.dart'; // Importa la schermata di registrazione per gli ospiti
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -15,19 +19,29 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 1; // Indice selezionato del BottomNavigationBar
-
+  int _selectedIndex = 0; // Imposta l'indice selezionato della BottomNavigationBar
   String? selectedTopic;
   bool isLoading = true;
   List<Level> levels = [];
   UserModel? currentUser;
   List<String> allTopics = [];
   bool _levelsInitialized = false;
+  bool isGuest = false; // Aggiunto per tracciare se l'utente è un ospite
 
   @override
-  void initState() {
-    super.initState();
-    _loadTopicsAndUser();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Recupera gli argomenti dalla rotta solo dopo che il widget è stato inizializzato
+    final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    isGuest = arguments?['isGuest'] ?? false;
+
+    if (isGuest) {
+      // Limita l'accesso degli ospiti a un solo livello
+      _loadLevelsForGuest();
+    } else {
+      _loadTopicsAndUser();
+    }
     _initializeLevels();
   }
 
@@ -39,6 +53,20 @@ class _HomeScreenState extends State<HomeScreen> {
           _levelsInitialized = true;
         });
       }
+    }
+  }
+
+  Future<void> _loadLevelsForGuest() async {
+    // Carica solo il primo livello per gli ospiti
+    final levelsCollection = FirebaseFirestore.instance.collection('levels');
+    final querySnapshot = await levelsCollection.orderBy('levelNumber').limit(1).get();
+    final fetchedLevels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
+
+    if (mounted) {
+      setState(() {
+        levels = fetchedLevels;
+        isLoading = false;
+      });
     }
   }
 
@@ -140,13 +168,23 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void onLevelCompleted(String topic, int levelNumber) async {
+  void onLevelCompleted(String? topic, int levelNumber) async {
+  if (isGuest) {
+    // Se l'utente è un ospite, naviga verso la schermata di registrazione
+    Navigator.pushReplacementNamed(context, '/guest_register_prompt');
+  } else if (topic != null) {
     await updateLevelCompletion(topic, levelNumber);
     await _loadLevels();
     if (mounted) {
       setState(() {}); // Forza l'aggiornamento della UI per riflettere il completamento del livello
     }
+  } else {
+    // Gestisci il caso in cui il topic sia nullo
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Errore: nessun topic selezionato')),
+    );
   }
+}
 
   void _selectTopic(String? newTopic) async {
     if (newTopic != null && newTopic != selectedTopic) {
@@ -191,10 +229,18 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    // Mappa di subtopic e livelli
     Map<String, List<Level>> levelsBySubtopic = {};
     for (var level in levels) {
       levelsBySubtopic.putIfAbsent(level.subtopic, () => []).add(level);
     }
+
+    // Definisci le pagine in base all'indice della BottomNavigationBar
+    final List<Widget> _pages = [
+      _buildLevelsView(levelsBySubtopic),
+      VideoListScreen(),
+      ShortsScreen(),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -229,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   );
                 },
-                child: Row(
+                                child: Row(
                   children: [
                     Text(
                       selectedTopic ?? 'Topic',
@@ -263,16 +309,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.logout),
+                  icon: Icon(Icons.account_circle),
                   color: Colors.white,
-                  onPressed: _logout,
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SettingsScreen(user: currentUser),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
           ],
         ),
       ),
-      body: _selectedIndex == 0 ? _buildLevelsView(levelsBySubtopic) : VideoListScreen(), // Mostra la schermata dei video se l'indice è 1
+      body: _pages[_selectedIndex], // Mostra la pagina selezionata
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -282,6 +335,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.video_library),
             label: 'Videos',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.short_text),
+            label: 'Shorts', // Nuova etichetta per gli short
           ),
         ],
         currentIndex: _selectedIndex,
@@ -339,26 +396,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       isCurrentLevel: isCurrentLevel,
                       isLocked: isLocked,
                       onTap: isLocked
-                          ? null
-                          : () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => LevelScreen(
-                                    level: level,
-                                    onLevelCompleted: () => onLevelCompleted(selectedTopic!, level.levelNumber),
-                                  ),
-                                ),
-                              );
+    ? null
+    : () async {
+        final result = await Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => LevelScreen(
+      level: level,
+      onLevelCompleted: () => onLevelCompleted(selectedTopic, level.levelNumber),
+      isGuest: isGuest, // Passiamo isGuest a LevelScreen
+    ),
+  ),
+);
 
-                              if (result == true) {
-                                if (mounted) {
-                                  setState(() {
-                                    _loadLevels();
-                                  });
-                                }
-                              }
-                            },
+        if (result == true) {
+          if (mounted) {
+            setState(() {
+              _loadLevels();
+            });
+          }
+        }
+      },
                     ),
                     if (levels.indexOf(level) < levels.length - 1)
                       Container(
@@ -495,7 +553,7 @@ class LevelCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Transform.scale(
-          scale: 1.4, // Adjust this value to zoom in/out
+          scale: 1.4, // Regola questo valore per zoomare dentro/fuori
           child: Image.network(
             level.steps[0].thumbnailUrl ?? "https://via.placeholder.com/108x86",
             fit: BoxFit.cover,

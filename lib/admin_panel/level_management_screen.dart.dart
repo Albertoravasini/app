@@ -1,3 +1,4 @@
+import 'package:Just_Learn/admin_panel/edit_level_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/level.dart';
@@ -213,7 +214,8 @@ class _LevelManagementScreenState extends State<LevelManagementScreen> {
                                   ),
                                 ],
                               );
-                        });
+                            },
+                          );
                           if (newSubtopic != null && newSubtopic.isNotEmpty) {
                             setState(() {
                               _subtopics.add(newSubtopic);
@@ -280,7 +282,10 @@ class _LevelManagementScreenState extends State<LevelManagementScreen> {
                   ),
                   ..._steps.map((step) => ListTile(
                     title: Text(step.type, style: TextStyle(color: Colors.white)),
-                    subtitle: Text(step.content, style: TextStyle(color: Colors.white)),
+                                        subtitle: Text(step.content, style: TextStyle(color: Colors.white)),
+                    trailing: step.isShort
+                        ? Icon(Icons.short_text, color: Colors.white)
+                        : Icon(Icons.video_library, color: Colors.white),
                   )),
                 ],
               ),
@@ -291,13 +296,27 @@ class _LevelManagementScreenState extends State<LevelManagementScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             ..._levels.map((level) => ListTile(
-              title: Text(level.title, style: TextStyle(color: Colors.white)),
-              subtitle: Text('Topic: ${level.topic}, Subtopic: ${level.subtopic}', style: TextStyle(color: Colors.white)),
-              trailing: IconButton(
-                icon: Icon(Icons.delete, color: Colors.white),
-                onPressed: () => _deleteLevel(level),
-              ),
-            )),
+  title: Text(level.title, style: TextStyle(color: Colors.white)),
+  subtitle: Text('Topic: ${level.topic}, Subtopic: ${level.subtopic}', style: TextStyle(color: Colors.white)),
+  trailing: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      IconButton(
+        icon: Icon(Icons.edit, color: Colors.white),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => EditLevelScreen(level: level)),
+          );
+        },
+      ),
+      IconButton(
+        icon: Icon(Icons.delete, color: Colors.white),
+        onPressed: () => _deleteLevel(level),
+      ),
+    ],
+  ),
+)),
           ],
         ),
       ),
@@ -322,6 +341,7 @@ class _AddStepDialogState extends State<AddStepDialog> {
   String? _correctAnswer;
   String? _explanation;
   String? _thumbnailUrl;
+  bool _isShort = false; // Nuovo campo per indicare se è uno short
 
   @override
   Widget build(BuildContext context) {
@@ -374,6 +394,16 @@ class _AddStepDialogState extends State<AddStepDialog> {
                   initialValue: _thumbnailUrl,
                   enabled: false,
                   style: TextStyle(color: Colors.black),
+                ),
+                CheckboxListTile(
+                  title: Text('È uno short?', style: TextStyle(color: Colors.black)),
+                  value: _isShort,
+                  onChanged: (value) {
+                    setState(() {
+                      _isShort = value!;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
                 ),
               ] else if (_type == 'question') ...[
                 TextFormField(
@@ -435,6 +465,7 @@ class _AddStepDialogState extends State<AddStepDialog> {
                 correctAnswer: _correctAnswer,
                 explanation: _explanation,
                 thumbnailUrl: _thumbnailUrl,
+                isShort: _isShort,  // Imposta il valore di isShort
               );
               Navigator.of(context).pop(newStep);
             }

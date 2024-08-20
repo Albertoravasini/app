@@ -255,10 +255,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_web_auth
-      sha256: "07ca6fedcbb1f9bc0ccb01e953ca6a2d47da0f83d6dcd9b2d6448de55d6ccefd"
+      sha256: a69fa8f43b9e4d86ac72176bf747b735e7b977dd7cf215076d95b87cb05affdd
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.2"
+    version: "0.5.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter

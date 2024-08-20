@@ -12,21 +12,30 @@ import 'package:flutter_web_auth/flutter_web_auth.dart';
 class LevelScreen extends StatefulWidget {
   final Level level;
   final VoidCallback onLevelCompleted;
+  final int initialStepIndex;  // Nuovo parametro per l'indice iniziale
+  final bool isGuest;
 
-  LevelScreen({required this.level, required this.onLevelCompleted});
+  LevelScreen({
+    required this.level,
+    required this.onLevelCompleted,
+    this.initialStepIndex = 0,  // Imposta il valore predefinito su 0
+    this.isGuest = false,  // Imposta il valore predefinito su false
+  });
 
   @override
   _LevelScreenState createState() => _LevelScreenState();
 }
 
 class _LevelScreenState extends State<LevelScreen> {
-  int currentStepIndex = 0;
+  late int currentStepIndex;
   bool isAnswered = false;
   bool isCorrect = false;
   double videoProgress = 0.0;
   int checkpoint = 0;
   List<Map<String, dynamic>> subtitles = [];
   String displayedText = '';
+  bool subtitlesAvailable = true; // Variabile per controllare se i sottotitoli sono disponibili
+  
 
   late YoutubePlayerController _youtubeController;
   final ScrollController _scrollController = ScrollController();
@@ -36,14 +45,8 @@ class _LevelScreenState extends State<LevelScreen> {
   @override
   void initState() {
     super.initState();
-    _youtubeController = YoutubePlayerController(
-      initialVideoId: currentStep.content,
-      flags: YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-      ),
-    )..addListener(_videoProgressListener);
-
+    currentStepIndex = widget.initialStepIndex;  // Inizializza l'indice dello step corrente
+    _initializeController();
     _initializePlayer();
     _fetchVideoText(currentStep.content);
   }
@@ -54,6 +57,16 @@ class _LevelScreenState extends State<LevelScreen> {
     _youtubeController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _initializeController() {
+    _youtubeController = YoutubePlayerController(
+      initialVideoId: currentStep.content,
+      flags: YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+      ),
+    )..addListener(_videoProgressListener);
   }
 
   void _initializePlayer() {
@@ -106,14 +119,6 @@ class _LevelScreenState extends State<LevelScreen> {
     });
   }
 
-  int _parseTimestamp(String timestamp) {
-    final parts = timestamp.split(':');
-    final hours = int.parse(parts[0]);
-    final minutes = int.parse(parts[1]);
-    final seconds = double.parse(parts[2]);
-    return (hours * 3600 + minutes * 60 + seconds).round();
-  }
-
   Future<void> _loadCheckpoint() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -153,66 +158,53 @@ class _LevelScreenState extends State<LevelScreen> {
     }
   }
 
+  Future<void> _fetchVideoText(String videoId) async {
+    try {
+      final videoUrl = 'https://www.youtube.com/watch?v=$videoId';
+      final subtitlesData = await VideoService().fetchVideoText(videoUrl);
+      setState(() {
+        subtitles = subtitlesData.map<Map<String, dynamic>>((subtitle) => subtitle as Map<String, dynamic>).toList();
+        subtitlesAvailable = true;
+      });
+    } catch (e) {
+      print('Failed to fetch video text: $e');
+      setState(() {
+        subtitlesAvailable = false; // Imposta la variabile a false se il caricamento dei sottotitoli fallisce
+      });
+    }
+  }
 
   void _requestSubtitlesWithAuth() async {
-  final authUrl = Uri.https('accounts.google.com', '/o/oauth2/auth', {
-  'client_id': '666035353608-51dreihqbgdcbk17ga7ijs5c1sv8rb9q.apps.googleusercontent.com',
-  'redirect_uri': 'justlearnapp://justlearnapp.com/oauth2callback',  // URI di reindirizzamento configurato
-  'response_type': 'token',  // Puoi usare 'code' per authorization code flow, 'token' per implicit flow
-  'scope': 'https://www.googleapis.com/auth/youtube.readonly',
-  'state': 'iphne',  // Stato per prevenzione CSRF
-  'include_granted_scopes': 'true',
-  'access_type': 'offline',  // Facoltativo, utile per ottenere un refresh token
-}); // URL di autenticazione OAuth con i parametri appropriati
-  final callbackUrlScheme = 'justlearnapp';  // Lo schema configurato per il deep linking
+    final authUrl = Uri.https('accounts.google.com', '/o/oauth2/auth', {
+      'client_id': '666035353608-51dreihqbgdcbk17ga7ijs5c1sv8rb9q.apps.googleusercontent.com',
+      'redirect_uri': 'justlearnapp://justlearnapp.com/oauth2callback',  // URI di reindirizzamento configurato
+      'response_type': 'token',  // Puoi usare 'code' per authorization code flow, 'token' per implicit flow
+      'scope': 'https://www.googleapis.com/auth/youtube.readonly',
+      'state': 'iphne',  // Stato per prevenzione CSRF
+      'include_granted_scopes': 'true',
+      'access_type': 'offline',  // Facoltativo, utile per ottenere un refresh token
+    }); // URL di autenticazione OAuth con i parametri appropriati
+    final callbackUrlScheme = 'justlearnapp';  // Lo schema configurato per il deep linking
 
-  try {
-    // Avvia il flusso OAuth
-    final result = await FlutterWebAuth.authenticate(
-      url: authUrl.toString(),
-      callbackUrlScheme: 'justlearnapp',
-    );
+    try {
+      // Avvia il flusso OAuth
+      final result = await FlutterWebAuth.authenticate(
+        url: authUrl.toString(),
+        callbackUrlScheme: 'justlearnapp',
+      );
 
-    // Estrai il token di accesso dall'URL di callback
-    final token = Uri.parse(result).queryParameters['access_token'];
+      // Estrai il token di accesso dall'URL di callback
+      final token = Uri.parse(result).queryParameters['access_token'];
 
-    // Utilizza il token di accesso per scaricare i sottotitoli
-    if (token != null) {
-      print("Token ricevuto: $token");
-      // Aggiungi qui la logica per usare il token
+      // Utilizza il token di accesso per scaricare i sottotitoli
+      if (token != null) {
+        print("Token ricevuto: $token");
+        // Aggiungi qui la logica per usare il token
+      }
+    } catch (e) {
+      print('Errore durante l\'autenticazione: $e');
     }
-  } catch (e) {
-    print('Errore durante l\'autenticazione: $e');
   }
-}
-
-Future<void> _fetchVideoText(String videoId) async {
-  try {
-    final videoUrl = 'https://www.youtube.com/watch?v=$videoId';
-    final subtitlesData = await VideoService().fetchVideoText(videoUrl);
-    setState(() {
-      subtitles = subtitlesData.map<Map<String, dynamic>>((subtitle) => subtitle as Map<String, dynamic>).toList();
-    });
-  } catch (e) {
-    print('Failed to fetch video text: $e');
-    // Mostra il pulsante "Attiva Sottotitoli" se fallisce
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Attiva Sottotitoli'),
-          content: Text('Per abilitare i sottotitoli, è necessaria l\'autenticazione.'),
-          actions: [
-            TextButton(
-              onPressed: _requestSubtitlesWithAuth,
-              child: Text('Attiva Sottotitoli'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
 
   void handleAnswer(bool correct) {
     setState(() {
@@ -222,19 +214,34 @@ Future<void> _fetchVideoText(String videoId) async {
   }
 
   void nextStep() {
-    setState(() {
-      if (currentStepIndex < widget.level.steps.length - 1) {
-        currentStepIndex++;
-        isAnswered = false;
-        isCorrect = false;
-        if (currentStep.type == 'video') {
-          _youtubeController.load(currentStep.content);
-          _fetchVideoText(currentStep.content); // Estrai il testo del video per il nuovo step
-        }
-      } else {
-        widget.onLevelCompleted();
-        Navigator.pop(context, true); // Notifica il completamento e torna indietro
+  setState(() {
+    if (currentStepIndex < widget.level.steps.length - 1) {
+      currentStepIndex++;
+      isAnswered = false;
+      isCorrect = false;
+      if (currentStep.type == 'video') {
+        _initializeController();
+        _fetchVideoText(currentStep.content);
       }
+    } else {
+      // Chiama la funzione onLevelCompleted una volta che l'ultimo step è completato
+      widget.onLevelCompleted();
+
+      // Se l'utente è registrato, torna alla schermata precedente
+      if (!widget.isGuest) {
+  Navigator.pop(context, true);  // Torna indietro solo se l'utente non è un ospite
+}
+    }
+  });
+}
+
+  void resetToFirstStep() {
+    setState(() {
+      currentStepIndex = 0;
+      isAnswered = false;
+      isCorrect = false;
+      _initializeController();
+      _fetchVideoText(currentStep.content);
     });
   }
 
@@ -258,80 +265,149 @@ Future<void> _fetchVideoText(String videoId) async {
           children: [
             LinearProgressIndicator(
               borderRadius: BorderRadius.circular(10),
-              minHeight: 10,
+              minHeight: 15,
               value: (currentStepIndex + 1) / widget.level.steps.length,
               backgroundColor: Colors.grey[700],
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-            SizedBox(height: 10),
+            ),            
+            SizedBox(height: 20),
             Expanded(
               child: Center(
                 child: currentStep.type == 'video'
-                    ? Column(
-                        children: [
-                          YoutubePlayer(
+                  ? Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16.0),
+                          child: YoutubePlayer(
                             controller: _youtubeController,
                             showVideoProgressIndicator: true,
                           ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24),
-                              child: SingleChildScrollView(
-                                controller: _scrollController,
-                                child: Text(
-                                  displayedText,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: subtitlesAvailable
+                              ? SingleChildScrollView(
+                                  controller: _scrollController,
+                                  child: Text(
+                                    displayedText,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                    ),
+                                    textAlign: TextAlign.left,
                                   ),
-                                  textAlign: TextAlign.left,
+                                )
+                              : Center(
+                                  child: ElevatedButton(
+                                    onPressed: _requestSubtitlesWithAuth,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        side: BorderSide(width: 1, color: Colors.white),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Attiva Sottotitoli',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
                           ),
-                        ],
-                      )
-                    : QuestionCard(step: currentStep, onAnswered: handleAnswer),
+                        ),
+                      ],
+                    )
+                  : QuestionCard(step: currentStep, onAnswered: handleAnswer),
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: GestureDetector(
-                onTap: () {
-                  if (isAnswered || currentStep.type == 'video') {
-                    nextStep();
-                  }
-                },
-                child: Container(
-                  width: 315,
-                  height: 56,
-                  padding: const EdgeInsets.symmetric(horizontal: 117, vertical: 17),
-                  decoration: ShapeDecoration(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      side: BorderSide(width: 1, color: Colors.white),
-                      borderRadius: BorderRadius.circular(20),
+              child: currentStep.type == 'video'
+                ? ElevatedButton(
+                    onPressed: nextStep,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      minimumSize: Size(343, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    child: Text(
+                      'Continua',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Continua',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                                                    fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.48,
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: resetToFirstStep,
+                          child: Container(
+                            height: 56,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+                            decoration: ShapeDecoration(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(width: 1, color: Colors.white),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Video',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: isAnswered ? nextStep : null,
+                          child: Container(
+                            height: 56,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+                            decoration: ShapeDecoration(
+                              color: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(width: 1, color: Colors.white),
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Domanda',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 16,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
             ),
           ],
         ),
