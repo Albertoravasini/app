@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Level {
+  final String? id; // Aggiungi questo campo per memorizzare l'ID del documento
   final int levelNumber;
   final String topic;
   final String subtopic;
@@ -8,6 +9,7 @@ class Level {
   final List<LevelStep> steps;
 
   Level({
+    this.id,  // Aggiungi id qui
     required this.levelNumber,
     required this.topic,
     required this.subtopic,
@@ -18,6 +20,7 @@ class Level {
   factory Level.fromFirestore(DocumentSnapshot doc) {
     Map data = doc.data() as Map;
     return Level(
+      id: doc.id,  // Salva l'ID del documento
       levelNumber: data['levelNumber'] ?? 0,
       topic: data['topic'] ?? '',
       subtopic: data['subtopic'] ?? '',

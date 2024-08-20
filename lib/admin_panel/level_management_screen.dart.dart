@@ -50,34 +50,37 @@ class _LevelManagementScreenState extends State<LevelManagementScreen> {
     });
   }
 
-  void _createLevel() {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      final newLevel = Level(
-        levelNumber: _levelNumber!,
-        topic: _selectedTopic!,
-        subtopic: _subtopic!,
-        title: _title!,
-        steps: _steps,
-      );
-      FirebaseFirestore.instance.collection('levels')
-        .add(newLevel.toMap())
-        .then((_) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Livello creato con successo', style: TextStyle(color: Colors.white))));
-          _formKey.currentState!.reset();
-          setState(() {
-            _steps = [];
-            _selectedTopic = null;
-            _subtopics = [];
-            _levelNumber = null;
-          });
-          _loadSubtopicsAndLevels(_selectedTopic!);
-        })
-        .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Errore nella creazione del livello: $error', style: TextStyle(color: Colors.white))));
-        });
+  Future<void> _createLevel() async {
+  if (_formKey.currentState!.validate()) {
+    _formKey.currentState!.save();
+    final newLevel = Level(
+      levelNumber: _levelNumber!,
+      topic: _selectedTopic!,
+      subtopic: _subtopic!,
+      title: _title!,
+      steps: _steps,
+    );
+
+    try {
+      // Crea il documento e lascia che Firestore generi un ID automaticamente
+      DocumentReference docRef = await FirebaseFirestore.instance.collection('levels').add(newLevel.toMap());
+      String generatedId = docRef.id;  // Questo è l'ID generato
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Livello creato con successo con ID $generatedId', style: TextStyle(color: Colors.white)),
+      ));
+
+      // Salva questo ID per futuri aggiornamenti
+      setState(() {
+        // Puoi memorizzare l'ID generato in qualche modo, ad esempio nel modello o nella variabile di stato
+      });
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Errore nella creazione del livello: $error', style: TextStyle(color: Colors.white)),
+      ));
     }
   }
+}
 
   void _deleteLevel(Level level) async {
     final levelsCollection = FirebaseFirestore.instance.collection('levels');

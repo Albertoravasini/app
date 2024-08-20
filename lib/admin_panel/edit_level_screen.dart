@@ -23,27 +23,39 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
     _steps = widget.level.steps;
   }
 
-  void _saveChanges() {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      FirebaseFirestore.instance
-          .collection('levels')
-          .doc(widget.level.levelNumber.toString())
-          .update({
+  Future<void> _saveChanges() async {
+  if (_formKey.currentState!.validate()) {
+    _formKey.currentState!.save();
+    
+    // Supponiamo che tu abbia salvato l'ID del documento Firestore da qualche parte
+    String documentId = widget.level.id!;  // Usa '!' per fare il cast a String
+    
+    final docRef = FirebaseFirestore.instance.collection('levels').doc(documentId);
+    final docSnapshot = await docRef.get();
+    
+    if (docSnapshot.exists) {
+      // Aggiorna il documento se esiste
+      await docRef.update({
         'title': _title,
         'steps': _steps.map((step) => step.toMap()).toList(),
       }).then((_) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Livello aggiornato con successo',
-                style: TextStyle(color: Colors.white))));
+          content: Text('Livello aggiornato con successo', style: TextStyle(color: Colors.white))
+        ));
         Navigator.pop(context);
       }).catchError((error) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Errore nell\'aggiornamento del livello: $error',
-                style: TextStyle(color: Colors.white))));
+          content: Text('Errore nell\'aggiornamento del livello: $error', style: TextStyle(color: Colors.white))
+        ));
       });
+    } else {
+      // Gestisci il caso in cui il documento non esiste
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Errore: documento non trovato', style: TextStyle(color: Colors.white))
+      ));
     }
   }
+}
 
   void _addStep(LevelStep step) {
     setState(() {
