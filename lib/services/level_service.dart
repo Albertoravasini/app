@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/level.dart';
 
 Future<void> createLevels() async {
   final levels = [

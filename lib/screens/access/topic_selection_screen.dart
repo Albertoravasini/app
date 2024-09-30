@@ -7,9 +7,10 @@ class TopicSelectionScreen extends StatefulWidget {
   final User user;
   final bool isRegistration;
 
-  TopicSelectionScreen({required this.user, this.isRegistration = false});
+  const TopicSelectionScreen({super.key, required this.user, this.isRegistration = false});
 
   @override
+  // ignore: library_private_types_in_public_api
   _TopicSelectionScreenState createState() => _TopicSelectionScreenState();
 }
 
@@ -61,10 +62,10 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
         child: Column(
           children: [
             const SizedBox(height: 30), // Aggiunto spazio extra per abbassare il titolo
-            Container(
+            const SizedBox(
               width: 324,
               child: Text(
-                'Seleziona degli argomenti',
+                'Please select topics',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 45,
@@ -73,7 +74,7 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 0),
             Expanded(
               child: ListView(
                 children: allTopics.map((topic) {
@@ -91,8 +92,8 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                       decoration: ShapeDecoration(
                         color: selectedTopic == topic ? Colors.white : Colors.transparent,
                         shape: RoundedRectangleBorder(
-                          side: BorderSide(width: 1, color: Colors.white),
-                          borderRadius: BorderRadius.circular(20),
+                          side: const BorderSide(width: 1, color: Colors.white),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       child: Center(
@@ -118,28 +119,30 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                   await _saveSelectedTopic();
                   if (widget.isRegistration) {
                     Navigator.pushReplacement(
+                      // ignore: use_build_context_synchronously
                       context,
-                      MaterialPageRoute(builder: (context) => HomeScreen()),
+                      MaterialPageRoute(builder: (context) => const HomeScreen()),
                     );
                   } else {
+                    // ignore: use_build_context_synchronously
                     Navigator.pop(context, true); // Indica che abbiamo aggiornato i topic
                   }
                 }
               },
               child: Container(
-                width: 324,
+                width: 345,
                 height: 56,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
                 decoration: ShapeDecoration(
                   color: Colors.white,
                   shape: RoundedRectangleBorder(
-                    side: BorderSide(width: 1, color: Colors.white),
-                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(width: 1, color: Colors.white),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: Center(
+                child: const Center(
                   child: Text(
-                    'Inizia',
+                    'Start',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.black,

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/level.dart';
@@ -5,9 +7,10 @@ import '../models/level.dart';
 class EditLevelScreen extends StatefulWidget {
   final Level level;
 
-  EditLevelScreen({required this.level});
+  const EditLevelScreen({super.key, required this.level});
 
   @override
+  // ignore: library_private_types_in_public_api
   _EditLevelScreenState createState() => _EditLevelScreenState();
 }
 
@@ -39,18 +42,18 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
         'title': _title,
         'steps': _steps.map((step) => step.toMap()).toList(),
       }).then((_) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Livello aggiornato con successo', style: TextStyle(color: Colors.white))
         ));
         Navigator.pop(context);
       }).catchError((error) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Errore nell\'aggiornamento del livello: $error', style: TextStyle(color: Colors.white))
+          content: Text('Errore nell\'aggiornamento del livello: $error', style: const TextStyle(color: Colors.white))
         ));
       });
     } else {
       // Gestisci il caso in cui il documento non esiste
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Errore: documento non trovato', style: TextStyle(color: Colors.white))
       ));
     }
@@ -94,7 +97,7 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Modifica Livello'),
+        title: const Text('Modifica Livello'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -104,7 +107,7 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
             children: [
               TextFormField(
                 initialValue: _title,
-                decoration: InputDecoration(labelText: 'Titolo'),
+                decoration: const InputDecoration(labelText: 'Titolo'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Per favore inserisci un titolo';
@@ -115,8 +118,8 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
                   _title = value!;
                 },
               ),
-              SizedBox(height: 20),
-              Text('Steps:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              const Text('Steps:', style: TextStyle(fontWeight: FontWeight.bold)),
               ..._steps.asMap().entries.map((entry) {
                 int index = entry.key;
                 LevelStep step = entry.value;
@@ -127,11 +130,11 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.edit),
+                        icon: const Icon(Icons.edit),
                         onPressed: () => _showEditStepDialog(step, index),
                       ),
                       IconButton(
-                        icon: Icon(Icons.delete),
+                        icon: const Icon(Icons.delete),
                         onPressed: () => _removeStep(index),
                       ),
                     ],
@@ -149,12 +152,12 @@ class _EditLevelScreenState extends State<EditLevelScreen> {
                     _addStep(result);
                   }
                 },
-                child: Text('Aggiungi Step'),
+                child: const Text('Aggiungi Step'),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _saveChanges,
-                child: Text('Salva modifiche'),
+                child: const Text('Salva modifiche'),
               ),
             ],
           ),
@@ -168,9 +171,10 @@ class AddStepDialog extends StatefulWidget {
   final String Function(String) getThumbnailUrl;
   final LevelStep? step;
 
-  AddStepDialog({required this.getThumbnailUrl, this.step});
+  const AddStepDialog({super.key, required this.getThumbnailUrl, this.step});
 
   @override
+  // ignore: library_private_types_in_public_api
   _AddStepDialogState createState() => _AddStepDialogState();
 }
 
@@ -201,14 +205,14 @@ class _AddStepDialogState extends State<AddStepDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.step != null ? 'Modifica Step' : 'Aggiungi Step', style: TextStyle(color: Colors.black)),
+      title: Text(widget.step != null ? 'Modifica Step' : 'Aggiungi Step', style: const TextStyle(color: Colors.black)),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
             children: [
               DropdownButtonFormField<String>(
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Tipo',
                   labelStyle: TextStyle(color: Colors.black),
                 ),
@@ -216,7 +220,7 @@ class _AddStepDialogState extends State<AddStepDialog> {
                 items: ['video', 'question'].map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
-                    child: Text(value, style: TextStyle(color: Colors.black)),
+                    child: Text(value, style: const TextStyle(color: Colors.black)),
                   );
                 }).toList(),
                 onChanged: (newValue) {
@@ -230,12 +234,12 @@ class _AddStepDialogState extends State<AddStepDialog> {
                   }
                   return null;
                 },
-                style: TextStyle(color: Colors.black),  // Colore del testo del Dropdown
+                style: const TextStyle(color: Colors.black),  // Colore del testo del Dropdown
               ),
               if (_type == 'video') ...[
                 TextFormField(
                   initialValue: _content,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'ID Video',
                     labelStyle: TextStyle(color: Colors.black),
                   ),
@@ -251,19 +255,19 @@ class _AddStepDialogState extends State<AddStepDialog> {
                       _thumbnailUrl = widget.getThumbnailUrl(value);
                     });
                   },
-                  style: TextStyle(color: Colors.black),  // Colore del testo
+                  style: const TextStyle(color: Colors.black),  // Colore del testo
                 ),
                 TextFormField(
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'URL Miniatura',
                     labelStyle: TextStyle(color: Colors.black),
                   ),
                   initialValue: _thumbnailUrl,
                   enabled: false,
-                  style: TextStyle(color: Colors.black),  // Colore del testo
+                  style: const TextStyle(color: Colors.black),  // Colore del testo
                 ),
                 CheckboxListTile(
-                  title: Text('È uno short?', style: TextStyle(color: Colors.black)),
+                  title: const Text('È uno short?', style: TextStyle(color: Colors.black)),
                   value: _isShort,
                   onChanged: (value) {
                     setState(() {
@@ -275,7 +279,7 @@ class _AddStepDialogState extends State<AddStepDialog> {
               ] else if (_type == 'question') ...[
                 TextFormField(
                   initialValue: _content,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Contenuto',
                     labelStyle: TextStyle(color: Colors.black),
                   ),
@@ -288,11 +292,11 @@ class _AddStepDialogState extends State<AddStepDialog> {
                   onSaved: (value) {
                     _content = value;
                   },
-                  style: TextStyle(color: Colors.black),  // Colore del testo
+                  style: const TextStyle(color: Colors.black),  // Colore del testo
                 ),
                 TextFormField(
                   initialValue: _choices?.join(', '),
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Scelte (separate da virgola)',
                     labelStyle: TextStyle(color: Colors.black),
                   ),
@@ -301,29 +305,29 @@ class _AddStepDialogState extends State<AddStepDialog> {
                       _choices = value.split(',').map((choice) => choice.trim()).toList();
                     }
                   },
-                  style: TextStyle(color: Colors.black),  // Colore del testo
+                  style: const TextStyle(color: Colors.black),  // Colore del testo
                 ),
                 TextFormField(
                   initialValue: _correctAnswer,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Risposta Corretta',
                     labelStyle: TextStyle(color: Colors.black),
                   ),
                   onSaved: (value) {
                     _correctAnswer = value;
                   },
-                  style: TextStyle(color: Colors.black),  // Colore del testo
+                  style: const TextStyle(color: Colors.black),  // Colore del testo
                 ),
                 TextFormField(
                   initialValue: _explanation,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Spiegazione',
                     labelStyle: TextStyle(color: Colors.black),
                   ),
                   onSaved: (value) {
                     _explanation = value;
                   },
-                  style: TextStyle(color: Colors.black),  // Colore del testo
+                  style: const TextStyle(color: Colors.black),  // Colore del testo
                 ),
               ],
             ],
@@ -335,7 +339,7 @@ class _AddStepDialogState extends State<AddStepDialog> {
           onPressed: () {
             Navigator.of(context).pop();
           },
-          child: Text('Annulla', style: TextStyle(color: Colors.black)),
+          child: const Text('Annulla', style: TextStyle(color: Colors.black)),
         ),
         TextButton(
           onPressed: () {
@@ -353,7 +357,7 @@ class _AddStepDialogState extends State<AddStepDialog> {
               Navigator.of(context).pop(newStep);
             }
           },
-          child: Text(widget.step != null ? 'Salva' : 'Aggiungi', style: TextStyle(color: Colors.black)),
+          child: Text(widget.step != null ? 'Salva' : 'Aggiungi', style: const TextStyle(color: Colors.black)),
         ),
       ],
     );

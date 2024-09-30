@@ -3,7 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 
 class UserManagementScreen extends StatefulWidget {
+  const UserManagementScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _UserManagementScreenState createState() => _UserManagementScreenState();
 }
 
@@ -16,7 +19,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Gestione Utenti', style: TextStyle(color: Colors.white)),
+        title: const Text('Gestione Utenti', style: TextStyle(color: Colors.white)),
       ),
       body: Column(
         children: [
@@ -30,7 +33,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               },
               decoration: InputDecoration(
                 hintText: 'Cerca utenti...',
-                prefixIcon: Icon(Icons.search, color: Colors.white),
+                prefixIcon: const Icon(Icons.search, color: Colors.white),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -45,22 +48,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
             children: [
               DropdownButton<String>(
                 value: _sortField,
-                items: [
+                items: const [
                   DropdownMenuItem(
-                    child: Text('Nome'),
                     value: 'name',
+                    child: Text('Nome'),
                   ),
                   DropdownMenuItem(
-                    child: Text('Email'),
                     value: 'email',
+                    child: Text('Email'),
                   ),
                   DropdownMenuItem(
-                    child: Text('Giorni consecutivi'),
                     value: 'consecutiveDays',
+                    child: Text('Giorni consecutivi'),
                   ),
                   DropdownMenuItem(
-                    child: Text('Ultimo accesso'),
                     value: 'lastAccess',
+                    child: Text('Ultimo accesso'),
                   ),
                 ],
                 onChanged: (value) {
@@ -84,7 +87,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               stream: FirebaseFirestore.instance.collection('users').snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 var users = snapshot.data!.docs.map((doc) {
@@ -118,7 +121,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 });
 
                 if (users.isEmpty) {
-                  return Center(child: Text('Nessun utente trovato', style: TextStyle(color: Colors.white)));
+                  return const Center(child: Text('Nessun utente trovato', style: TextStyle(color: Colors.white)));
                 }
 
                 return ListView.builder(
@@ -126,22 +129,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   itemBuilder: (context, index) {
                     final user = users[index];
                     return ListTile(
-                      title: Text(user.name, style: TextStyle(color: Colors.white)),
-                      subtitle: Text(user.email, style: TextStyle(color: Colors.white)),
+                      title: Text(user.name, style: const TextStyle(color: Colors.white)),
+                      subtitle: Text(user.email, style: const TextStyle(color: Colors.white)),
                       onTap: () {
                         showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
-                            title: Text(user.name, style: TextStyle(color: Colors.black)),
+                            title: Text(user.name, style: const TextStyle(color: Colors.black)),
                             content: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text('Email: ${user.email}', style: TextStyle(color: Colors.black)),
-                                Text('Livelli completati: ${user.completedLevelsByTopic.length}', style: TextStyle(color: Colors.black)),
-                                Text('Giorni consecutivi: ${user.consecutiveDays}', style: TextStyle(color: Colors.black)),
-                                Text('Ultimo accesso: ${user.lastAccess}', style: TextStyle(color: Colors.black)),
-                                Text('Argomenti: ${user.topics.join(', ')}', style: TextStyle(color: Colors.black)),
-                                ...user.savedVideosByTopic.entries.map((entry) => Text('${entry.key}: ${entry.value.length} video', style: TextStyle(color: Colors.black))),
+                                Text('Email: ${user.email}', style: const TextStyle(color: Colors.black)),
+                                Text('Giorni consecutivi: ${user.consecutiveDays}', style: const TextStyle(color: Colors.black)),
+                                Text('Ultimo accesso: ${user.lastAccess}', style: const TextStyle(color: Colors.black)),
+                                Text('Argomenti: ${user.topics.join(', ')}', style: const TextStyle(color: Colors.black)),
+                                ...user.WatchedVideos.entries.map((entry) => Text('${entry.key}: ${entry.value.length} video', style: const TextStyle(color: Colors.black))),
                               ],
                             ),
                             actions: [
@@ -149,7 +151,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                 onPressed: () {
                                   Navigator.of(context).pop();
                                 },
-                                child: Text('Chiudi', style: TextStyle(color: Colors.black)),
+                                child: const Text('Chiudi', style: TextStyle(color: Colors.black)),
                               ),
                             ],
                           ),

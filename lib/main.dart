@@ -1,54 +1,34 @@
-import 'package:Just_Learn/models/user.dart';
-import 'package:Just_Learn/screens/Privacy_Policy_Screen.dart';
+import 'package:Just_Learn/screens/access/login_screen.dart';
+import 'package:Just_Learn/screens/access/register_screen.dart';
+import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
 import 'package:Just_Learn/screens/access/welcome_screen.dart';
-import 'package:Just_Learn/screens/guest_register_prompt_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:Just_Learn/screens/access/splash_screen.dart'; // Importa la Splash Screen
+import 'package:Just_Learn/screens/futuristic_screen.dart';
+import 'package:Just_Learn/services/auth_service.dart';
+import 'package:Just_Learn/models/user.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'screens/home_screen.dart';
-import 'screens/access/login_screen.dart';
-import 'screens/access/register_screen.dart';
-import 'screens/access/topic_selection_screen.dart';
-import 'services/auth_service.dart';
-import 'admin_panel/admin_panel_screen.dart';
-import './admin_panel/user_management_screen.dart.dart';
-import './admin_panel/level_management_screen.dart.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'screens/video_list_screen.dart'; // Importa la nuova schermata
+import 'firebase_options.dart';
+import 'screens/home_screen.dart';
+import 'admin_panel/admin_panel_screen.dart';
+import 'screens/privacy_policy_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navigazione personalizzata
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  try {
-    await createTopics();
-  } catch (e) {
-    print('Error creating topics: $e');
-  }
-  runApp(MyApp());
-}
-
-Future<void> createTopics() async {
-  final topics = ['Finanza'];
-  final topicsCollection = FirebaseFirestore.instance.collection('topics');
-  
-  try {
-    for (var topic in topics) {
-      final doc = await topicsCollection.doc(topic).get();
-      if (!doc.exists) {
-        await topicsCollection.doc(topic).set({});
-      }
-    }
-  } catch (e) {
-    print('Error while accessing Firestore: $e');
-    throw e;
-  }
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -67,10 +47,10 @@ class MyApp extends StatelessWidget {
           primaryColor: Colors.white,
           scaffoldBackgroundColor: Colors.black,
           fontFamily: 'Montserrat',
-          iconTheme: IconThemeData(
+          iconTheme: const IconThemeData(
             color: Colors.white,
           ),
-          appBarTheme: AppBarTheme(
+          appBarTheme: const AppBarTheme(
             color: Colors.black,
             titleTextStyle: TextStyle(
               fontSize: 20.0,
@@ -82,16 +62,16 @@ class MyApp extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          floatingActionButtonTheme: FloatingActionButtonThemeData(
+          floatingActionButtonTheme: const FloatingActionButtonThemeData(
             backgroundColor: Colors.white,
             foregroundColor: Colors.black,
           ),
-          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
             backgroundColor: Colors.black,
             selectedItemColor: Colors.white,
             unselectedItemColor: Colors.white54,
           ),
-          textTheme: TextTheme(
+          textTheme: const TextTheme(
             bodyLarge: TextStyle(
               fontSize: 14.0,
               fontFamily: 'Montserrat',
@@ -115,61 +95,81 @@ class MyApp extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
               foregroundColor: Colors.black,
-              textStyle: TextStyle(
+              textStyle: const TextStyle(
                 fontFamily: 'Montserrat',
                 fontWeight: FontWeight.bold,
               ),
             ),
+          ),// Personalizza il colore della rotella di caricamento (CircularProgressIndicator)
+          progressIndicatorTheme: const ProgressIndicatorThemeData(
+            color: Colors.white, // Cambia la rotella di caricamento a bianco
+          ),
+          // Personalizza il colore dell'evidenziazione del testo
+          textSelectionTheme: const TextSelectionThemeData(
+            selectionColor: Color.fromARGB(130, 158, 158, 158), // Colore dell'evidenziazione del testo
+            selectionHandleColor: Color.fromARGB(130, 158, 158, 158), // Colore del "manico" di selezione
+            cursorColor: Colors.white, // Colore della lineetta del cursore
+          ),
+          // Personalizzazione globale degli errori con SnackBar
+          snackBarTheme: SnackBarThemeData(
+            backgroundColor: Colors.white, // Sfondo bianco
+            contentTextStyle: const TextStyle(color: Colors.black), // Testo nero
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12), // Bordi arrotondati
+            ),
+            behavior: SnackBarBehavior.floating, // SnackBar fluttuante sopra il contenuto
           ),
         ),
-        home: Consumer<User?>(
-          builder: (context, user, _) {
-            if (user == null) {
-              return LoginScreen();
-            } else {
-              return FutureBuilder<DocumentSnapshot>(
-                future: FirebaseFirestore.instance.collection('users').doc(user.uid).get(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Scaffold(body: Center(child: CircularProgressIndicator()));
-                  } else if (snapshot.hasError) {
-                    return Scaffold(
-                      body: Center(
-                        child: Text('Errore: ${snapshot.error}'),
-                      ),
-                    );
-                  } else if (snapshot.hasData && snapshot.data != null) {
-                    final userData = snapshot.data!.data() as Map<String, dynamic>?;
-                    if (userData == null) {
-                      return LoginScreen();
-                    }
-                    final userModel = UserModel.fromMap(userData);
-                    if (userModel.role == 'admin') {
-                      return AdminPanelScreen();
-                    } else {
-                      return HomeScreen();
-                    }
-                  } else {
-                    return LoginScreen();
-                  }
-                },
-              );
-            }
-          },
-        ),
+        home: const SplashScreen(), // SplashScreen come la schermata iniziale
         routes: {
-  '/home': (context) => HomeScreen(),
-  '/login': (context) => LoginScreen(),
-  '/register': (context) => RegisterScreen(),
-  '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
-  '/admin': (context) => AdminPanelScreen(),
-  '/admin/users': (context) => UserManagementScreen(),
-  '/admin/levels': (context) => LevelManagementScreen(),
-  '/welcome': (context) => WelcomeScreen(),
-  '/videos': (context) => VideoListScreen(),
-  '/privacy-policy': (context) => PrivacyPolicyScreen(), // Aggiungi questa linea
-  '/guest_register_prompt': (context) => GuestRegisterPromptScreen(),
-},
+          '/home': (context) => const HomeScreen(),
+          '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
+          '/admin': (context) => const AdminPanelScreen(),
+          '/welcome': (context) => const WelcomeScreen(),
+          '/privacy-policy': (context) => const PrivacyPolicyScreen(),
+        },
+      ),
+    );
+  }
+}
+
+class MainScreen extends StatefulWidget {
+  final UserModel userModel;
+
+  const MainScreen({super.key, required this.userModel});
+
+  @override
+  _MainScreenState createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const Center(child: ComingSoonAI()),
+    const SettingsScreen(currentUser: null),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
+      bottomNavigationBar: BottomNavigationBarCustom(
+        currentUser: widget.userModel,
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
       ),
     );
   }

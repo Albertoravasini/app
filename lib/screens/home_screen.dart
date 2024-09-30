@@ -1,103 +1,105 @@
 import 'package:Just_Learn/screens/access/login_screen.dart';
+import 'package:Just_Learn/screens/subtopic_selection_sheet.dart';
+import 'package:Just_Learn/screens/topic_selection_sheet.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'level_screen.dart';
-import '../models/level.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'shorts_screen.dart';
 import '../models/user.dart';
-import './access/login_screen.dart';
-import '../services/level_service.dart';
-import 'video_list_screen.dart'; // Importa la schermata dei video
-import 'shorts_screen.dart'; // Importa la schermata degli short
-import 'settings_screen.dart'; // Importa la nuova schermata delle impostazioni
-import 'guest_register_prompt_screen.dart'; // Importa la schermata di registrazione per gli ospiti
+import '../models/level.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
+  // ignore: library_private_types_in_public_api
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0; // Imposta l'indice selezionato della BottomNavigationBar
   String? selectedTopic;
+  String? selectedSubtopic;
   bool isLoading = true;
-  List<Level> levels = [];
   UserModel? currentUser;
   List<String> allTopics = [];
-  bool _levelsInitialized = false;
-  bool isGuest = false; // Aggiunto per tracciare se l'utente è un ospite
+  List<String> subtopics = [];
+  String videoTitle = ""; // Titolo iniziale del video
+  bool showSavedVideos = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    // Recupera gli argomenti dalla rotta solo dopo che il widget è stato inizializzato
-    final arguments = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    isGuest = arguments?['isGuest'] ?? false;
-
-    if (isGuest) {
-      // Limita l'accesso degli ospiti a un solo livello
-      _loadLevelsForGuest();
-    } else {
+    if (allTopics.isEmpty) {
       _loadTopicsAndUser();
     }
-    _initializeLevels();
   }
 
-  Future<void> _initializeLevels() async {
-    if (!_levelsInitialized) {
-      await createLevels();
-      if (mounted) {
-        setState(() {
-          _levelsInitialized = true;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadLevelsForGuest() async {
-    // Carica solo il primo livello per gli ospiti
-    final levelsCollection = FirebaseFirestore.instance.collection('levels');
-    final querySnapshot = await levelsCollection.orderBy('levelNumber').limit(1).get();
-    final fetchedLevels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
-
-    if (mounted) {
-      setState(() {
-        levels = fetchedLevels;
-        isLoading = false;
-      });
-    }
-  }
+void _toggleSavedVideos() {
+  setState(() {
+    showSavedVideos = !showSavedVideos; // Alterna la variabile
+  });
+  // Non serve ricaricare tutto qui perché la chiave cambierà e forzerà il ri-rendering
+}
 
   Future<void> _loadTopicsAndUser() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+
+    if (user != null || (args != null && args['isGuest'] == true)) {
       try {
-        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
-          final userData = userDoc.data();
-          if (userData != null) {
-            final userModel = UserModel.fromMap(userData);
-            await _updateConsecutiveDays(userModel);
-            if (mounted) {
-              setState(() {
-                currentUser = userModel;
-                selectedTopic = userModel.topics.isNotEmpty ? userModel.topics.first : null;
-              });
+        if (user != null) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+          if (userDoc.exists) {
+            final userData = userDoc.data();
+
+            if (userData != null) {
+              final userModel = UserModel.fromMap(userData);
+              await _updateConsecutiveDays(userModel);
+
+              if (mounted) {
+                setState(() {
+                  currentUser = userModel;
+                  selectedTopic = userModel.topics.isNotEmpty ? userModel.topics.first : 'Just Learn';
+                  selectedSubtopic = selectedSubtopic ?? null; // Manteniamo il subtopic se già selezionato
+                });
+              }
             }
+          } else {
+            _redirectToLogin();
           }
         } else {
-          _redirectToLogin();
+          // Logica per l'ospite
+          if (mounted) {
+            setState(() {
+              selectedTopic = 'Just Learn';
+              selectedSubtopic = null;
+            });
+          }
         }
       } catch (e) {
         print('Error loading user: $e');
-        _redirectToLogin();
+        if (mounted) {
+          _redirectToLogin();
+        }
       }
     } else {
       _redirectToLogin();
     }
+
     await _loadAllTopics();
+
+    if (selectedTopic == null) {
+      setState(() {
+        selectedTopic = 'Just Learn';
+        selectedSubtopic = null;
+      });
+    }
+
+    if (subtopics.isEmpty) {
+      await _loadSubtopics(selectedTopic!);
+    }
   }
 
   Future<void> _updateConsecutiveDays(UserModel user) async {
@@ -126,439 +128,264 @@ class _HomeScreenState extends State<HomeScreen> {
         isLoading = false;
       });
     }
-    await _loadLevels();
   }
 
-  Future<void> _loadLevels() async {
-    if (selectedTopic == null) return;
-    final levelsCollection = FirebaseFirestore.instance.collection('levels');
-    final querySnapshot = await levelsCollection
-        .where('topic', isEqualTo: selectedTopic)
-        .orderBy('levelNumber') // Ordina per levelNumber
-        .get();
-    final fetchedLevels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
-    if (mounted) {
-      setState(() {
-        levels = fetchedLevels;
-        isLoading = false;
-      });
-    }
-  }
+  Future<void> _loadSubtopics(String topic) async {
+  final levelsCollection = FirebaseFirestore.instance.collection('levels');
+  final querySnapshot = await levelsCollection
+      .where('topic', isEqualTo: topic)
+      .orderBy('subtopicOrder')  // Ordina per subtopicOrder
+      .orderBy('levelNumber')    // Ordina per levelNumber
+      .get();
+  final levels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
 
-  Future<void> updateLevelCompletion(String topic, int levelNumber) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final doc = await docRef.get();
-      if (doc.exists) {
-        final userData = doc.data();
-        if (userData != null) {
-          final userModel = UserModel.fromMap(userData);
-          final completedLevels = userModel.completedLevelsByTopic[topic] ?? [];
-          if (!completedLevels.contains(levelNumber)) {
-            completedLevels.add(levelNumber);
-            userModel.completedLevelsByTopic[topic] = completedLevels;
-            await docRef.update(userModel.toMap());
-            setState(() {
-              currentUser = userModel; // Aggiorna lo stato corrente dell'utente
-            });
-          }
-        }
-      }
-    }
-  }
+  final newSubtopics = levels
+      .map((level) => level.subtopic ?? '')
+      .where((subtopic) => subtopic.isNotEmpty)
+      .toSet()
+      .toList();
 
-  void onLevelCompleted(String? topic, int levelNumber) async {
-  if (isGuest) {
-    // Se l'utente è un ospite, naviga verso la schermata di registrazione
-    Navigator.pushReplacementNamed(context, '/guest_register_prompt');
-  } else if (topic != null) {
-    await updateLevelCompletion(topic, levelNumber);
-    await _loadLevels();
-    if (mounted) {
-      setState(() {}); // Forza l'aggiornamento della UI per riflettere il completamento del livello
-    }
-  } else {
-    // Gestisci il caso in cui il topic sia nullo
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Errore: nessun topic selezionato')),
-    );
+  if (mounted) {
+    setState(() {
+      subtopics = newSubtopics;
+    });
   }
 }
 
-  void _selectTopic(String? newTopic) async {
-    if (newTopic != null && newTopic != selectedTopic) {
+  void _selectTopic(String newTopic) async {
+    if (selectedTopic != newTopic) {
+      // Cambia il topic solo se diverso da quello attualmente selezionato
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          'topics': [newTopic],
+        });
+      }
+
+      await _loadSubtopics(newTopic);
+
       if (mounted) {
         setState(() {
           selectedTopic = newTopic;
-          isLoading = true;
+          selectedSubtopic = null; // Deselezioniamo il subtopic quando cambiamo il topic
         });
       }
-      await _loadLevels();
     }
   }
 
-  void _redirectToLogin() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginScreen()),
+  void _selectSubtopic(String? newSubtopic) {
+    setState(() {
+      selectedSubtopic = newSubtopic;
+      videoTitle = ''; // Resettiamo il titolo del video quando cambiamo subtopic
+    });
+  }
+
+  void _openSubtopicSelectionSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) => SubtopicSelectionSheet(
+        subtopics: [ ...subtopics], 
+        selectedSubtopic: selectedSubtopic,
+        onSelectSubtopic: _selectSubtopic,
+      ),
     );
   }
 
-  Future<void> _logout() async {
-    await FirebaseAuth.instance.signOut();
-    _redirectToLogin();
+  void _redirectToLogin() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      }
+    });
   }
 
-  void _onItemTapped(int index) {
+  void _updateVideoTitle(String newTitle) {
     setState(() {
-      _selectedIndex = index;
+      videoTitle = newTitle;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Caricamento...'),
-        ),
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // Mappa di subtopic e livelli
-    Map<String, List<Level>> levelsBySubtopic = {};
-    for (var level in levels) {
-      levelsBySubtopic.putIfAbsent(level.subtopic, () => []).add(level);
-    }
-
-    // Definisci le pagine in base all'indice della BottomNavigationBar
-    final List<Widget> _pages = [
-      _buildLevelsView(levelsBySubtopic),
-      VideoListScreen(),
-      ShortsScreen(),
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AlertDialog(
-                        title: Text('Seleziona Topic'),
-                        content: Container(
-                          width: double.maxFinite,
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: allTopics.length,
-                            itemBuilder: (BuildContext context, int index) {
-                              return ListTile(
-                                title: Text(allTopics[index]),
-                                onTap: () {
-                                  _selectTopic(allTopics[index]);
-                                  Navigator.of(context).pop();
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-                                child: Row(
-                  children: [
-                    Text(
-                      selectedTopic ?? 'Topic',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w800,
-                        height: 1.0,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
-                  ],
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Icon(Icons.local_fire_department, color: Colors.white, size: 25),
-                const SizedBox(width: 5),
-                Text(
-                  '${currentUser?.consecutiveDays ?? 0}',
-                  style: TextStyle(
+  title: Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Expanded(
+        child: GestureDetector(
+          onTap: () => _showTopicSelectionSheet(context),
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  selectedTopic ?? 'Topic',
+                  style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 28,
                     fontFamily: 'Montserrat',
                     fontWeight: FontWeight.w800,
                     height: 1.0,
-                    letterSpacing: 0.66,
                   ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.account_circle),
-                  color: Colors.white,
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SettingsScreen(user: currentUser),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      body: _pages[_selectedIndex], // Mostra la pagina selezionata
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assistant_rounded),
-            label: 'Livelli',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.video_library),
-            label: 'Videos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.short_text),
-            label: 'Shorts', // Nuova etichetta per gli short
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: const Color.fromARGB(255, 255, 255, 255),
-        onTap: _onItemTapped,
-      ),
-    );
-  }
-
-  Widget _buildLevelsView(Map<String, List<Level>> levelsBySubtopic) {
-    return ListView.builder(
-      itemCount: levelsBySubtopic.keys.length,
-      itemBuilder: (context, index) {
-        String subtopic = levelsBySubtopic.keys.elementAt(index);
-        List<Level> subtopicLevels = levelsBySubtopic[subtopic]!;
-        return Container(
-          margin: EdgeInsets.symmetric(vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 343,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
-                  decoration: ShapeDecoration(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    subtopic,
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 24,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                    ),
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                  ),
+                  overflow: TextOverflow.ellipsis, // Troncamento del testo se troppo lungo
                 ),
               ),
-              SizedBox(height: 20),
-              ...subtopicLevels.map((level) {
-                bool isCompleted = currentUser?.completedLevelsByTopic[selectedTopic]?.contains(level.levelNumber) ?? false;
-                bool isCurrentLevel = !isCompleted && (currentUser?.completedLevelsByTopic[selectedTopic]?.length == level.levelNumber - 1);
-                bool isLocked = !isCompleted && !isCurrentLevel && level.levelNumber != 1; // Assicurati che il primo livello sia sempre sbloccato
-                return Column(
-                  children: [
-                    LevelCard(
-                      level: level,
-                      isLeft: levels.indexOf(level) % 2 == 0,
-                      isCurrentLevel: isCurrentLevel,
-                      isLocked: isLocked,
-                      onTap: isLocked
-    ? null
-    : () async {
-        final result = await Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => LevelScreen(
-      level: level,
-      onLevelCompleted: () => onLevelCompleted(selectedTopic, level.levelNumber),
-      isGuest: isGuest, // Passiamo isGuest a LevelScreen
-    ),
-  ),
-);
-
-        if (result == true) {
-          if (mounted) {
-            setState(() {
-              _loadLevels();
-            });
-          }
-        }
-      },
-                    ),
-                    if (levels.indexOf(level) < levels.length - 1)
-                      Container(
-                        height: 110,
-                        child: Center(
-                          child: SvgPicture.asset(
-                            levels.indexOf(level) % 2 == 0
-                                ? isCompleted
-                                    ? 'assets/Vector_fatto_sx.svg'
-                                    : 'assets/vector_futuro_sx.svg'
-                                : isCompleted
-                                    ? 'assets/Vector_fatto_dx.svg'
-                                    : 'assets/vector_futuro_dx.svg',
-                            width: 150,
-                            height: 150,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              }).toList(),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
             ],
           ),
-        );
-      },
-    );
-  }
-}
-
-class LevelCard extends StatelessWidget {
-  final Level level;
-  final bool isLeft;
-  final bool isCurrentLevel;
-  final bool isLocked;
-  final VoidCallback? onTap;
-
-  const LevelCard({
-    Key? key,
-    required this.level,
-    required this.isLeft,
-    required this.isCurrentLevel,
-    required this.isLocked,
-    this.onTap,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 343,
-      height: 120,
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
+        ),
+      ),
+      Row(
+  children: [
+    SvgPicture.asset(
+      'assets/mdi_fire.svg', // Percorso dell'icona SVG
+      color: Colors.white, // Colore dell'icona
+      height: 25, // Dimensione dell'icona, equivalente all'icona precedente
+      width: 25,
+    ),
+    const SizedBox(width: 5),
+    Text(
+      '${currentUser?.consecutiveDays ?? 0}',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 22,
+        fontFamily: 'Montserrat',
+        fontWeight: FontWeight.w800,
+        height: 1.0,
+        letterSpacing: 0.66,
+      ),
+    ),
+          const SizedBox(width: 10),
+          IconButton(
+            icon: SvgPicture.asset(
+              'assets/mingcute_bookmark-fill.svg',
+              color: showSavedVideos ? Colors.yellow : Colors.white, // Cambia il colore se attivo
+            ),
+            onPressed: _toggleSavedVideos, // Funzione per alternare la visualizzazione dei video salvati
+          ),
+        ],
+      ),
+    ],
+  ),
+),
+      body: Column(
         children: [
-          Container(
-            width: 343,
-            height: 96,
-            padding: isLeft
-                ? const EdgeInsets.only(top: 5, left: 5, right: 92, bottom: 5)
-                : const EdgeInsets.only(top: 3, left: 93, right: 4, bottom: 3),
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(),
-            child: Row(
+          SizedBox(
+            width: 345,
+            height: 76,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: isLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isLeft)
-                  GestureDetector(
-                    onTap: onTap,
-                    child: buildImageContainer(level, isLocked, isCurrentLevel),
+                GestureDetector(
+                  onTap: _openSubtopicSelectionSheet,
+                  child: Container(
+                    width: 345,
+                    height: 34,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: ShapeDecoration(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      shadows: const [
+                        BoxShadow(
+                          color: Color(0x3F000000),
+                          blurRadius: 4,
+                          offset: Offset(0, 4),
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          selectedSubtopic ?? 'Select Sub-Topic',
+                          style: const TextStyle(
+                            color: Colors.black,
+                                                        fontSize: 16,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w800,
+                            height: 1.0,
+                            letterSpacing: 0.48,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Transform(
+                          transform: Matrix4.identity()..rotateZ(3.13),
+                          child: const Icon(Icons.arrow_forward_ios, size: 13.91),
+                        ),
+                      ],
+                    ),
                   ),
-                if (isLeft) const SizedBox(width: 21),
-                Expanded(
-                  child: buildTextContainer(level, isLeft, isCurrentLevel, isLocked),
                 ),
-                if (!isLeft) const SizedBox(width: 21),
-                if (!isLeft)
-                  GestureDetector(
-                    onTap: onTap,
-                    child: buildImageContainer(level, isLocked, isCurrentLevel),
-                  ),
+                const SizedBox(height: 8),
+                Container(
+  width: 345,
+  height: 34,
+  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+  decoration: ShapeDecoration(
+    shape: RoundedRectangleBorder(
+      side: const BorderSide(width: 1, color: Colors.white),
+      borderRadius: BorderRadius.circular(10),
+    ),
+  ),
+  child: Center(
+    child: Text(
+      videoTitle, // La variabile che contiene il titolo del video
+      textAlign: TextAlign.center,
+      overflow: TextOverflow.ellipsis, // Per gestire titoli lunghi
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 14,
+        fontFamily: 'Montserrat',
+        fontWeight: FontWeight.w700,
+        height: 1.0,
+        letterSpacing: 0.42,
+      ),
+    ),
+  ),
+),
               ],
             ),
           ),
+          Expanded(
+  child: ShortsScreen(
+    key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'), // Forza il ri-rendering
+    selectedTopic: selectedTopic,
+    selectedSubtopic: selectedSubtopic,
+    onVideoTitleChange: _updateVideoTitle,
+    showSavedVideos: showSavedVideos, // Passa la variabile per mostrare i video salvati
+  ),
+),
         ],
       ),
     );
   }
 
-  Container buildTextContainer(Level level, bool isLeft, bool isCurrentLevel, bool isLocked) {
-    bool isHighlighted = isCurrentLevel || !isLocked;
-    return Container(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: isLeft ? MainAxisAlignment.start : MainAxisAlignment.end,
-        crossAxisAlignment: isLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-        children: [
-          SizedBox(
-            width: 117,
-            child: Text(
-              level.title,
-              textAlign: isLeft ? TextAlign.left : TextAlign.right,
-              softWrap: true,
-              overflow: TextOverflow.visible,
-              style: TextStyle(
-                color: isHighlighted ? Colors.white : Color(0xFF7D7D7D),
-                fontSize: 16,
-                fontFamily: 'Montserrat',
-                fontWeight: FontWeight.w800,
-                height: 1.2,
-                letterSpacing: 0.48,
-              ),
-            ),
-          ),
-        ],
+  void _showTopicSelectionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
-    );
-  }
-
-  Widget buildImageContainer(Level level, bool isLocked, bool isCurrentLevel) {
-    return Container(
-      width: 108,
-      height: 86,
-      decoration: ShapeDecoration(
-        shape: RoundedRectangleBorder(
-          side: BorderSide(
-            width: isLocked ? 2 : 4,
-            strokeAlign: BorderSide.strokeAlignOutside,
-            color: isLocked ? Color(0xFF7D7D7D) : Colors.white,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Transform.scale(
-          scale: 1.4, // Regola questo valore per zoomare dentro/fuori
-          child: Image.network(
-            level.steps[0].thumbnailUrl ?? "https://via.placeholder.com/108x86",
-            fit: BoxFit.cover,
-          ),
-        ),
+      builder: (context) => TopicSelectionSheet(
+        allTopics: allTopics,
+        selectedTopic: selectedTopic,
+        onSelectTopic: _selectTopic,
       ),
     );
   }
