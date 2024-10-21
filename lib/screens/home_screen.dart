@@ -26,14 +26,15 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> subtopics = [];
   String videoTitle = ""; // Titolo iniziale del video
   bool showSavedVideos = false;
+  
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (allTopics.isEmpty) {
-      _loadTopicsAndUser();
-    }
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  if (allTopics.isEmpty) {
+    _loadTopicsAndUser();
   }
+}
 
 void _toggleSavedVideos() {
   setState(() {
@@ -101,6 +102,15 @@ void _toggleSavedVideos() {
       await _loadSubtopics(selectedTopic!);
     }
   }
+
+  // Metodo per aggiornare i coins dell'utente
+void _updateCoins(int newCoins) {
+  if (mounted) {
+    setState(() {
+      currentUser?.coins = newCoins;
+    });
+  }
+}
 
   Future<void> _updateConsecutiveDays(UserModel user) async {
     final now = DateTime.now();
@@ -234,7 +244,7 @@ void _toggleSavedVideos() {
                     fontWeight: FontWeight.w800,
                     height: 1.0,
                   ),
-                  overflow: TextOverflow.ellipsis, // Troncamento del testo se troppo lungo
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
@@ -244,32 +254,39 @@ void _toggleSavedVideos() {
         ),
       ),
       Row(
-  children: [
-    SvgPicture.asset(
-      'assets/mdi_fire.svg', // Percorso dell'icona SVG
-      color: Colors.white, // Colore dell'icona
-      height: 25, // Dimensione dell'icona, equivalente all'icona precedente
-      width: 25,
-    ),
-    const SizedBox(width: 5),
-    Text(
-      '${currentUser?.consecutiveDays ?? 0}',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 22,
-        fontFamily: 'Montserrat',
-        fontWeight: FontWeight.w800,
-        height: 1.0,
-        letterSpacing: 0.66,
-      ),
-    ),
-          const SizedBox(width: 10),
+        children: [
+          // Sostituisci l'icona del fuoco e i giorni consecutivi con il Container dei coins
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
+                const SizedBox(width: 8),
+                Text(
+                  '${currentUser?.coins ?? 0}', // Mostra il numero di coins
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.w800,
+                    height: 1.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 5),
           IconButton(
             icon: SvgPicture.asset(
               'assets/mingcute_bookmark-fill.svg',
-              color: showSavedVideos ? Colors.yellow : Colors.white, // Cambia il colore se attivo
+              color: showSavedVideos ? Colors.yellow : Colors.white,
             ),
-            onPressed: _toggleSavedVideos, // Funzione per alternare la visualizzazione dei video salvati
+            onPressed: _toggleSavedVideos,
           ),
         ],
       ),
@@ -279,7 +296,7 @@ void _toggleSavedVideos() {
       body: Column(
         children: [
           SizedBox(
-            width: 345,
+            width: double.infinity,
             height: 76,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -287,70 +304,52 @@ void _toggleSavedVideos() {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GestureDetector(
-                  onTap: _openSubtopicSelectionSheet,
-                  child: Container(
-                    width: 345,
-                    height: 34,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: ShapeDecoration(
-                      color: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      shadows: const [
-                        BoxShadow(
-                          color: Color(0x3F000000),
-                          blurRadius: 4,
-                          offset: Offset(0, 4),
-                          spreadRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          selectedSubtopic ?? 'Select Sub-Topic',
-                          style: const TextStyle(
-                            color: Colors.black,
-                                                        fontSize: 16,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w800,
-                            height: 1.0,
-                            letterSpacing: 0.48,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Transform(
-                          transform: Matrix4.identity()..rotateZ(3.13),
-                          child: const Icon(Icons.arrow_forward_ios, size: 13.91),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+  onTap: _openSubtopicSelectionSheet,
+  child: Container(
+    width: double.infinity,  // Assicurati che abbia la stessa larghezza
+    height: 34,
+    decoration: ShapeDecoration(
+      color: const Color(0xFF181819),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          selectedSubtopic ?? 'Select Sub-Topic',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            height: 1.0,
+            letterSpacing: 0.48,
+          ),
+        ),
+      ],
+    ),
+  ),
+),
                 const SizedBox(height: 8),
                 Container(
-  width: 345,
+  width: double.infinity,  // Larghezza massima
   height: 34,
-  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),  // Assicurati che il padding sia corretto
   decoration: ShapeDecoration(
+    color: const Color(0xFF181819),
     shape: RoundedRectangleBorder(
-      side: const BorderSide(width: 1, color: Colors.white),
       borderRadius: BorderRadius.circular(10),
     ),
   ),
   child: Center(
     child: Text(
-      videoTitle, // La variabile che contiene il titolo del video
+      videoTitle,
       textAlign: TextAlign.center,
-      overflow: TextOverflow.ellipsis, // Per gestire titoli lunghi
+      overflow: TextOverflow.ellipsis,
       style: const TextStyle(
         color: Colors.white,
         fontSize: 14,
-        fontFamily: 'Montserrat',
         fontWeight: FontWeight.w700,
         height: 1.0,
         letterSpacing: 0.42,
@@ -367,6 +366,7 @@ void _toggleSavedVideos() {
     selectedTopic: selectedTopic,
     selectedSubtopic: selectedSubtopic,
     onVideoTitleChange: _updateVideoTitle,
+    onCoinsUpdate: _updateCoins,  // Passiamo la funzione per aggiornare i coins
     showSavedVideos: showSavedVideos, // Passa la variabile per mostrare i video salvati
   ),
 ),

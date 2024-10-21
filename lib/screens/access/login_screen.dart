@@ -1,17 +1,19 @@
-import 'package:Just_Learn/admin_panel/admin_panel_screen.dart';
 import 'package:Just_Learn/main.dart';
 import 'package:Just_Learn/models/user.dart';
+import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
+import 'package:Just_Learn/screens/home_screen.dart';
+import 'package:Just_Learn/services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/auth_service.dart';
+import 'register_screen.dart'; // Import your Register screen
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _LoginScreenState createState() => _LoginScreenState();
 }
 
@@ -25,103 +27,104 @@ class _LoginScreenState extends State<LoginScreen> {
     final authService = Provider.of<AuthService>(context);
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Container(
-          width: 316,
-          padding: const EdgeInsets.symmetric(vertical: 40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'Just Learn',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 57,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w800,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          color: Colors.black
+        ),
+        child: Column(
+          children: [
+            // Top status bar-like container (can be customized further)
+            Container(
+              width: double.infinity,
+              height: 60,
+            ),
+            
+            // Main content
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 23),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(31),
+                    topRight: Radius.circular(31),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8), // Spazio tra le due scritte
-              const Text(
-                'The only scrolling app made for education ⚡️',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70, // Colore leggermente più chiaro
-                  fontSize: 18, // Più piccolo del titolo
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                height: 137,
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(
+                      width: double.infinity,
+                      height: 75,
+                      child: Text(
+                        'Log In',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 45,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Montserrat',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 31),
+                    // Email input
                     Container(
                       width: double.infinity,
                       height: 56,
                       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 17),
-                      decoration: ShapeDecoration(
-                        shape: RoundedRectangleBorder(
-                          side: const BorderSide(width: 1, color: Colors.white),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white12, width: 1),
                       ),
                       child: TextField(
                         controller: emailController,
                         cursorColor: Colors.white,
                         decoration: const InputDecoration(
-                          hintText: 'Email',
                           border: InputBorder.none,
+                          hintText: 'Email',
                           hintStyle: TextStyle(
-                            color: Colors.white,
+                            color: Colors.white70,
                             fontSize: 16,
                             fontFamily: 'Montserrat',
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 0.48,
                           ),
                         ),
                         style: const TextStyle(color: Colors.white),
                       ),
                     ),
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 31),
+                    // Password input
                     Container(
-                      width: 345,
+                      width: double.infinity,
                       height: 56,
                       padding: const EdgeInsets.symmetric(horizontal: 13),
-                      decoration: ShapeDecoration(
-                        shape: RoundedRectangleBorder(
-                          side: const BorderSide(width: 1, color: Colors.white),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white12, width: 1),
                       ),
                       child: TextField(
                         controller: passwordController,
-                        cursorColor: Colors.white,
                         obscureText: !_isPasswordVisible,
+                        cursorColor: Colors.white,
                         decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16), // Padding per centrare testo e icona
-                          hintText: 'Password',
                           border: InputBorder.none,
+                          hintText: 'Password',
                           hintStyle: const TextStyle(
-                            color: Colors.white,
+                            color: Colors.white70,
                             fontSize: 16,
                             fontFamily: 'Montserrat',
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 0.48,
                           ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 15),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                               color: Colors.white,
-                              size: 20, // Riduce la dimensione dell'icona
                             ),
                             onPressed: () {
                               setState(() {
@@ -133,145 +136,188 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: const TextStyle(color: Colors.white),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 223),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () async {
-                      final email = emailController.text;
-                      final password = passwordController.text;
-                      User? user = await authService.signInWithEmailPassword(email, password);
-                      if (user != null) {
-                        final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-                        if (userDoc.exists) {
-                          final userModel = UserModel.fromMap(userDoc.data()!);
-                          if (context.mounted) {
-                            if (userModel.role == 'admin') {
-                              Navigator.pushReplacement(
+                    const SizedBox(height: 31),
+                    // OR separator
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 20.0),
+                            child: Divider(
+                              color: Colors.white70,
+                              thickness: 1,
+                              height: 3,
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          'OR',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Montserrat',
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            margin: const EdgeInsets.only(left: 20.0),
+                            child: Divider(
+                              color: Colors.white70,
+                              thickness: 1,
+                              height: 3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 31),
+                    // Sign In with Google
+                    GestureDetector(
+                      onTap: () async {
+                        final authService = Provider.of<AuthService>(context, listen: false);
+                        User? user = await authService.signInWithGoogle();
+
+                        if (user != null) {
+                          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+                          if (userDoc.exists) {
+                            final userModel = UserModel.fromMap(userDoc.data()!);
+
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => MainScreen(userModel: userModel),
+                              ),
+                              (Route<dynamic> route) => false,
+                            );
+                          } else {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => TopicSelectionScreen(user: user),
+                              ),
+                              (Route<dynamic> route) => false,
+                            );
+                          }
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Failed to sign in with Google')),
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        height: 56,
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.white12, width: 2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Image.asset(
+                              'assets/Vector1.png',
+                              height: 24,
+                              width: 24,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              'Sign In with Google',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: 'Montserrat',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Continue Button
+                    GestureDetector(
+                      onTap: () async {
+                        final email = emailController.text;
+                        final password = passwordController.text;
+                        User? user = await authService.signInWithEmailPassword(email, password);
+                        if (user != null) {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user != null) {
+                            final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+                            if (userDoc.exists) {
+                              final userModel = UserModel.fromMap(userDoc.data()!);
+
+                              Navigator.pushAndRemoveUntil(
                                 context,
-                                MaterialPageRoute(builder: (context) => AdminPanelScreen()),
-                              );
-                            } else {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(builder: (context) => MainScreen(userModel: userModel)),
+                                MaterialPageRoute(
+                                  builder: (context) => MainScreen(userModel: userModel),
+                                ),
+                                (Route<dynamic> route) => false,
                               );
                             }
                           }
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Errore durante il caricamento dei dati utente')),
+                            const SnackBar(content: Text('Failed to sign in')),
                           );
                         }
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Failed to sign in')),
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: 345,
-                      height: 56,
-                      decoration: ShapeDecoration(
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          side: const BorderSide(width: 1, color: Colors.white),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Log In',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 16,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                            letterSpacing: 0.48,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pushReplacementNamed(context, '/home', arguments: {'isGuest': true});
-                    },
-                    child: Container(
-                      width: 345,
-                      height: 56,
-                      decoration: ShapeDecoration(
-                        color: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          side: const BorderSide(width: 1, color: Colors.grey),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'Guest',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                            letterSpacing: 0.48,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacementNamed(context, '/welcome');
                       },
-                      child: const Text(
-                        'Don’t have an account? Register',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
+                      child: Container(
+                        padding: const EdgeInsets.all(17),
+                        decoration: BoxDecoration(
                           color: Colors.white,
-                          fontSize: 14,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                          letterSpacing: 0.42,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(width: 1, color: Colors.white12),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Continue',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pushNamed(context, '/privacy-policy');
-                    },
-                    child: const Text(
-                      'Privacy Policy',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(height: 11),
+                    // Sign Up Button
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(17),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          border: Border.all(width: 2, color: Colors.white12),
+                                                    borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

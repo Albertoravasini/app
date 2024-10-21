@@ -1,3 +1,4 @@
+import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/screens/comments_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -8,66 +9,98 @@ import '../services/comment_service.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final YoutubePlayerController controller;
-  final bool isLiked; // Add back the isLiked parameter
-  final int likeCount; // Add back the likeCount parameter
+  final bool isLiked;
+  final int likeCount;
+  final LevelStep? questionStep; // La domanda associata al video
+  final Function() onShowQuestion; // Callback per mostrare la domanda
 
   const VideoPlayerWidget({
-    super.key,
+    Key? key,
     required this.controller,
-    this.isLiked = false, // Provide a default value if necessary
-    this.likeCount = 0, // Provide a default value if necessary
-  });
+    this.isLiked = false,
+    this.likeCount = 0,
+    this.questionStep,
+    required this.onShowQuestion,
+  }) : super(key: key);
 
   @override
   _VideoPlayerWidgetState createState() => _VideoPlayerWidgetState();
 }
 
-class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
+class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
+    with SingleTickerProviderStateMixin {
   bool isLiked = false;
   int likeCount = 0;
-  int commentCount = 0; // Variable to store the comment count
-  final CommentService _commentService = CommentService(); // Initialize CommentService
-
-   @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_updateState);
-    // Imposta i valori iniziali con quelli passati dal genitore
-    setState(() {
-      isLiked = widget.isLiked;
-      likeCount = widget.likeCount;
-    });
-  }
+  int commentCount = 0;
+  bool showQuestionIcon = false;
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  final CommentService _commentService = CommentService();
 
   @override
-  void didUpdateWidget(covariant VideoPlayerWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.controller.metadata.videoId != oldWidget.controller.metadata.videoId ||
-        widget.likeCount != oldWidget.likeCount ||
-        widget.isLiked != oldWidget.isLiked) {
+void initState() {
+  super.initState();
+  widget.controller.addListener(_videoListener);
+  isLiked = widget.isLiked;
+  likeCount = widget.likeCount;
+
+  // Inizializza il conteggio dei commenti
+  _fetchCommentsCount();
+
+  // Inizializza l'AnimationController per l'icona della domanda
+  _animationController = AnimationController(
+    duration: const Duration(milliseconds: 300),
+    vsync: this,
+  );
+  _scaleAnimation = CurvedAnimation(
+    parent: _animationController,
+    curve: Curves.linear,
+  );
+  if (widget.questionStep != null) {
+    showQuestionIcon = true;
+    _animationController.forward();
+  }
+}
+
+// Funzione per ottenere il numero di commenti
+Future<void> _fetchCommentsCount() async {
+  final videoId = widget.controller.metadata.videoId;
+  if (videoId.isNotEmpty) {
+    final count = await _commentService.getCommentsCount(videoId);
+    setState(() {
+      commentCount = count;
+    });
+  }
+}
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_videoListener);
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _videoListener() {
+    if (mounted) {
       setState(() {
-        isLiked = widget.isLiked;
-        likeCount = widget.likeCount;
+        // Non serve più tracciare il progresso o la fine del video
       });
     }
   }
 
-  void _updateState() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
+  void _onQuestionIconTap() {
+  // Reverse the scale animation for a quick shrinking effect before showing the question
+  _animationController.reverse().then((_) {
+    _animationController.forward();
+    // Callback to show the question after the animation
+    widget.onShowQuestion();
+  });
+}
 
-  @override
-  void dispose() {
-    widget.controller.removeListener(_updateState);
-    super.dispose();
-  }
-
-  // Function to fetch the current like status and count from Firestore
+  // Funzione per ottenere lo stato e il conteggio dei like da Firestore
   Future<void> _fetchLikeStatusAndCount() async {
     final videoId = widget.controller.metadata.videoId;
-    if (videoId.isNotEmpty) { // Ensure videoId is not empty
+    if (videoId.isNotEmpty) {
       try {
         final videoDoc = await FirebaseFirestore.instance.collection('videos').doc(videoId).get();
 
@@ -75,12 +108,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
           final videoData = videoDoc.data();
           if (videoData != null) {
             setState(() {
-              likeCount = videoData['likes'] ?? 0; // Set the like count
+              likeCount = videoData['likes'] ?? 0; // Imposta il conteggio dei like
             });
           }
         }
 
-        // Check the like status for the current user
+        // Controlla lo stato del like per l'utente corrente
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -88,25 +121,25 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             final userData = userDoc.data() as Map<String, dynamic>;
             final likedVideos = userData['LikedVideos'] as List<dynamic>? ?? [];
             setState(() {
-              isLiked = likedVideos.contains(videoId); // Update isLiked status
+              isLiked = likedVideos.contains(videoId); // Aggiorna lo stato di like
             });
           }
         }
       } catch (e) {
-        print('Error fetching like status and count: $e');
+        print('Errore durante il recupero dello stato e del conteggio dei like: $e');
       }
     } else {
-      print("Error: Video ID is empty"); // Debug message
+      print("Errore: ID video è vuoto"); // Messaggio di debug
     }
   }
+  
 
-
-  // Function to update like status
+  // Funzione per aggiornare lo stato del like
   Future<void> _toggleLike() async {
     final videoId = widget.controller.metadata.videoId;
     final user = FirebaseAuth.instance.currentUser;
 
-    if (videoId.isNotEmpty && user != null) { // Ensure videoId is not empty
+    if (videoId.isNotEmpty && user != null) {
       setState(() {
         isLiked = !isLiked;
         likeCount += isLiked ? 1 : -1;
@@ -136,147 +169,180 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
             final newLikes = isLiked ? likes + 1 : likes - 1;
             transaction.update(videoDocRef, {'likes': newLikes});
           } else {
-            // If video document doesn't exist, create it with the initial count
+            // Se il documento del video non esiste, crealo con il conteggio iniziale
             transaction.set(videoDocRef, {'likes': isLiked ? 1 : 0});
           }
         });
       }
     } else {
-      print("Error: Video ID is empty or user is not logged in"); // Debug message
+      print("Errore: ID video è vuoto o l'utente non è loggato"); // Messaggio di debug
     }
   }
 
-  // Function to open comments
+  // Funzione per aprire i commenti
   void _openComments(BuildContext context) {
     final videoId = widget.controller.metadata.videoId;
-    if (videoId.isNotEmpty) { // Ensure videoId is not empty before using it
+    if (videoId.isNotEmpty) {
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(25.0))),
-        builder: (context) => CommentsScreen(videoId: videoId), // Pass the video id
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25.0))),
+        builder: (context) => CommentsScreen(videoId: videoId),
       );
     } else {
-      print("Error: Video ID is empty"); // Debug message
+      print("Errore: ID video è vuoto"); // Messaggio di debug
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final videoId = widget.controller.metadata.videoId;
+Widget build(BuildContext context) {
+  final videoId = widget.controller.metadata.videoId;
 
-    return Column(
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(7.0),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
-                children: [
-                  IgnorePointer(
-                    ignoring: true,
-                    child: SizedBox(
-                      width: MediaQuery.of(context).size.width * 0.9,
-                      height: MediaQuery.of(context).size.height * 0.8,
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        child: SizedBox(
-                          width: MediaQuery.of(context).size.width,
-                          height: MediaQuery.of(context).size.height,
-                          child: YoutubePlayer(
-                            controller: widget.controller,
-                            showVideoProgressIndicator: false,
-                          ),
+  return Column(
+    children: [
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              children: [
+                // Invisible layer for tapping (it won't interfere with the video controls)
+                GestureDetector(
+                  onTap: () {
+                    if (widget.controller.value.isPlaying) {
+                      widget.controller.pause();
+                    } else {
+                      widget.controller.play();
+                    }
+                  },
+                  child: Container(
+                    color: Colors.transparent,  // Invisible layer over the video
+                    width: MediaQuery.of(context).size.width,
+                    height: MediaQuery.of(context).size.height,
+                  ),
+                ),
+                // YoutubePlayer widget
+                IgnorePointer(
+                  ignoring: true,  // Ensures the user can tap without triggering the video player UI
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 1,
+                    height: MediaQuery.of(context).size.height * 1,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: MediaQuery.of(context).size.width,
+                        height: MediaQuery.of(context).size.height,
+                        child: YoutubePlayer(
+                          controller: widget.controller,
+                          showVideoProgressIndicator: false,
                         ),
                       ),
                     ),
                   ),
-                  // Like and comment buttons
-                  Positioned(
-                    bottom: 5,
-                    right: 5,
-                    child: Column(
-                      children: [
-                        // Like button
+                ),
+                // Like, comment buttons and other overlays remain unchanged
+                Positioned(
+                  bottom: 5,
+                  right: 5,
+                  child: Column(
+                    children: [
+                      // Icona della domanda
+                      if (showQuestionIcon && widget.questionStep != null)
                         GestureDetector(
-                          onTap: _toggleLike,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            transitionBuilder: (Widget child, Animation<double> animation) {
-                              return ScaleTransition(scale: animation, child: child);
+                          onTap: _onQuestionIconTap,
+                          child: AnimatedBuilder(
+                            animation: _animationController,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _scaleAnimation.value,
+                                child: SvgPicture.asset(
+                                  'assets/ai_icon.svg',
+                                  color: Colors.white,
+                                  width: 25,
+                                  height: 40,
+                                ),
+                              );
                             },
-                            child: isLiked
-                                ? Icon(
-                                    Icons.favorite,
-                                    key: ValueKey<int>(1),
-                                    color: Colors.red,
-                                    size: 40,
-                                  )
-                                : Icon(
-                                    Icons.favorite_border,
-                                    key: ValueKey<int>(2),
-                                    color: Colors.white,
-                                    size: 40,
-                                  ),
                           ),
                         ),
-                        Text(
-                          likeCount.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(height: 20),
+                      // Bottone like
+                      GestureDetector(
+                        onTap: _toggleLike,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (Widget child, Animation<double> animation) {
+                            return ScaleTransition(scale: animation, child: child);
+                          },
+                          child: isLiked
+                              ? Icon(
+                                  Icons.favorite,
+                                  key: ValueKey<int>(1),
+                                  color: Colors.red,
+                                  size: 40,
+                                )
+                              : Icon(
+                                  Icons.favorite_border,
+                                  key: ValueKey<int>(2),
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
                         ),
-                        const SizedBox(height: 10), // Space between like and comments
-                        // Comment button
-                        GestureDetector(
-                          onTap: () => _openComments(context), // Open comments
-                          child: Column(
-                            children: [
-                              SvgPicture.asset('assets/comment_icon.svg', // Your SVG icon path
-            color: Colors.white, // Icon color
-            width: 25, // SVG icon size
-            height: 30,
-          ),
-                              StreamBuilder<int>(
-                                stream: _commentService.getCommentCount(videoId),
-                                builder: (context, snapshot) {
-                                  if (snapshot.hasData) {
-                                    final newCommentCount = snapshot.data!;
-                                    // Check if the count is different to avoid unnecessary rendering
-                                    if (commentCount != newCommentCount) {
-                                      commentCount = newCommentCount;
-                                    }
-                                  }
-                                  // Show the comment count or 0 if no data
-                                  return Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      '$commentCount',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  );
-                                },
+                      ),
+                      Text(
+                        likeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Bottone commenti
+                      GestureDetector(
+                        onTap: () => _openComments(context),
+                        child: Column(
+                          children: [
+                            SvgPicture.asset(
+                              'assets/comment_icon.svg',
+                              color: Colors.white,
+                              width: 25,
+                              height: 30,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                '$commentCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
+}}
+class CommentService {
+  // Metodo per ottenere il numero di commenti per un video
+  Future<int> getCommentsCount(String videoId) async {
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('comments')
+        .where('videoId', isEqualTo: videoId)
+        .get();
+    return querySnapshot.size;
   }
 }

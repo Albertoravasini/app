@@ -1,9 +1,13 @@
+import 'package:Just_Learn/main.dart';
+import 'package:Just_Learn/models/user.dart';
+import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
+import 'package:Just_Learn/screens/home_screen.dart';
+import 'package:Just_Learn/services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/auth_service.dart';
-import 'topic_selection_screen.dart';
+import 'login_screen.dart'; // Import your login screen
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,238 +17,334 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController nameController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _isPasswordVisible = false;
 
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              const SizedBox(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: const BoxDecoration(color: Colors.black),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status bar and top spacing
+            Container(
+              width: double.infinity,
+              height: 60,
+            ),
+            const SizedBox(height: 1),
+            // Form container
+            Expanded(
+              child: Container(
                 width: double.infinity,
-                child: Text(
-                  'Create a new account',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 45,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
+                padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 22),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05), // Trasparenza come su login_screen.dart
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(31),
+                    topRight: Radius.circular(31),
                   ),
                 ),
-              ),
-              const SizedBox(height: 30),
-              
-              _buildTextField(nameController, 'Name'),
-              const SizedBox(height: 20),
-              _buildTextField(emailController, 'Email'),
-              const SizedBox(height: 20),
-              _buildTextField(passwordController, 'Password', obscureText: true),
-
-              const SizedBox(height: 20),
-
-              // Separatore con "OR"
-              Row(
-                children: [
-                  Expanded(
-                    child: Divider(color: Colors.white, thickness: 1),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text(
-                      'OR',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.48,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Divider(color: Colors.white, thickness: 1),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 20),
-
-              // Bottoni "Registrati" e "Accedi" in basso
-              GestureDetector(
-                onTap: () async {
-                  final name = nameController.text;
-                  final email = emailController.text;
-                  final password = passwordController.text;
-                  User? user = await authService.registerWithEmailPassword(email, password);
-                  if (user != null) {
-                    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-                      'uid': user.uid,
-                      'email': email,
-                      'name': name,
-                      'topics': [],
-                      'completedLevels': [],
-                      'consecutiveDays': 0,
-                      'role': 'user',
-                      'lastAccess': DateTime.now().toIso8601String(),
-                    });
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => TopicSelectionScreen(user: user, isRegistration: true)),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to register')),
-                    );
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
-                  decoration: ShapeDecoration(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      side: const BorderSide(width: 1, color: Colors.white),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Sign Up',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                        letterSpacing: 0.48,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Google Sign-in Button
-              GestureDetector(
-                onTap: () async {
-                  User? user = await authService.signInWithGoogle();
-                  if (user != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => TopicSelectionScreen(user: user, isRegistration: true)),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to sign in with Google')),
-                    );
-                  }
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
-                  decoration: ShapeDecoration(
-                    color: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      side: const BorderSide(width: 1, color: Colors.white),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Row(
+                child: Form(
+                  key: _formKey,
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Icona di Google a sinistra
-                      Image.asset(
-                        'assets/ri_google-fill.png', // Assicurati di avere l'immagine nella cartella assets
-                        height: 20,
-                        width: 20,
-                      ),
-                      const SizedBox(width: 10),
+                      // Header text
                       const Text(
-                        'Sign in with Google',
-                        textAlign: TextAlign.center,
+                        'Create a new Account',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
+                          color: Colors.white, // Cambiato a bianco
+                          fontSize: 45,
+                          fontWeight: FontWeight.w800,
                           fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                          letterSpacing: 0.48,
                         ),
                       ),
+                      const SizedBox(height: 40),
+
+                      // Name input
+                      _buildTextInput(nameController, 'Name', TextInputType.name),
+                      const SizedBox(height: 31),
+
+                      // Email input
+                      _buildTextInput(emailController, 'Email', TextInputType.emailAddress),
+                      const SizedBox(height: 31),
+
+                      // Password input
+                      _buildPasswordInput(passwordController, 'Password'),
+                      const SizedBox(height: 31),
+
+                      // OR divider
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 20.0),
+                              child: Divider(
+                                color: Colors.white70, // Cambiato a bianco semi-opaco
+                                thickness: 1,
+                                height: 3,
+                              ),
+                            ),
+                          ),
+                          const Text(
+                            'OR',
+                            style: TextStyle(
+                              color: Colors.white70, // Cambiato a bianco semi-opaco
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              fontFamily: 'Montserrat',
+                            ),
+                          ),
+                          Expanded(
+                            child: Container(
+                              margin: const EdgeInsets.only(left: 20.0),
+                              child: Divider(
+                                color: Colors.white70, // Cambiato a bianco semi-opaco
+                                thickness: 1,
+                                height: 3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 31),
+
+                      // Google sign-in button
+                      GestureDetector(
+                        onTap: () async {
+                          final authService = Provider.of<AuthService>(context, listen: false);
+                          User? user = await authService.signInWithGoogle();
+
+                          if (user != null) {
+                            final userDoc = await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .get();
+
+                            if (userDoc.exists) {
+                              final userModel = UserModel.fromMap(userDoc.data()!);
+
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      MainScreen(userModel: userModel),
+                                ),
+                                (Route<dynamic> route) => false,
+                              );
+                            } else {
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      TopicSelectionScreen(user: user),
+                                ),
+                                (Route<dynamic> route) => false,
+                              );
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Failed to sign in with Google')),
+                            );
+                          }
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          height: 56,
+                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                          decoration: BoxDecoration(
+                            border: Border.all(width: 2, color: Colors.white12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(
+                                'assets/Vector1.png',
+                                height: 24,
+                                width: 24,
+                                color: Colors.white, // Cambiato a bianco
+                              ),
+                              const SizedBox(width: 10),
+                              const Text(
+                                'Sign In with Google',
+                                style: TextStyle(
+                                  color: Colors.white, // Cambiato a bianco
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Montserrat',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Continue and Log In buttons
+                      _buildPrimaryButton('Continue', Colors.white, Colors.black, () async {
+                        if (_formKey.currentState!.validate()) {
+                          try {
+                            User? user = await authService.registerWithEmailPassword(
+                              emailController.text.trim(),
+                              passwordController.text.trim(),
+                            );
+
+                            if (user != null) {
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .set({
+                                'uid': user.uid,
+                                'email': emailController.text.trim(),
+                                'name': nameController.text.trim(),
+                                'topics': [],
+                                'completedLevels': [],
+                                'consecutiveDays': 0,
+                                'role': 'user',
+                                'lastAccess': DateTime.now().toIso8601String(),
+                              });
+
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      TopicSelectionScreen(user: user),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to register: $e')),
+                            );
+                          }
+                        }
+                      }),
+                      const SizedBox(height: 11),
+                      _buildPrimaryButton('Log In', Colors.white.withOpacity(0.05), Colors.white, () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        );
+                      }),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Log In Button
-              GestureDetector(
-                onTap: () {
-                  Navigator.pushReplacementNamed(context, '/login');
-                },
-                child: const SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    'Log In',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      letterSpacing: 0.42,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 60),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hintText, {bool obscureText = false}) {
+  Widget _buildTextInput(TextEditingController controller, String hintText, TextInputType inputType) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 5),
-      decoration: ShapeDecoration(
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Colors.white),
-          borderRadius: BorderRadius.circular(16),
-        ),
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 17),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1), // Sfondo trasparente
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white12, width: 1),
       ),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
-        cursorColor: Colors.white,
-        obscureText: obscureText,
+        keyboardType: inputType,
+        style: const TextStyle(color: Colors.white), // Cambiato a bianco
         decoration: InputDecoration(
           hintText: hintText,
+          hintStyle: const TextStyle(color: Colors.white70), // Cambiato a bianco semi-opaco
           border: InputBorder.none,
-          hintStyle: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.48,
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter your $hintText';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildPasswordInput(TextEditingController controller, String hintText) {    return Container(
+      width: double.infinity,
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 13),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1), // Sfondo trasparente
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white12, width: 1), // Bordo semi-trasparente
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: !_isPasswordVisible,
+        style: const TextStyle(color: Colors.white), // Cambiato a bianco
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(color: Colors.white70), // Cambiato a bianco semi-opaco
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          suffixIcon: IconButton(
+            icon: Icon(
+              _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+              color: Colors.white, // Cambiato a bianco
+            ),
+            onPressed: () {
+              setState(() {
+                _isPasswordVisible = !_isPasswordVisible;
+              });
+            },
           ),
         ),
-        style: const TextStyle(color: Colors.white),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Please enter your $hintText';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildPrimaryButton(String label, Color backgroundColor, Color textColor, VoidCallback onPressed) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: double.infinity,
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: textColor.withOpacity(0.2), width: 2), // Trasparenza
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'Montserrat',
+            ),
+          ),
+        ),
       ),
     );
   }

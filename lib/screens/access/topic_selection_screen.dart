@@ -1,16 +1,16 @@
+import 'package:Just_Learn/main.dart';
+import 'package:Just_Learn/models/user.dart';
+import 'package:Just_Learn/screens/home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../home_screen.dart';
 
 class TopicSelectionScreen extends StatefulWidget {
   final User user;
-  final bool isRegistration;
 
-  const TopicSelectionScreen({super.key, required this.user, this.isRegistration = false});
+  const TopicSelectionScreen({Key? key, required this.user}) : super(key: key);
 
   @override
-  // ignore: library_private_types_in_public_api
   _TopicSelectionScreenState createState() => _TopicSelectionScreenState();
 }
 
@@ -29,129 +29,152 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
     setState(() {
       allTopics.addAll(querySnapshot.docs.map((doc) => doc.id).toList());
     });
-    _loadSelectedTopic();
-  }
-
-  Future<void> _loadSelectedTopic() async {
-    final doc = await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).get();
-    if (doc.exists) {
-      final userData = doc.data();
-      if (userData != null) {
-        final userTopics = List<String>.from(userData['topics'] ?? []);
-        setState(() {
-          if (userTopics.isNotEmpty) {
-            selectedTopic = userTopics.first;
-          }
-        });
-      }
-    }
   }
 
   Future<void> _saveSelectedTopic() async {
-    await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
-      'topics': [selectedTopic],
-    });
+    if (selectedTopic != null) {
+      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+        'topics': [selectedTopic],
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 32.0),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        padding: const EdgeInsets.only(top: 60, bottom: 0),
+        decoration: const BoxDecoration(
+          color: Colors.black, // Sfondo nero
+        ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 30), // Aggiunto spazio extra per abbassare il titolo
-            const SizedBox(
-              width: 324,
-              child: Text(
-                'Please select topics',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 45,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-            const SizedBox(height: 0),
             Expanded(
-              child: ListView(
-                children: allTopics.map((topic) {
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedTopic = topic;
-                      });
-                    },
-                    child: Container(
-                      width: 324,
-                      height: 56,
-                      margin: const EdgeInsets.symmetric(vertical: 10),
-                      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 17),
-                      decoration: ShapeDecoration(
-                        color: selectedTopic == topic ? Colors.white : Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          side: const BorderSide(width: 1, color: Colors.white),
-                          borderRadius: BorderRadius.circular(16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.only(
+                  top: 26,
+                  left: 26,
+                  right: 25,
+                  bottom: 23,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05), // Colore semi-trasparente bianco
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(31),
+                    topRight: Radius.circular(31),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(
+                      width: double.infinity,
+                      child: Text(
+                        'What do you want to Improve?',
+                        style: TextStyle(
+                          color: Colors.white, // Testo bianco
+                          fontSize: 45,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                      child: Center(
-                        child: Text(
-                          topic,
-                          style: TextStyle(
-                            color: selectedTopic == topic ? Colors.black : Colors.white,
-                            fontSize: 16,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w700,
+                    ),
+                    const SizedBox(height: 18),
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: allTopics.length,
+                        itemBuilder: (context, index) {
+                          final topic = allTopics[index];
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedTopic = topic;
+                              });
+                            },
+                            child: Container(
+                              height: 56,
+                              margin: const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 17),
+                              decoration: BoxDecoration(
+                                color: selectedTopic == topic ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.05), // Colore del contenitore cambiato
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  width: 1,
+                                  color: selectedTopic == topic ? Colors.white : Colors.white12, // Bordi simili a quelli nel login_screen
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  topic,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: selectedTopic == topic ? Colors.white : Colors.white70, // Colore del testo cambiato
+                                    fontSize: 16,
+                                    fontFamily: 'Montserrat',
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    GestureDetector(
+                      onTap: () async {
+                        if (selectedTopic != null) {
+                          await _saveSelectedTopic();
+                          final user = FirebaseAuth.instance.currentUser;
+
+                          if (user != null && selectedTopic != null) {
+                            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                              'topics': [selectedTopic],
+                            });
+
+                            final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+                            if (userDoc.exists) {
+                              final updatedUserModel = UserModel.fromMap(userDoc.data()!);
+
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MainScreen(userModel: updatedUserModel),
+                                ),
+                                (Route<dynamic> route) => false,
+                              );
+                            }
+                          }
+                        }
+                      },
+                      child: Container(
+                        width: 324,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+                        decoration: BoxDecoration(
+                          color: Colors.white, // Bottone bianco
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(width: 1, color: Colors.white12), // Bordi semi-trasparenti
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Continue',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.black, // Testo nero
+                              fontSize: 16,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: () async {
-                if (selectedTopic != null) {
-                  await _saveSelectedTopic();
-                  if (widget.isRegistration) {
-                    Navigator.pushReplacement(
-                      // ignore: use_build_context_synchronously
-                      context,
-                      MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    );
-                  } else {
-                    // ignore: use_build_context_synchronously
-                    Navigator.pop(context, true); // Indica che abbiamo aggiornato i topic
-                  }
-                }
-              },
-              child: Container(
-                width: 345,
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
-                decoration: ShapeDecoration(
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    side: const BorderSide(width: 1, color: Colors.white),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Start',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.48,
-                    ),
-                  ),
+                  ],
                 ),
               ),
             ),

@@ -50,9 +50,9 @@ class _TopicSelectionSheetState extends State<TopicSelectionSheet> {
       builder: (context, scrollController) {
         return Container(
           padding: const EdgeInsets.all(16.0),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+          decoration: BoxDecoration(
+            color: Colors.black, // Sfondo semi-trasparente
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(25.0)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,7 +64,7 @@ class _TopicSelectionSheetState extends State<TopicSelectionSheet> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 0, 0, 0),
+                    color: Colors.white, // Linea bianca
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -83,9 +83,14 @@ class _TopicSelectionSheetState extends State<TopicSelectionSheet> {
                         margin: const EdgeInsets.symmetric(vertical: 10),
                         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 17),
                         decoration: ShapeDecoration(
-                          color: _selectedTopic == topic ? Colors.black : Colors.white,
+                          color: _selectedTopic == topic
+                              ? Colors.white.withOpacity(0.1) // Selezionato
+                              : Colors.white.withOpacity(0.05), // Non selezionato
                           shape: RoundedRectangleBorder(
-                            side: const BorderSide(width: 1, color: Colors.black),
+                            side: BorderSide(
+                              width: 1,
+                              color: Colors.white.withOpacity(0.12), // Bordi semi-trasparenti
+                            ),
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
@@ -93,7 +98,9 @@ class _TopicSelectionSheetState extends State<TopicSelectionSheet> {
                           child: Text(
                             topic,
                             style: TextStyle(
-                              color: _selectedTopic == topic ? Colors.white : Colors.black,
+                              color: _selectedTopic == topic
+                                  ? Colors.white // Testo bianco se selezionato
+                                  : Colors.white70, // Testo semi-trasparente se non selezionato
                               fontSize: 16,
                               fontFamily: 'Montserrat',
                               fontWeight: FontWeight.w700,

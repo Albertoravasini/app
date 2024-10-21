@@ -1,18 +1,16 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const redis = require('redis');
-const { fetchVideosFromYouTube } = require('./videos/fetchVideos');
-const compression = require('compression');
 const admin = require('firebase-admin');
-const { extractVideoText } = require('./videos/extractVideoText');
-const { OAuth2Client } = require('google-auth-library');
+const compression = require('compression');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = require('./FirebaseAdminsdk.json');
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://<your-project-id>.firebaseio.com"
 });
 
 app.use(bodyParser.json());
@@ -26,130 +24,129 @@ redisClient.on('connect', () => console.log('Connected to Redis'));
   await redisClient.connect();
 })();
 
-// Configurazione OAuth2
-const CLIENT_ID = '666035353608-51dreihqbgdcbk17ga7ijs5c1sv8rb9q.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
-const REDIRECT_URL = 'https://justlearnapp.com/oauth2callback';
-
-const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URL);
-
-app.get('/auth', (req, res) => {
-  console.log('Redirecting to Google OAuth2...');
-  const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline',
-      scope: ['https://www.googleapis.com/auth/youtube.force-ssl'],
-      prompt: 'consent',  // Chiede all'utente di selezionare un account ogni volta
-  });
-  res.redirect(authUrl);
-});
-
-app.get('/oauth2callback', async (req, res) => {
-  const code = req.query.code;
-  console.log('Received OAuth2 callback with code:', code);
+// Funzione per inviare notifiche push
+async function sendPushNotification(token, title, body) {
+  const message = {
+    notification: {
+      title: title,
+      body: body,
+    },
+    token: token,
+  };
 
   try {
-      const { tokens } = await oauth2Client.getToken(code);
-      console.log('Tokens received:', tokens);
-
-      oauth2Client.setCredentials(tokens);
-      // Redirecta con il token di accesso in una query string
-      res.redirect(`/subtitles?accessToken=${tokens.access_token}`);
+    const response = await admin.messaging().send(message);
+    console.log(`Successfully sent message: ${response}`);
   } catch (error) {
-      console.error('Error during OAuth2 callback:', error);
-      res.status(500).send('Authentication failed');
+    console.error(`Error sending message to token ${token}:`, error);
   }
-});
+}
 
-app.get('/subtitles', (req, res) => {
-  const accessToken = req.query.accessToken;
-  if (!accessToken) {
-      console.error('No access token found in query string');
-      return res.status(400).send('Access token missing');
+// Funzione per calcolare il prossimo ritardo di notifica utilizzando backoff esponenziale
+function getNextNotificationDelay(lastNotificationDelay) {
+  if (lastNotificationDelay == null) {
+    return 6 * 60 * 60 * 1000; // 6 ore in millisecondi
+  } else if (lastNotificationDelay < 24 * 60 * 60 * 1000) {
+    return lastNotificationDelay * 2; // Raddoppia l'intervallo
+  } else {
+    return 24 * 60 * 60 * 1000; // Massimo 24 ore in millisecondi
   }
-  console.log('Redirecting back to the app with access token:', accessToken);
+}
 
-  // Questo URL dovrebbe corrispondere a quello configurato per l'app mobile.
-  res.redirect(`justlearnapp://subtitles?accessToken=${accessToken}`);
-});
+// Programma una notifica con un ritardo specificato, evitando ore notturne
+function scheduleNotification(token, title, body, delay) {
+  let sendTime = Date.now() + delay;
+  let sendDate = new Date(sendTime);
+  let hours = sendDate.getHours();
 
-app.post('/extract_video_text', async (req, res) => {
-  const { videoUrl, accessToken } = req.body;
-  console.log('Received request to extract video text for URL:', videoUrl);
-
-  try {
-      const subtitles = await extractVideoText(videoUrl, accessToken);
-      console.log('Subtitles extracted successfully');
-      res.json({ subtitles });
-  } catch (error) {
-      console.error('Failed to extract subtitles:', error);
-      res.status(500).json({ error: 'Failed to extract video text' });
-  }
-});
-
-app.post('/new_videos', async (req, res) => {
-  const { keywords, viewedVideos, pageToken, topic } = req.body;
-  const actualPageToken = pageToken || '';
-
-  console.log(`Request received with keywords: ${keywords.join(', ')}, pageToken: ${actualPageToken}, topic: ${topic}`);
-
-  try {
-    const cachedDataPromises = keywords.map(keyword => redisClient.get(`videos_${keyword}_${actualPageToken}`));
-    const cachedDataResults = await Promise.all(cachedDataPromises);
-
-    let cachedVideos = [];
-    let keywordsToFetch = [];
-
-    cachedDataResults.forEach((cachedData, index) => {
-      if (cachedData) {
-        console.log(`Cache hit for keyword: ${keywords[index]} with pageToken: ${actualPageToken}`);
-        const data = JSON.parse(cachedData);
-        cachedVideos = cachedVideos.concat(data.videoDetails.filter(video => !viewedVideos.includes(video.id)));
-      } else {
-        console.log(`Cache miss for keyword: ${keywords[index]} with pageToken: ${actualPageToken}`);
-        keywordsToFetch.push(keywords[index]);
-      }
-    });
-
-    if (keywordsToFetch.length > 0) {
-      for (const keyword of keywordsToFetch) {
-        console.log(`Fetching videos for keyword: ${keyword} from YouTube API`);
-        const result = await fetchVideosFromYouTube([keyword], actualPageToken, topic);
-        const videoDetails = result.videoDetails;
-        const nextPageToken = result.nextPageToken || '';
-
-        console.log(`Fetched ${videoDetails.length} videos for keyword: ${keyword}`);
-
-        redisClient.setEx(`videos_${keyword}_${actualPageToken}`, 86400, JSON.stringify({ videoDetails, nextPageToken }));
-        console.log(`Stored ${videoDetails.length} videos in cache for keyword: ${keyword} with pageToken: ${actualPageToken}`);
-
-        cachedVideos = cachedVideos.concat(videoDetails.filter(video => !viewedVideos.includes(video.id)));
-      }
-    } else {
-      console.log(`All keywords were cache hits.`);
+  // Se l'ora è tra le 22 e le 8 del mattino, posticipa la notifica alle 8 del mattino successivo
+  if (hours >= 22 || hours < 8) {
+    let nextMorning = new Date(sendDate);
+    if (hours >= 22) {
+      // Aggiungi un giorno se sono dopo le 22
+      nextMorning.setDate(nextMorning.getDate() + 1);
     }
-
-    cachedVideos.sort(() => 0.5 - Math.random());
-    console.log(`Returning ${cachedVideos.length} videos to client.`);
-
-    res.json({ videos: cachedVideos, nextPageToken: '' });
-  } catch (error) {
-    console.error('Error fetching videos:', error);
-    res.status(500).send('Error fetching videos');
+    nextMorning.setHours(8, 0, 0, 0);
+    delay = nextMorning.getTime() - Date.now();
   }
-});
 
-app.post('/extract_video_text', async (req, res) => {
-  const { videoUrl, accessToken } = req.body;
+  console.log(`Scheduling notification: "${title}" to be sent after ${delay / 1000} seconds`);
 
+  setTimeout(() => {
+    console.log(`Sending notification: "${title}" now`);
+    sendPushNotification(token, title, body);
+  }, delay);
+}
+
+// Funzione per programmare la notifica con la nuova logica
+async function schedulePushNotification(uid, token) {
+  console.log(`Scheduling notifications for user ${uid} with token ${token}`);
+  const lastAccess = await redisClient.get(`user_last_access_${uid}`);
+
+  if (!lastAccess) {
+    console.log(`No last access time found for user ${uid}`);
+    return;
+  }
+
+  console.log(`Last access for user ${uid}: ${lastAccess}`);
+
+  // Ottieni l'ultimo ritardo di notifica
+  let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
+  lastNotificationDelay = lastNotificationDelay ? parseInt(lastNotificationDelay) : null;
+
+  // Calcola il prossimo ritardo di notifica
+  const nextNotificationDelay = getNextNotificationDelay(lastNotificationDelay);
+
+  // Salva il prossimo ritardo di notifica
+  await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay);
+
+  // Recupera informazioni sull'utente per personalizzare la notifica
+  let userName = 'Amico';
   try {
-    const subtitles = await extractVideoText(videoUrl, accessToken);
-    res.json({ subtitles });
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      userName = userData.name || 'Amico';
+    }
   } catch (error) {
-    console.error('Error extracting video text:', error);
-    res.status(500).json({ error: 'Failed to extract video text' });
+    console.error(`Error fetching user data for uid ${uid}:`, error);
   }
+
+  // Personalizza il messaggio della notifica
+  const notificationTitle = `⏰ Time’s Ticking!`;
+  const notificationBody = `Don’t let another minute go to waste. Enhance your skills now! 💡📱`;
+
+  // Programma la notifica
+  scheduleNotification(
+    token,
+    notificationTitle,
+    notificationBody,
+    nextNotificationDelay
+  );
+}
+
+// Endpoint per aggiornare l'ultimo accesso dell'utente
+app.post('/update_last_access', async (req, res) => {
+  const { uid, fcmToken } = req.body;
+
+  console.log(`Received request to update last access for user ${uid} with token ${fcmToken}`);
+
+  // Salva l'ultimo accesso su Redis
+  const currentTime = new Date().toISOString();
+  await redisClient.set(`user_last_access_${uid}`, currentTime);
+
+  console.log(`Last access time for user ${uid} set to ${currentTime}`);
+
+  // Reimposta il ritardo di notifica
+  await redisClient.del(`user_last_notification_delay_${uid}`);
+
+  // Programma la notifica utilizzando la nuova logica
+  schedulePushNotification(uid, fcmToken);
+
+  res.send('Last access time updated and notifications scheduled.');
 });
 
+// Avvia il server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

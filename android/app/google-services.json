@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "771313118088",
+    "project_id": "app-just-learn",
+    "storage_bucket": "app-just-learn.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771313118088:android:cc00ee9377cbe94e35a83d",
+        "android_client_info": {
+          "package_name": "com.example.justlearn"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "771313118088-9b6crj5embs8q4sqf4rqoji5qbrqmaof.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.justlearn",
+            "certificate_hash": "c64c9236670134f15ce955b17cb45b624cbe36ee"
+          }
+        },
+        {
+          "client_id": "771313118088-bknlrhejom7firh4fh37vgd9fq063ufm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCjoxjtorOADx1oWdcCmoIO3xT-rjMkB4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "771313118088-bknlrhejom7firh4fh37vgd9fq063ufm.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "771313118088-0q718885dli0amli39geraseuaetdffo.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.justlearn"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

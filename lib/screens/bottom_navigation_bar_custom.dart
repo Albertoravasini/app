@@ -1,6 +1,6 @@
-import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:Just_Learn/models/user.dart';
 
 class BottomNavigationBarCustom extends StatefulWidget {
   final UserModel? currentUser;
@@ -15,7 +15,6 @@ class BottomNavigationBarCustom extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
   _BottomNavigationBarCustomState createState() => _BottomNavigationBarCustomState();
 }
 
@@ -26,126 +25,79 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
       return const SizedBox.shrink();
     }
 
-    double screenWidth = MediaQuery.of(context).size.width;
-    double containerWidth = 345.0;
-    double horizontalMargin = (screenWidth - containerWidth) / 2;
-
     return Container(
-      width: containerWidth,
+      width: double.infinity,
       height: 55,
-      margin: EdgeInsets.only(bottom: 20, left: horizontalMargin, right: horizontalMargin),
-      padding: const EdgeInsets.symmetric(vertical: 5.5, horizontal: 25),
-      clipBehavior: Clip.antiAlias,
-      decoration: ShapeDecoration(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          side: const BorderSide(width: 1, color: Colors.white),
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
+      color: Colors.black,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Primo pulsante (Home)
+          // Icona per la schermata corsi
           GestureDetector(
-            onTap: () => widget.onItemTapped(0),  // Usa il callback qui
-            child: SizedBox(
-              width: 59,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/ph_castle-turret-fill.svg', // Icona custom per Home
-                    color: widget.selectedIndex == 0 ? Colors.black : Colors.black,
-                  ),
-                  const SizedBox(height: 3),
-                  if (widget.selectedIndex == 0)
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const ShapeDecoration(
-                        color: Colors.black,
-                        shape: OvalBorder(),
-                      ),
-                    ),
-                ],
-              ),
+            onTap: () => widget.onItemTapped(0),
+            child: _buildNavItem(
+              'assets/fluent_hat-graduation-sparkle-24-filled.svg',  // Icona Corsi
+              widget.selectedIndex == 0,
             ),
           ),
-          Container(width: 59), // Spaziatura tra i pulsanti
+          const SizedBox(width: 59),  // Spaziatura tra le icone
 
-          // Secondo pulsante (centrale con design personalizzato)
+          // Icona per la schermata Home
           GestureDetector(
-            onTap: () => widget.onItemTapped(1),  // Usa il callback qui
-            child: Container(
-              width: 59,
-              height: 39,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
-              decoration: ShapeDecoration(
-                color: Colors.black,
-                shape: RoundedRectangleBorder(
-                  side: const BorderSide(width: 1, color: Colors.white),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                shadows: const [
-                  BoxShadow(
-                    color: Color(0x3F000000),
-                    blurRadius: 4,
-                    offset: Offset(0, 4),
-                    spreadRadius: 0,
-                  ),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  '?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                  ),
-                ),
-              ),
+            onTap: () => widget.onItemTapped(1),
+            child: _buildNavItem(
+              'assets/ph_castle-turret-fill.svg',  // Icona Home
+              widget.selectedIndex == 1,
             ),
           ),
-          Container(width: 59), // Spaziatura tra i pulsanti
+          const SizedBox(width: 59),  // Spaziatura tra le icone
 
-          // Terzo pulsante (Settings)
+          // Icona per la schermata Quiz
           GestureDetector(
-            onTap: () => widget.onItemTapped(2),  // Usa il callback qui
-            child: SizedBox(
-              width: 59,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SvgPicture.asset(
-                    'assets/iconamoon_profile-bold.svg', // Icona custom per Settings
-                    color: widget.selectedIndex == 2 ? Colors.black : Colors.black,
-                  ),
-                  const SizedBox(height: 3),
-                  if (widget.selectedIndex == 2)
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const ShapeDecoration(
-                        color: Colors.black,
-                        shape: OvalBorder(),
-                      ),
-                    ),
-                ],
-              ),
+            onTap: () => widget.onItemTapped(2),  // Schermata Quiz
+            child: _buildNavItem(
+              'assets/ic_round-quiz.svg',  // Icona per la schermata Quiz (puoi cambiare l'icona)
+              widget.selectedIndex == 2,
+            ),
+          ),
+          const SizedBox(width: 59),  // Spaziatura tra le icone
+
+          // Icona per la schermata Impostazioni
+          GestureDetector(
+            onTap: () => widget.onItemTapped(3),  // Schermata Impostazioni
+            child: _buildNavItem(
+              'assets/iconamoon_profile-fill.svg',  // Icona Impostazioni
+              widget.selectedIndex == 3,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Metodo per costruire un elemento della barra di navigazione
+  Widget _buildNavItem(String assetPath, bool isSelected) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SvgPicture.asset(
+          assetPath,
+          color: isSelected ? Colors.white : const Color(0xFF434348),
+        ),
+        if (isSelected)
+          const SizedBox(height: 3),
+        if (isSelected)
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const ShapeDecoration(
+              color: Colors.white,
+              shape: OvalBorder(),
+            ),
+          ),
+      ],
     );
   }
 }

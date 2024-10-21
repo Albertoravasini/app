@@ -3,10 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 
 class UserManagementScreen extends StatefulWidget {
-  const UserManagementScreen({super.key});
-
   @override
-  // ignore: library_private_types_in_public_api
   _UserManagementScreenState createState() => _UserManagementScreenState();
 }
 
@@ -14,15 +11,51 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   String _searchText = '';
   String _sortField = 'name';
   bool _isAscending = true;
+  int _totalSubscribeClicks = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _getTotalSubscribeClicks(); // Carica il totale dei clic all'inizio
+  }
+
+  Future<void> _getTotalSubscribeClicks() async {
+  QuerySnapshot querySnapshot = await FirebaseFirestore.instance.collection('users').get();
+  int totalClicks = 0;
+
+  for (var doc in querySnapshot.docs) {
+    // Controlla se il documento non è nullo e contiene il campo 'subscribeClicks'
+    final data = doc.data() as Map<String, dynamic>?; // Verifica se i dati non sono nulli
+    if (data != null && data.containsKey('subscribeClicks')) {
+      totalClicks += (data['subscribeClicks'] ?? 0) as int; // Somma i clic di ogni utente
+    }
+  }
+
+  setState(() {
+    _totalSubscribeClicks = totalClicks; // Aggiorna il totale dei clic
+  });
+}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gestione Utenti', style: TextStyle(color: Colors.white)),
+        title: Text('Gestione Utenti'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(
+              child: Text(
+                'Totale Click Subscribe: $_totalSubscribeClicks', // Mostra il numero totale di click
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
+          // Campo di ricerca
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
@@ -33,7 +66,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               },
               decoration: InputDecoration(
                 hintText: 'Cerca utenti...',
-                prefixIcon: const Icon(Icons.search, color: Colors.white),
+                prefixIcon: Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -43,27 +76,28 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
             ),
           ),
+          // Dropdown per ordinare gli utenti
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               DropdownButton<String>(
                 value: _sortField,
-                items: const [
+                items: [
                   DropdownMenuItem(
-                    value: 'name',
                     child: Text('Nome'),
+                    value: 'name',
                   ),
                   DropdownMenuItem(
-                    value: 'email',
                     child: Text('Email'),
+                    value: 'email',
                   ),
                   DropdownMenuItem(
-                    value: 'consecutiveDays',
                     child: Text('Giorni consecutivi'),
+                    value: 'consecutiveDays',
                   ),
                   DropdownMenuItem(
-                    value: 'lastAccess',
                     child: Text('Ultimo accesso'),
+                    value: 'lastAccess',
                   ),
                 ],
                 onChanged: (value) {
@@ -82,12 +116,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
             ],
           ),
+          // Elenco utenti
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance.collection('users').snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(child: CircularProgressIndicator());
                 }
 
                 var users = snapshot.data!.docs.map((doc) {
@@ -95,6 +130,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   return UserModel.fromMap(data);
                 }).toList();
 
+                // Filtro per ricerca
                 if (_searchText.isNotEmpty) {
                   users = users.where((user) {
                     return user.name.toLowerCase().contains(_searchText.toLowerCase()) ||
@@ -102,10 +138,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   }).toList();
                 }
 
+                // Ordinamento
                 users.sort((a, b) {
                   final aValue = a.toMap()[_sortField];
                   final bValue = b.toMap()[_sortField];
-
                   int comparison;
                   if (aValue is String && bValue is String) {
                     comparison = aValue.compareTo(bValue);
@@ -116,12 +152,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   } else {
                     comparison = 0;
                   }
-
                   return _isAscending ? comparison : -comparison;
                 });
 
                 if (users.isEmpty) {
-                  return const Center(child: Text('Nessun utente trovato', style: TextStyle(color: Colors.white)));
+                  return Center(
+                    child: Text('Nessun utente trovato', style: TextStyle(color: Colors.white)),
+                  );
                 }
 
                 return ListView.builder(
@@ -129,35 +166,55 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   itemBuilder: (context, index) {
                     final user = users[index];
                     return ListTile(
-                      title: Text(user.name, style: const TextStyle(color: Colors.white)),
-                      subtitle: Text(user.email, style: const TextStyle(color: Colors.white)),
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(user.name, style: const TextStyle(color: Colors.black)),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('Email: ${user.email}', style: const TextStyle(color: Colors.black)),
-                                Text('Giorni consecutivi: ${user.consecutiveDays}', style: const TextStyle(color: Colors.black)),
-                                Text('Ultimo accesso: ${user.lastAccess}', style: const TextStyle(color: Colors.black)),
-                                Text('Argomenti: ${user.topics.join(', ')}', style: const TextStyle(color: Colors.black)),
-                                ...user.WatchedVideos.entries.map((entry) => Text('${entry.key}: ${entry.value.length} video', style: const TextStyle(color: Colors.black))),
-                              ],
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                },
-                                child: const Text('Chiudi', style: TextStyle(color: Colors.black)),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
+  title: Text(user.name, style: TextStyle(color: Colors.white)),
+  subtitle: Text(user.email, style: TextStyle(color: Colors.white)),
+  trailing: user.uid != null && user.uid.isNotEmpty // Verifica se user.uid è valido
+      ? StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Text('Loading...', style: TextStyle(color: Colors.white));
+            }
+            // Cast esplicito a Map<String, dynamic>
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final userClicks = data['subscribeClicks'] ?? 0;
+            
+            // Se il numero di clic è diverso da 0, il testo sarà giallo, altrimenti bianco
+            return Text(
+              'Subscribe Clicks: $userClicks',
+              style: TextStyle(
+                color: userClicks != 0 ? Colors.yellowAccent : Colors.white, // Colore giallo se i click sono > 0
+              ),
+            );
+          },
+        )
+      : Text('N/A', style: TextStyle(color: Colors.white)), // Gestione del caso in cui user.uid è vuoto
+  onTap: () {
+    // Logica per visualizzare ulteriori dettagli sull'utente
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(user.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Email: ${user.email}'),
+            Text('Giorni consecutivi: ${user.consecutiveDays}'),
+            Text('Ultimo accesso: ${user.lastAccess}'),
+            Text('Argomenti: ${user.topics.join(', ')}'),
+            ...user.WatchedVideos.entries.map((entry) => Text('${entry.key}: ${entry.value.length} video guardati')),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Chiudi'),
+          ),
+        ],
+      ),
+    );
+  },
+);
                   },
                 );
               },

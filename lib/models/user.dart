@@ -8,10 +8,13 @@ class UserModel {
   final List<String> topics;
   final Map<String, List<VideoWatched>> WatchedVideos;
   final Map<String, List<String>> answeredQuestions;
+  final Map<String, int> currentSteps; // Memorizza lo step corrente per ogni sezione
+  final List<String> completedSections; // Memorizza le sezioni completate
   int consecutiveDays;
   DateTime lastAccess;
   final String role;
-  final List<Notification> notifications; // Aggiungi questo campo
+  final List<Notification> notifications;
+  int coins;
 
   UserModel({
     required this.uid,
@@ -20,59 +23,49 @@ class UserModel {
     required this.topics,
     required this.WatchedVideos,
     required this.answeredQuestions,
+    required this.currentSteps, // Inizializza lo stato dello step corrente
+    required this.completedSections, // Inizializza lo stato delle sezioni completate
     required this.consecutiveDays,
     required this.lastAccess,
     required this.role,
-    this.notifications = const [], // Inizializza come lista vuota
+    this.notifications = const [],
+    required this.coins,
   });
 
-  // Aggiungi questo nella classe UserModel, all'interno del factory UserModel.fromMap.
-factory UserModel.fromMap(Map<String, dynamic> data) {
-  var watchedVideosFromData = data['WatchedVideos'] as Map<String, dynamic>? ?? {};
-  Map<String, List<VideoWatched>> WatchedVideos = watchedVideosFromData.map((topic, videoList) {
-    List<VideoWatched> videosWatchedList = (videoList as List).map((videoData) => VideoWatched.fromMap(videoData)).toList();
-    return MapEntry(topic, videosWatchedList);
-  });
+  // Factory per creare un UserModel dai dati Firestore
+  factory UserModel.fromMap(Map<String, dynamic> data) {
+    var watchedVideosFromData = data['WatchedVideos'] as Map<String, dynamic>? ?? {};
+    Map<String, List<VideoWatched>> WatchedVideos = watchedVideosFromData.map((topic, videoList) {
+      List<VideoWatched> videosWatchedList = (videoList as List).map((videoData) => VideoWatched.fromMap(videoData)).toList();
+      return MapEntry(topic, videosWatchedList);
+    });
 
-  var answeredQuestionsFromData = data['answeredQuestions'] as Map<String, dynamic>? ?? {};
-  Map<String, List<String>> answeredQuestions = answeredQuestionsFromData.map((level, questions) {
-    return MapEntry(level, List<String>.from(questions as List));
-  });
+    var answeredQuestionsFromData = data['answeredQuestions'] as Map<String, dynamic>? ?? {};
+    Map<String, List<String>> answeredQuestions = answeredQuestionsFromData.map((level, questions) {
+      return MapEntry(level, List<String>.from(questions as List));
+    });
 
-  var notificationsFromData = data['notifications'] as List<dynamic>? ?? [];
-  List<Notification> notifications = [];
+    var notificationsFromData = data['notifications'] as List<dynamic>? ?? [];
+    List<Notification> notifications = notificationsFromData.map((notificationData) => Notification.fromMap(notificationData)).toList();
 
-  try {
-    print('Parsing le notifiche...');
-    notifications = notificationsFromData.map((notificationData) {
-      print('Dati notifica: $notificationData');
-      return Notification.fromMap(notificationData);
-    }).toList();
-
-    // Rimuovi duplicati in base all'ID della notifica
-    final uniqueNotifications = {for (var n in notifications) n.id: n}.values.toList();
-    notifications = uniqueNotifications;
-
-  } catch (e) {
-    print('Errore durante la conversione delle notifiche: $e');
+    return UserModel(
+      uid: data['uid'] ?? '',
+      email: data['email'] ?? '',
+      name: data['name'] ?? '',
+      topics: List<String>.from(data['topics'] ?? []),
+      WatchedVideos: WatchedVideos,
+      answeredQuestions: answeredQuestions,
+      currentSteps: Map<String, int>.from(data['currentSteps'] ?? {}), // Carica lo step corrente
+      completedSections: List<String>.from(data['completedSections'] ?? []), // Carica le sezioni completate
+      consecutiveDays: data['consecutiveDays'] ?? 0,
+      lastAccess: data['lastAccess'] != null ? DateTime.parse(data['lastAccess']) : DateTime.now(),
+      role: data['role'] ?? 'user',
+      notifications: notifications,
+      coins: data['coins'] ?? 0,  // Assicurati che il campo coins sia nel database
+    );
   }
 
-  print('Notifiche finali: $notifications'); // Debug per vedere le notifiche finali
-
-  return UserModel(
-    uid: data['uid'] ?? '',
-    email: data['email'] ?? '',
-    name: data['name'] ?? '',
-    topics: List<String>.from(data['topics'] ?? []),
-    WatchedVideos: WatchedVideos,
-    answeredQuestions: answeredQuestions,
-    consecutiveDays: data['consecutiveDays'] ?? 0,
-    lastAccess: data['lastAccess'] != null ? DateTime.parse(data['lastAccess']) : DateTime.now(),
-    role: data['role'] ?? 'user',
-    notifications: notifications, // Aggiungi questa linea
-  );
-}
-
+  // Metodo per convertire un UserModel in una mappa compatibile con Firestore
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
@@ -81,40 +74,44 @@ factory UserModel.fromMap(Map<String, dynamic> data) {
       'topics': topics,
       'WatchedVideos': WatchedVideos.map((topic, videos) => MapEntry(topic, videos.map((video) => video.toMap()).toList())),
       'answeredQuestions': answeredQuestions,
+      'currentSteps': currentSteps, // Mappa lo step corrente
+      'completedSections': completedSections, // Mappa le sezioni completate
       'consecutiveDays': consecutiveDays,
       'lastAccess': lastAccess.toIso8601String(),
       'role': role,
-      'notifications': notifications.map((notification) => notification.toMap()).toList(), // Aggiungi questa linea
+      'notifications': notifications.map((notification) => notification.toMap()).toList(),
+      'coins': coins,
     };
   }
 }
 
+// Modello per la gestione delle notifiche
 class Notification {
   final String id;
   final String message;
-  bool isRead; // Rimuovi `final` per rendere modificabile questo campo
+  bool isRead;
   final DateTime timestamp;
   final String? videoId;
 
   Notification({
     required this.id,
     required this.message,
-    this.isRead = false, // Puoi modificare questo campo in futuro
+    this.isRead = false,
     required this.timestamp,
     this.videoId,
   });
 
   factory Notification.fromMap(Map<String, dynamic> data) {
-  return Notification(
-    id: data['id'] ?? '',
-    message: data['message'] ?? '',
-    isRead: data['isRead'] ?? false,
-    timestamp: data['timestamp'] is Timestamp
-        ? (data['timestamp'] as Timestamp).toDate()
-        : DateTime.parse(data['timestamp']), // Aggiungi questo per gestire il caso in cui sia una stringa
-    videoId: data['videoId'],
-  );
-}
+    return Notification(
+      id: data['id'] ?? '',
+      message: data['message'] ?? '',
+      isRead: data['isRead'] ?? false,
+      timestamp: data['timestamp'] is Timestamp
+          ? (data['timestamp'] as Timestamp).toDate()
+          : DateTime.parse(data['timestamp']),
+      videoId: data['videoId'],
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -132,6 +129,7 @@ class Notification {
   }
 }
 
+// Modello per la gestione dei video guardati
 class VideoWatched {
   final String videoId;
   final String title;
@@ -159,10 +157,12 @@ class VideoWatched {
     };
   }
 }
+
+// Modello per la gestione dei commenti
 class Comment {
   final String commentId;
   final String userId;
-  final String username; // Aggiungi questo campo
+  final String username;
   final String videoId;
   final String content;
   final DateTime timestamp;
@@ -172,7 +172,7 @@ class Comment {
   Comment({
     required this.commentId,
     required this.userId,
-    required this.username, // Aggiungi questo campo
+    required this.username,
     required this.videoId,
     required this.content,
     required this.timestamp,
@@ -184,7 +184,7 @@ class Comment {
     return Comment(
       commentId: data['commentId'] ?? '',
       userId: data['userId'] ?? '',
-      username: data['username'] ?? '', // Aggiungi questo campo
+      username: data['username'] ?? '',
       videoId: data['videoId'] ?? '',
       content: data['content'] ?? '',
       timestamp: data['timestamp'] is Timestamp
@@ -202,7 +202,7 @@ class Comment {
     return {
       'commentId': commentId,
       'userId': userId,
-      'username': username, // Aggiungi questo campo
+      'username': username,
       'videoId': videoId,
       'content': content,
       'timestamp': timestamp.toIso8601String(),

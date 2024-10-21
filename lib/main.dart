@@ -1,12 +1,14 @@
 import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:Just_Learn/screens/access/register_screen.dart';
 import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
-import 'package:Just_Learn/screens/access/welcome_screen.dart';
-import 'package:Just_Learn/screens/access/splash_screen.dart'; // Importa la Splash Screen
-import 'package:Just_Learn/screens/futuristic_screen.dart';
+import 'package:Just_Learn/screens/access/splash_screen.dart';
+import 'package:Just_Learn/screens/course_screen.dart';
+import 'package:Just_Learn/screens/quiz_screen.dart';
+import 'package:Just_Learn/services/%20notification_service.dart';
 import 'package:Just_Learn/services/auth_service.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,16 +20,31 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navigazione personalizzata
 
+// Navigator key globale per accedere al contesto fuori dal MaterialApp
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inizializza Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+
+  // Ottenere l'utente corrente (se autenticato)
+  User? currentUser = FirebaseAuth.instance.currentUser;
+
+  // Inizializza il servizio notifiche
+  final NotificationService notificationService = NotificationService();
+  await notificationService.initialize();
+
+  runApp(MyApp(user: currentUser));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final User? user;
+
+  const MyApp({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +60,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Education App',
+        navigatorKey: navigatorKey,
         theme: ThemeData(
           primaryColor: Colors.white,
           scaffoldBackgroundColor: Colors.black,
@@ -91,43 +109,30 @@ class MyApp extends StatelessWidget {
               color: Colors.white,
             ),
           ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              textStyle: const TextStyle(
-                fontFamily: 'Montserrat',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),// Personalizza il colore della rotella di caricamento (CircularProgressIndicator)
           progressIndicatorTheme: const ProgressIndicatorThemeData(
-            color: Colors.white, // Cambia la rotella di caricamento a bianco
+            color: Colors.white,
           ),
-          // Personalizza il colore dell'evidenziazione del testo
           textSelectionTheme: const TextSelectionThemeData(
-            selectionColor: Color.fromARGB(130, 158, 158, 158), // Colore dell'evidenziazione del testo
-            selectionHandleColor: Color.fromARGB(130, 158, 158, 158), // Colore del "manico" di selezione
-            cursorColor: Colors.white, // Colore della lineetta del cursore
+            selectionColor: Color.fromARGB(130, 158, 158, 158),
+            selectionHandleColor: Color.fromARGB(130, 158, 158, 158),
+            cursorColor: Colors.white,
           ),
-          // Personalizzazione globale degli errori con SnackBar
           snackBarTheme: SnackBarThemeData(
-            backgroundColor: Colors.white, // Sfondo bianco
-            contentTextStyle: const TextStyle(color: Colors.black), // Testo nero
+            backgroundColor: Colors.white,
+            contentTextStyle: const TextStyle(color: Colors.black),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12), // Bordi arrotondati
+              borderRadius: BorderRadius.circular(12),
             ),
-            behavior: SnackBarBehavior.floating, // SnackBar fluttuante sopra il contenuto
+            behavior: SnackBarBehavior.floating,
           ),
         ),
-        home: const SplashScreen(), // SplashScreen come la schermata iniziale
+        home: const SplashScreen(),
         routes: {
           '/home': (context) => const HomeScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
           '/admin': (context) => const AdminPanelScreen(),
-          '/welcome': (context) => const WelcomeScreen(),
           '/privacy-policy': (context) => const PrivacyPolicyScreen(),
         },
       ),
@@ -145,31 +150,30 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const Center(child: ComingSoonAI()),
-    const SettingsScreen(currentUser: null),
-  ];
+  int _selectedIndex = 1;
 
   void _onItemTapped(int index) {
     setState(() {
-      _selectedIndex = index;
+      _selectedIndex = index;  // Cambia l'indice selezionato
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Inizializziamo _screens qui, dove è possibile accedere a widget
+    final List<Widget> _screens = [
+      const CourseScreen(),
+      const HomeScreen(),
+      const QuizScreen(),
+      SettingsScreen(currentUser: widget.userModel),  // Qui ora puoi accedere a widget.userModel
+    ];
+
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: _screens[_selectedIndex],  // Mostra la schermata selezionata
       bottomNavigationBar: BottomNavigationBarCustom(
         currentUser: widget.userModel,
         selectedIndex: _selectedIndex,
-        onItemTapped: _onItemTapped,
+        onItemTapped: _onItemTapped,  // Callback per cambiare schermata
       ),
     );
   }

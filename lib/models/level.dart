@@ -50,47 +50,56 @@ class Level {
 class LevelStep {
   final String type;
   final String content;
+  final String? videoUrl; // Aggiungi questo campo
   final List<String>? choices;
   final String? correctAnswer;
   final String? explanation;
   final String? thumbnailUrl;
-  final bool isShort;  // Nuovo campo aggiunto
-  final String? fullText; // Aggiunto per il testo completo del video
+  final bool isShort;
+  final String? fullText;
+  String? topic; // Aggiungi questo campo se non esiste
+  
 
   LevelStep({
     required this.type,
     required this.content,
+    this.videoUrl, // Assicurati che questo campo sia incluso nel costruttore
     this.choices,
     this.correctAnswer,
     this.explanation,
     this.thumbnailUrl,
-    this.isShort = false, // Imposta false come valore predefinito
-    this.fullText, // Campo opzionale per il testo completo
+    this.isShort = false,
+    this.fullText,
+    this.topic, // Aggiungi questo parametro nel costruttore
   });
 
   factory LevelStep.fromMap(Map<String, dynamic> data) {
     return LevelStep(
       type: data['type'] ?? '',
       content: data['content'] ?? '',
+      videoUrl: data['videoUrl'], // Mappalo dal database
       choices: List<String>.from(data['choices'] ?? []),
       correctAnswer: data['correctAnswer'],
       explanation: data['explanation'],
       thumbnailUrl: data['thumbnailUrl'],
-      isShort: data['isShort'] ?? false,  // Recupera il valore dal database
-      fullText: data['fullText'], // Recupera il testo completo
+      isShort: data['isShort'] ?? false,
+      fullText: data['fullText'],
+      topic: data['topic'], // Assicurati che questo venga estratto correttamente
     );
   }
+  
 
   Map<String, dynamic> toMap() {
     return {
       'type': type,
       'content': content,
+      'videoUrl': videoUrl, // Assicurati che venga mappato correttamente
       'choices': choices,
       'correctAnswer': correctAnswer,
       'explanation': explanation,
       'thumbnailUrl': thumbnailUrl,
-      'isShort': isShort,  // Salva il valore nel database
-      'fullText': fullText, // Salva il testo completo nel database
+      'isShort': isShort,
+      'fullText': fullText,
     };
   }
 }

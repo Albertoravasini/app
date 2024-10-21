@@ -1,5 +1,6 @@
 import 'package:Just_Learn/admin_panel/bulk_shorts_screen.dart';
 import 'package:Just_Learn/admin_panel/chart_screen.dart';
+import 'package:Just_Learn/admin_panel/course_management_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -82,7 +83,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const UserManagementScreen()),
+                MaterialPageRoute(builder: (context) =>  UserManagementScreen()),
               );
             },
           ),
@@ -109,6 +110,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => BulkShortsScreen()), // Naviga alla nuova schermata
+              );
+            },
+          ),
+          ListTile(
+            title: const Text('Corsi', style: TextStyle(color: Colors.white)),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CourseManagementScreen()),
               );
             },
           ),
