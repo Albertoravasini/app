@@ -10,7 +10,7 @@ const port = process.env.PORT || 3000;
 const serviceAccount = require('./FirebaseAdminsdk.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://<your-project-id>.firebaseio.com"
+  databaseURL: "https://app-just-learn.firebaseio.com"
 });
 
 app.use(bodyParser.json());
