@@ -56,6 +56,7 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
   void _addLevel() {
     setState(() {
       _levels.add({
+        'id': DateTime.now().millisecondsSinceEpoch.toString(), // Identificatore unico
         'subtopic': '',
         'title': '',
         'videoId': '',
@@ -73,45 +74,45 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
 
   // Funzione per controllare se un video ID esiste in tutto il database
   Future<void> _checkVideoExists(int index, String videoId) async {
-  if (videoId.isEmpty) {
-    setState(() {
-      _levels[index]['videoExists'] = false;
-    });
-    return;
-  }
-
-  try {
-    print("Controllo se esiste l'ID video: $videoId");
-
-    // Recupera tutti i documenti dalla collezione 'levels'
-    final querySnapshot = await FirebaseFirestore.instance.collection('levels').get();
-
-    bool videoExists = false;
-
-    for (var doc in querySnapshot.docs) {
-      // Ottieni il campo 'steps' dal documento
-      List<dynamic> steps = doc['steps'];
-
-      // Controlla se uno degli step contiene il videoId specificato
-      for (var step in steps) {
-        if (step['type'] == 'video' && step['content'] == videoId) {
-          videoExists = true;
-          break;
-        }
-      }
-
-      if (videoExists) break;
+    if (videoId.isEmpty) {
+      setState(() {
+        _levels[index]['videoExists'] = false;
+      });
+      return;
     }
 
-    setState(() {
-      _levels[index]['videoExists'] = videoExists;
-    });
+    try {
+      print("Controllo se esiste l'ID video: $videoId");
 
-    print("L'ID video esiste? ${_levels[index]['videoExists']}");
-  } catch (e) {
-    print("Errore durante il controllo dell'ID video: $e");
+      // Recupera tutti i documenti dalla collezione 'levels'
+      final querySnapshot = await FirebaseFirestore.instance.collection('levels').get();
+
+      bool videoExists = false;
+
+      for (var doc in querySnapshot.docs) {
+        // Ottieni il campo 'steps' dal documento
+        List<dynamic> steps = doc['steps'];
+
+        // Controlla se uno degli step contiene il videoId specificato
+        for (var step in steps) {
+          if (step['type'] == 'video' && step['content'] == videoId) {
+            videoExists = true;
+            break;
+          }
+        }
+
+        if (videoExists) break;
+      }
+
+      setState(() {
+        _levels[index]['videoExists'] = videoExists;
+      });
+
+      print("L'ID video esiste? ${_levels[index]['videoExists']}");
+    } catch (e) {
+      print("Errore durante il controllo dell'ID video: $e");
+    }
   }
-}
 
   Future<void> _saveLevels() async {
     if (_selectedTopic == null) {
@@ -153,11 +154,18 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
       batch.set(FirebaseFirestore.instance.collection('levels').doc(), levelData);
     }
 
-    await batch.commit();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Livelli aggiunti con successo')),
-    );
-    Navigator.pop(context);
+    try {
+      await batch.commit();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Livelli aggiunti con successo')),
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore durante il salvataggio: $e')),
+      );
+      // Non fare nulla qui per mantenere lo stato corrente
+    }
   }
 
   Future<void> _createSubtopic(int index) async {
@@ -229,7 +237,6 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                 labelText: 'Seleziona Topic',
                 labelStyle: TextStyle(color: Colors.white),
               ),
-              
               items: _topics.map((topic) {
                 return DropdownMenuItem(
                   value: topic,
@@ -253,7 +260,9 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
               child: ListView.builder(
                 itemCount: _levels.length,
                 itemBuilder: (context, index) {
+                  final level = _levels[index];
                   return Card(
+                    key: ValueKey(level['id']), // Assegna la chiave unica
                     margin: const EdgeInsets.symmetric(vertical: 10),
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -286,24 +295,23 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                                       });
                                     }
                                   },
-                                  value: _levels[index]['subtopic'].isEmpty
-                                      ? null
-                                      : _levels[index]['subtopic'],
+                                  value: level['subtopic'].isEmpty ? null : level['subtopic'],
                                   style: TextStyle(color: Colors.black),
                                   dropdownColor: Colors.white,
                                 ),
                               ),
                               SizedBox(width: 10),
                               Text(
-                                'Livello: ${_levels[index]['levelNumber']}',
+                                'Livello: ${level['levelNumber']}',
                                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                               ),
                             ],
                           ),
                           SizedBox(height: 10),
                           TextFormField(
-                                                        decoration: InputDecoration(labelText: 'Titolo'),
-                                                        style: TextStyle(color: Colors.black),
+                            decoration: InputDecoration(labelText: 'Titolo'),
+                            style: TextStyle(color: Colors.black),
+                            initialValue: level['title'],
                             onChanged: (value) {
                               setState(() {
                                 _levels[index]['title'] = value;
@@ -314,11 +322,10 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                           TextFormField(
                             decoration: InputDecoration(
                               labelText: 'ID Video',
-                              errorText: _levels[index]['videoExists']
-                                  ? 'ID video già esistente'
-                                  : null,
+                              errorText: level['videoExists'] ? 'ID video già esistente' : null,
                             ),
                             style: TextStyle(color: Colors.black),
+                            initialValue: level['videoId'],
                             onChanged: (value) {
                               setState(() {
                                 _levels[index]['videoId'] = value;
