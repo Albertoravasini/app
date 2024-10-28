@@ -84,7 +84,7 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
                     widget.step.content,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 36,
+                      fontSize: 30,
                       fontFamily: 'Montserrat',
                       fontWeight: FontWeight.w800,
                     ),

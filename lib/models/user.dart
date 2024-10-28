@@ -14,6 +14,7 @@ class UserModel {
   DateTime lastAccess;
   final String role;
   final List<Notification> notifications;
+  List<String> unlockedCourses; // Remove 'final' to allow updates
   int coins;
 
   UserModel({
@@ -29,6 +30,7 @@ class UserModel {
     required this.lastAccess,
     required this.role,
     this.notifications = const [],
+    this.unlockedCourses = const [],
     required this.coins,
   });
 
@@ -62,6 +64,7 @@ class UserModel {
       role: data['role'] ?? 'user',
       notifications: notifications,
       coins: data['coins'] ?? 0,  // Assicurati che il campo coins sia nel database
+      unlockedCourses: List<String>.from(data['unlockedCourses'] ?? []),
     );
   }
 
@@ -81,6 +84,7 @@ class UserModel {
       'role': role,
       'notifications': notifications.map((notification) => notification.toMap()).toList(),
       'coins': coins,
+      'unlockedCourses': unlockedCourses,
     };
   }
 }

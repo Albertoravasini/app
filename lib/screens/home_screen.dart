@@ -297,41 +297,13 @@ void _updateCoins(int newCoins) {
         children: [
           SizedBox(
             width: double.infinity,
-            height: 76,
+            height: 34,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-  onTap: _openSubtopicSelectionSheet,
-  child: Container(
-    width: double.infinity,  // Assicurati che abbia la stessa larghezza
-    height: 34,
-    decoration: ShapeDecoration(
-      color: const Color(0xFF181819),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10),
-      ),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          selectedSubtopic ?? 'Select Sub-Topic',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            height: 1.0,
-            letterSpacing: 0.48,
-          ),
-        ),
-      ],
-    ),
-  ),
-),
-                const SizedBox(height: 8),
+               
                 Container(
   width: double.infinity,  // Larghezza massima
   height: 34,

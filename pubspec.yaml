@@ -2,7 +2,7 @@ name: Just_Learn
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 2.3.0+32
+version: 2.3.2+35
 
 environment:
   sdk: '>=3.4.3 <4.0.0'
@@ -33,11 +33,11 @@ dependencies:
   flutter_animated_icons: ^1.0.0 # Aggiungi questa linea
   flutter_vibrate: ^1.3.0
   carousel_slider: ^5.0.0
-  flutter_local_notifications: ^17.2.3
   firebase_messaging: ^15.1.3
   vibration: ^2.0.1
   audioplayers: ^6.1.0 
   sign_in_with_apple: ^6.1.3
+  firebase_analytics: ^11.3.3
 
 dev_dependencies:
   flutter_test:

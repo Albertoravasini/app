@@ -38,15 +38,18 @@ print('Permessi notifiche: ${settings.authorizationStatus}');
 
   // Ottenere il token FCM e inviarlo al server
   void _getToken() async {
+  try {
     String? token = await _firebaseMessaging.getToken();
     print("FCM Token: $token");
 
     if (token != null) {
-      // Invia il token al backend
-      String uid = "ID_UNICO_UTENTE";  // Cambia con l'UID dell'utente autenticato
+      String uid = "ID_UNICO_UTENTE";  // Replace with authenticated user UID
       await updateLastAccess(uid, token);
     }
+  } catch (e) {
+    print("Error getting FCM token: $e");
   }
+}
 
   // Mostra una notifica in foreground
   void _showForegroundNotification(RemoteMessage message) {

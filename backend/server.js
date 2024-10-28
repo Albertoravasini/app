@@ -3,10 +3,13 @@ const bodyParser = require('body-parser');
 const redis = require('redis');
 const admin = require('firebase-admin');
 const compression = require('compression');
+const generateQuestionsRouter = require('./questions/generate_questions'); // Importa il router
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Inizializza Firebase Admin SDK
 const serviceAccount = require('./FirebaseAdminsdk.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -23,6 +26,9 @@ redisClient.on('connect', () => console.log('Connected to Redis'));
 (async () => {
   await redisClient.connect();
 })();
+
+// Usa il router per l'endpoint /generate_questions
+app.use('/generate_questions', generateQuestionsRouter);
 
 // Funzione per inviare notifiche push
 async function sendPushNotification(token, title, body) {
@@ -125,28 +131,7 @@ async function schedulePushNotification(uid, token) {
   );
 }
 
-// Endpoint per aggiornare l'ultimo accesso dell'utente
-app.post('/update_last_access', async (req, res) => {
-  const { uid, fcmToken } = req.body;
-
-  console.log(`Received request to update last access for user ${uid} with token ${fcmToken}`);
-
-  // Salva l'ultimo accesso su Redis
-  const currentTime = new Date().toISOString();
-  await redisClient.set(`user_last_access_${uid}`, currentTime);
-
-  console.log(`Last access time for user ${uid} set to ${currentTime}`);
-
-  // Reimposta il ritardo di notifica
-  await redisClient.del(`user_last_notification_delay_${uid}`);
-
-  // Programma la notifica utilizzando la nuova logica
-  schedulePushNotification(uid, fcmToken);
-
-  res.send('Last access time updated and notifications scheduled.');
-});
-
-// Avvia il server
+// Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

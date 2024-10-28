@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:Just_Learn/models/course.dart';
-import 'package:Just_Learn/widgets/course_question_card.dart'; // Import del widget personalizzato
-import 'package:youtube_player_flutter/youtube_player_flutter.dart'; // Import del lettore video
+import 'package:Just_Learn/models/level.dart';
+import 'package:Just_Learn/widgets/course_question_card.dart';
+import 'package:Just_Learn/widgets/video_player_widget.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:Just_Learn/models/level.dart'; // Importa il modello aggiornato LevelStep
 
 class LevelScreen extends StatefulWidget {
   final Section section;
@@ -19,35 +20,39 @@ class _LevelScreenState extends State<LevelScreen> {
   int _currentStep = 0;
   bool sectionCompleted = false;
   YoutubePlayerController? _youtubeController;
+  PageController? _pageController;
+  LevelStep? currentStepData;
 
   @override
   void initState() {
     super.initState();
-    _initializePlayer(widget.section.steps[_currentStep]);
-    _loadUserProgress(); // Carica il progresso dell'utente
+    _loadUserProgress(); // Load user progress
   }
 
   @override
   void dispose() {
     _youtubeController?.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
 
-  // Inizializza il lettore video se lo step è un video
-  // Inizializza il lettore video se lo step è un video
+  // Initialize video player if the step is a video
   void _initializePlayer(LevelStep step) {
-    if (step.type == 'video' && step.content.isNotEmpty) { // Usa 'content' per l'URL del video
+    if (step.type == 'video' && step.content.isNotEmpty) {
       _youtubeController = YoutubePlayerController(
-        initialVideoId: YoutubePlayer.convertUrlToId(step.content)!, // Usa 'content' come URL del video
+        initialVideoId: YoutubePlayer.convertUrlToId(step.content)!,
         flags: const YoutubePlayerFlags(
           autoPlay: true,
           mute: false,
         ),
       );
+    } else {
+      _youtubeController?.dispose();
+      _youtubeController = null;
     }
   }
 
-  // Carica il progresso dell'utente da Firestore
+  // Load user progress from Firestore
   Future<void> _loadUserProgress() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -59,33 +64,49 @@ class _LevelScreenState extends State<LevelScreen> {
         setState(() {
           _currentStep = userData['currentSteps'][widget.section.title] ?? 0;
           sectionCompleted = (userData['completedSections'] ?? []).contains(widget.section.title);
+          _pageController = PageController(initialPage: _currentStep);
         });
+      } else {
+        _pageController = PageController(initialPage: _currentStep);
       }
+    } else {
+      _pageController = PageController(initialPage: _currentStep);
     }
   }
 
-  // Salva il progresso dell'utente su Firestore
+  // Save user progress to Firestore
   Future<void> _saveUserProgress() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
 
-      await userDoc.update({
-        'currentSteps.${widget.section.title}': _currentStep,
-        if (sectionCompleted) 'completedSections': FieldValue.arrayUnion([widget.section.title]),
-      });
-    }
+    await userDoc.update({
+      // If section is completed, set currentStep to the total number of steps
+      'currentSteps.${widget.section.title}':
+          sectionCompleted ? widget.section.steps.length : _currentStep,
+      if (sectionCompleted)
+        'completedSections': FieldValue.arrayUnion([widget.section.title]),
+    });
   }
+}
 
-  // Gestione del completamento di uno step
+  // Handle completion of a step
   void _onCompleteStep() {
     setState(() {
-      _currentStep += 1;
-      if (_currentStep >= widget.section.steps.length) {
-        sectionCompleted = true;
-        _saveUserProgress(); // Salva il completamento della sezione
+      if (_currentStep < widget.section.steps.length - 1) {
+        _currentStep += 1;
+        _pageController?.animateToPage(
+          _currentStep,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        _saveUserProgress();
       } else {
-        _saveUserProgress(); // Salva il progresso corrente
+        // Section completed
+        sectionCompleted = true;
+        _saveUserProgress();
+        // Navigate back to CourseDetailScreen and indicate that progress has been updated
+        Navigator.pop(context, true);
       }
     });
   }
@@ -97,17 +118,16 @@ class _LevelScreenState extends State<LevelScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 30),
 
-          // Barra di progresso personalizzata con pulsante "back"
+          // Custom progress bar with "back" button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 0.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Back button
                 GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
@@ -125,7 +145,7 @@ class _LevelScreenState extends State<LevelScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10), // Spazio tra il pulsante e la barra di progresso
+                const SizedBox(width: 10),
 
                 Expanded(
                   child: Container(
@@ -139,8 +159,10 @@ class _LevelScreenState extends State<LevelScreen> {
                     child: Row(
                       children: [
                         Container(
-                          // Solo il cambio di pagina incrementa la larghezza della barra
-                          width: (312 * (_currentStep + 1) / steps.length).clamp(0, 312),
+                          width: ((MediaQuery.of(context).size.width - 80) *
+                                  (_currentStep + 1) /
+                                  steps.length)
+                              .clamp(0.0, MediaQuery.of(context).size.width - 80),
                           height: 15,
                           decoration: ShapeDecoration(
                             color: Colors.white,
@@ -157,9 +179,9 @@ class _LevelScreenState extends State<LevelScreen> {
             ),
           ),
 
-          const SizedBox(height: 0),
+          const SizedBox(height: 5),
 
-          // Titolo della sezione
+          // Section title
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -187,25 +209,70 @@ class _LevelScreenState extends State<LevelScreen> {
 
           const SizedBox(height: 5),
 
-          // Corpo principale della pagina con PageView verticale
+          // Main body with vertical PageView
           Expanded(
             child: PageView.builder(
               scrollDirection: Axis.vertical,
               itemCount: steps.length,
-              controller: PageController(initialPage: _currentStep),
+              controller: _pageController,
               onPageChanged: (index) {
-                setState(() {
-                  _currentStep = index; // Aggiorna il passo corrente solo quando cambia pagina
-                  _initializePlayer(steps[index]); // Inizializza il video per il nuovo step
-                  _saveUserProgress(); // Salva il progresso ogni volta che cambia pagina
-                });
-              },
+  setState(() {
+    _currentStep = index;
+    currentStepData = steps[index];
+    _initializePlayer(steps[index]);
+
+    // Check if the last step is reached
+    if (_currentStep == steps.length - 1) {
+      sectionCompleted = true;
+    } else {
+      sectionCompleted = false;
+    }
+
+    _saveUserProgress();
+  });
+},
               itemBuilder: (context, index) {
                 final step = steps[index];
 
-                return Center();
+                if (step.type == 'video') {
+                  // Return VideoPlayerWidget
+                  _initializePlayer(step);
+                  if (_youtubeController == null) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+                  return VideoPlayerWidget(
+                    controller: _youtubeController!,
+                    onShowQuestion: () {},
+                    isLiked: false,
+                    likeCount: 0,
+                    isSaved: false,
+                  );
+                } else if (step.type == 'question') {
+                  // Return CourseQuestionCard
+                  return CourseQuestionCard(
+                    step: step,
+                    onAnswered: (isCorrect) {},
+                    onCompleteStep: () {},
+                    topic: widget.section.title,
+                  );
+                } else {
+                  // Handle other step types if any
+                  return Center(
+                    child: Text(
+                      'Unknown step type',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  );
+                }
               },
             ),
+          ),
+
+          // "Next" button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+            child: SizedBox(
+              ),
           ),
         ],
       ),

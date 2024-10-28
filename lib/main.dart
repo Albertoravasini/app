@@ -40,7 +40,6 @@ void main() async {
 
   runApp(MyApp(user: currentUser));
 }
-
 class MyApp extends StatelessWidget {
   final User? user;
 
@@ -60,6 +59,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Education App',
+        debugShowCheckedModeBanner: false,
         navigatorKey: navigatorKey,
         theme: ThemeData(
           primaryColor: Colors.white,

@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../models/course.dart';
 import 'level_screen.dart';
 import 'package:Just_Learn/models/user.dart';
-import 'package:Just_Learn/models/user.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Add this to update Firestore
 
 class CourseDetailScreen extends StatefulWidget {
   final Course course;
@@ -18,11 +18,19 @@ class CourseDetailScreen extends StatefulWidget {
 }
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
+  bool _isCourseUnlocked = false;
   int _currentPage = 0;
-  int _priceButtonClicks = 0;  // Variabile per tracciare i click
+
+  @override
+  void initState() {
+    super.initState();
+    _isCourseUnlocked = widget.user.unlockedCourses.contains(widget.course.id);
+  }
 
   @override
   Widget build(BuildContext context) {
+    _isCourseUnlocked = widget.user.unlockedCourses.contains(widget.course.id);
+
     return Scaffold(
       body: Stack(
         children: [
@@ -36,54 +44,56 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   _buildPageIndicators(),
                   const SizedBox(height: 20),
                   _buildSections(),
-                  const SizedBox(height: 120), // Spazio extra per evitare che le sezioni siano coperte dai pulsanti
+                  const SizedBox(height: 120),
                 ],
               ),
             ),
           ),
-          if (_priceButtonClicks < 20) _buildBottomButtons(), // Mostra i pulsanti solo se non ci sono 20 click
+          if (!_isCourseUnlocked) _buildBottomButtons(),
           _buildBackButton(),
         ],
       ),
     );
   }
 
-  // Funzione per costruire i pulsanti in basso
   Widget _buildBottomButtons() {
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Riga per i due pulsanti
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  flex: 2, // Pulsante Subscribe più largo
-                  child: _buildSubscribeButton(),
-                ),
-                const SizedBox(width: 16), // Spazio tra i due pulsanti
-                Expanded(
-                  flex: 1, // Pulsante Prezzo più stretto
-                  child: _buildPriceButton(),
-                ),
-              ],
-            ),
-          ],
+    if (!_isCourseUnlocked) {
+      return Positioned(
+        bottom: 0,
+        left: 0,
+        right: 0,
+        child: Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Row for the two buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildSubscribeButton(),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 1,
+                    child: _buildPriceButton(),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      return SizedBox.shrink();
+    }
   }
 
-  // Pulsante "Subscribe" in stile SubscriptionScreen
   Widget _buildSubscribeButton() {
     return SizedBox(
-      height: 60, // Più alto per dare importanza visiva
+      height: 60,
       child: ElevatedButton(
         onPressed: () {
           Navigator.push(
@@ -96,9 +106,9 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           foregroundColor: Colors.black,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12), // Bordi arrotondati eleganti
+            borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 8, // Leggera ombreggiatura per effetto 3D
+          elevation: 8,
         ),
         child: const Text(
           'Subscribe',
@@ -112,39 +122,67 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     );
   }
 
-  // Pulsante che mostra il prezzo con contorno in stile SubscriptionScreen
   Widget _buildPriceButton() {
     return SizedBox(
-      height: 60, // Altezza coerente con il pulsante Subscribe
+      height: 60,
       child: ElevatedButton(
-        onPressed: () {
-          setState(() {
-            _priceButtonClicks++;  // Incrementa il contatore ad ogni click
-          });
-        },
+        onPressed: _unlockCourse,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.05), // Sfondo trasparente
+          backgroundColor: Colors.white.withOpacity(0.05),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12), // Bordi arrotondati
+            borderRadius: BorderRadius.circular(12),
           ),
           side: BorderSide(
-            color: Colors.white12, // Contorno simile al SubscriptionScreen
-            width: 2, // Larghezza del contorno
+            color: Colors.white12,
+            width: 2,
           ),
-          elevation: 0, // Nessuna ombreggiatura per il pulsante del prezzo
+          elevation: 0,
         ),
-        child: const Text(
-          '1,99€',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Montserrat',
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
+            const SizedBox(width: 8),
+            const Text(
+              '500',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Montserrat',
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  void _unlockCourse() async {
+    if (widget.user.coins >= 500) {
+      int newCoins = widget.user.coins - 500;
+      List<String> newUnlockedCourses = List.from(widget.user.unlockedCourses)..add(widget.course.id);
+
+      setState(() {
+        widget.user.coins = newCoins;
+        widget.user.unlockedCourses = newUnlockedCourses;
+        _isCourseUnlocked = true;
+      });
+
+      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+        'coins': newCoins,
+        'unlockedCourses': newUnlockedCourses,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Course unlocked!')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Not enough coins')),
+      );
+    }
   }
 
   // Funzione per ottenere il currentStep per una sezione
@@ -184,16 +222,23 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 20.0),
           child: GestureDetector(
-            onTap: _priceButtonClicks >= 20 // Cliccabile solo dopo 20 click
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LevelScreen(section: section),
-                      ),
-                    );
-                  }
-                : null, // Disabilita il clic se non sono stati raggiunti i 20 click
+  onTap: _isCourseUnlocked
+      ? () async {
+          bool? result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LevelScreen(section: section),
+            ),
+          );
+
+          if (result == true) {
+            // User completed the section or made progress
+            setState(() {
+              // Force re-render to update progress bars
+            });
+          }
+        }
+      : null, // Disabilita il clic se non sono stati raggiunti i 20 click
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
@@ -366,7 +411,7 @@ Widget _buildSectionTitle(String title, String iconAsset) {
             ),
             child: Image.network(
               videos[index].thumbnailUrl!,
-              fit: BoxFit.cover,
+              fit: BoxFit.cover
             ),
           );
         },

@@ -61,58 +61,59 @@ class _StreakScreenState extends State<StreakScreen> with TickerProviderStateMix
   }
 
   Future<void> _collectCoins() async {
-  setState(() {
-    _coinsCollected = true;
-    // Calcola le monete in base ai giorni consecutivi: 10 il primo giorno, poi +5 ogni giorno
-    coinsToAdd = 10 + (widget.consecutiveDays - 1) * 5;
-  });
+    setState(() {
+      _coinsCollected = true;
+      // Calcola le monete in base ai giorni consecutivi: 10 il primo giorno, poi +5 ogni giorno
+      coinsToAdd = 10 + (widget.consecutiveDays - 1) * 5;
+    });
 
-  // Avvia l'animazione e il suono
-  _coinAnimationController.forward();
-  _fadeController.forward();
-
-  try {
-    await _audioPlayer.play(AssetSource('success_sound.mp3'));
-    print('Audio played successfully'); // Debugging
-  } catch (e) {
-    print('Error playing audio: $e'); // Debugging
-  }
-
-  // Attendi un breve periodo dopo l'animazione
-  await Future.delayed(Duration(seconds: 2));
-
-  if (mounted) {
-    print('Updating coins in Firestore with $coinsToAdd coins');
+    // Avvia l'animazione e il suono
+    _coinAnimationController.forward();
+    _fadeController.forward();
 
     try {
-      await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
-        'coins': FieldValue.increment(coinsToAdd),
-      });
-      print('Coins updated in Firestore');
+      await _audioPlayer.play(AssetSource('success_sound.mp3'));
+      print('Audio played successfully'); // Debugging
     } catch (e) {
-      print('Error updating coins: $e');
+      print('Error playing audio: $e'); // Debugging
     }
 
-    // Naviga alla schermata principale
-    if (widget.userModel.role == 'admin') {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AdminPanelScreen()),
-      );
-      print('Navigated to AdminPanelScreen');
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => MainScreen(userModel: widget.userModel)),
-      );
-      print('Navigated to MainScreen');
+    // Attendi un breve periodo dopo l'animazione
+    await Future.delayed(Duration(seconds: 2));
+
+    if (mounted) {
+      print('Updating coins in Firestore with $coinsToAdd coins');
+
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+          'coins': FieldValue.increment(coinsToAdd),
+        });
+        print('Coins updated in Firestore');
+      } catch (e) {
+        print('Error updating coins: $e');
+      }
+
+      // Naviga alla schermata principale
+      if (widget.userModel.role == 'admin') {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const AdminPanelScreen()),
+        );
+        print('Navigated to AdminPanelScreen');
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => MainScreen(userModel: widget.userModel)),
+        );
+        print('Navigated to MainScreen');
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
+        alignment: Alignment.center, // Aggiungi questa riga per centrare i figli dello Stack
         children: [
           // Sfondo con gradient dinamico
           AnimatedContainer(

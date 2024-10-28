@@ -273,6 +273,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.4"
+  firebase_analytics:
+    dependency: "direct main"
+    description:
+      name: firebase_analytics
+      sha256: "2c4e7b548d41b46e8aa08bc3bd1163146be7e6d48f678f2e6dd3114994e42458"
+      url: "https://pub.dev"
+    source: hosted
+    version: "11.3.3"
+  firebase_analytics_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_analytics_platform_interface
+      sha256: c259ae890c7d4c5d1675d35936be0b1fcd587fce9645948982cd87ad08df6222
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.2.5"
+  firebase_analytics_web:
+    dependency: transitive
+    description:
+      name: firebase_analytics_web
+      sha256: "5988d1fd022e55515c2a14811c9b5104c32acde115874a9a69ff7c77c4c05cd9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.10+2"
   firebase_auth:
     dependency: "direct main"
     description:
@@ -454,30 +478,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
-  flutter_local_notifications:
-    dependency: "direct main"
-    description:
-      name: flutter_local_notifications
-      sha256: "49eeef364fddb71515bc78d5a8c51435a68bccd6e4d68e25a942c5e47761ae71"
-      url: "https://pub.dev"
-    source: hosted
-    version: "17.2.3"
-  flutter_local_notifications_linux:
-    dependency: transitive
-    description:
-      name: flutter_local_notifications_linux
-      sha256: c49bd06165cad9beeb79090b18cd1eb0296f4bf4b23b84426e37dd7c027fc3af
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.1"
-  flutter_local_notifications_platform_interface:
-    dependency: transitive
-    description:
-      name: flutter_local_notifications_platform_interface
-      sha256: "85f8d07fe708c1bdcf45037f2c0109753b26ae077e9d9e899d55971711a4ea66"
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.2.0"
   flutter_svg:
     dependency: "direct main"
     description:
@@ -989,14 +989,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.2"
-  timezone:
-    dependency: transitive
-    description:
-      name: timezone
-      sha256: "2236ec079a174ce07434e89fcd3fcda430025eb7692244139a9cf54fdcf1fc7d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.4"
   translator:
     dependency: "direct main"
     description:

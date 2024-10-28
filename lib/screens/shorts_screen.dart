@@ -1,7 +1,6 @@
 import 'package:Just_Learn/models/course.dart';
 import 'package:Just_Learn/screens/course_detail_screen.dart';
 import 'package:Just_Learn/widgets/course_question_card.dart';
-import 'package:Just_Learn/widgets/shorts_question_card.dart';
 import 'package:Just_Learn/widgets/video_player_widget.dart';
 import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +9,6 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/models/level.dart';
-import 'package:Just_Learn/screens/share_video_screen.dart'; // Importa la schermata di condivisione
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -40,7 +38,6 @@ class _ShortsScreenState extends State<ShortsScreen> {
   List<YoutubePlayerController> _youtubeControllers = [];
   String? selectedChoice;
   bool hasSwiped = false;
-  bool showShareScreen = false;
   bool isLoadingMore = false; // Variabile per tenere traccia del caricamento di più video
   int currentLoadedVideos = 0; // Numero di video attualmente caricati
 // Aggiungi qui la variabile savedVideos
@@ -49,6 +46,7 @@ class _ShortsScreenState extends State<ShortsScreen> {
   bool isLiked = false; // Per tenere traccia dello stato di like corrente
   int likeCount = 0; // Per tenere traccia del conteggio dei like
  UserModel? _currentUser;
+ 
 
   @override
   void initState() {
@@ -424,6 +422,7 @@ Future<void> _updateLikeState(String videoId) async {
   YoutubePlayerController controller = _youtubeControllers[index];
   bool isLiked = allShortSteps[index]['isLiked'] ?? false;
   int likeCount = allShortSteps[index]['likeCount'] ?? 0;
+  bool isSaved = allShortSteps[index]['isSaved'] ?? false;
 
   final currentStep = allShortSteps[index]['step'] as LevelStep;
   final level = allShortSteps[index]['level'] as Level;
@@ -448,6 +447,7 @@ Future<void> _updateLikeState(String videoId) async {
         isLiked: isLiked,
         likeCount: likeCount,
         questionStep: questionStep,
+        isSaved: isSaved, // Passiamo lo stato isSaved
         onShowQuestion: () {
           setState(() {
             if (questionStep != null) {
@@ -561,31 +561,7 @@ Future<void> _updateLikeState(String videoId) async {
   itemCount: allShortSteps.length,
   itemBuilder: (context, index) {
     final showQuestion = allShortSteps[index]['showQuestion'] ?? false;
-    if (showShareScreen) {
-      return GestureDetector(
-        onHorizontalDragUpdate: (details) {
-          if (details.delta.dx < -10 && !hasSwiped) {
-            setState(() {
-              showShareScreen = false;
-            });
-            hasSwiped = true;
-          }
-        },
-        onHorizontalDragEnd: (_) {
-          hasSwiped = false;
-        },
-        child: ShareVideoScreen(
-          videoLink: 'https://www.youtube.com/watch?v=${allShortSteps[index]['step'].content}',
-          onClose: () {
-            if (mounted) {
-              setState(() {
-                showShareScreen = false;
-              });
-            }
-          },
-        ),
-      );
-    }
+    
 
                 return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -598,7 +574,6 @@ Future<void> _updateLikeState(String videoId) async {
             if (details.delta.dx > 10 && !hasSwiped) {
               if (mounted) {
                 setState(() {
-                  showShareScreen = true;
                 });
               }
               hasSwiped = true;

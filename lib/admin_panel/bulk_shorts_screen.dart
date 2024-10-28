@@ -12,6 +12,7 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
   List<String> _topics = [];
   Map<String, int> _levelCountBySubtopic = {};
   List<String> _subtopics = [];
+  Map<String, int> _subtopicOrderMap = {}; // Mappa per subtopicOrder
 
   @override
   void initState() {
@@ -31,15 +32,25 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
     final levelsCollection = FirebaseFirestore.instance.collection('levels');
     final querySnapshot = await levelsCollection
         .where('topic', isEqualTo: topic)
+        .orderBy('subtopicOrder') // Assicurati che Firestore abbia un indice per questa query
         .get();
+
     final fetchedSubtopics = querySnapshot.docs
         .map((doc) => doc['subtopic'] as String)
         .toSet()
         .toList();
 
     final Map<String, int> levelCountMap = {};
+    final Map<String, int> subtopicOrderMap = {};
+    int currentOrder = 1;
+
     for (var doc in querySnapshot.docs) {
       final subtopic = doc['subtopic'] as String;
+      if (!subtopicOrderMap.containsKey(subtopic)) {
+        subtopicOrderMap[subtopic] = currentOrder;
+        currentOrder++;
+      }
+
       if (levelCountMap.containsKey(subtopic)) {
         levelCountMap[subtopic] = levelCountMap[subtopic]! + 1;
       } else {
@@ -50,6 +61,7 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
     setState(() {
       _subtopics = fetchedSubtopics;
       _levelCountBySubtopic = levelCountMap;
+      _subtopicOrderMap = subtopicOrderMap;
     });
   }
 
@@ -62,13 +74,29 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
         'videoId': '',
         'levelNumber': 0, // Inizialmente 0, sarà aggiornato quando viene selezionato un subtopic
         'videoExists': false,
+        'isShort': true, // Imposta isShort su true per default
+        'thumbnailUrl': '', // Inizializza con stringa vuota
+        'subtopicOrder': 0, // Inizialmente 0, sarà aggiornato
       });
     });
   }
 
   void _removeLevel(int index) {
     setState(() {
-      _levels.removeAt(index);
+      final removedLevel = _levels.removeAt(index);
+      final subtopic = removedLevel['subtopic'];
+      if (_levelCountBySubtopic.containsKey(subtopic)) {
+        _levelCountBySubtopic[subtopic] = _levelCountBySubtopic[subtopic]! - 1;
+        if (_levelCountBySubtopic[subtopic]! <= 0) {
+          _levelCountBySubtopic.remove(subtopic);
+        }
+      }
+
+      // Se nessun livello rimane per questo subtopic, rimuovi anche il subtopicOrderMap
+      if (!_levels.any((level) => level['subtopic'] == subtopic)) {
+        _subtopicOrderMap.remove(subtopic);
+        _subtopics.remove(subtopic);
+      }
     });
   }
 
@@ -139,15 +167,21 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
 
     final batch = FirebaseFirestore.instance.batch();
     for (var level in _levels) {
+      final videoId = level['videoId'];
+      final thumbnailUrl = _getThumbnailUrl(videoId); // Genera l'URL della miniatura
+
       final levelData = {
         'topic': _selectedTopic,
         'subtopic': level['subtopic'],
         'title': level['title'],
         'levelNumber': level['levelNumber'],
+        'subtopicOrder': level['subtopicOrder'], // Includi subtopicOrder
         'steps': [
           {
             'type': 'video',
-            'content': level['videoId'],
+            'content': videoId,
+            'isShort': level['isShort'], // Imposta isShort
+            'thumbnailUrl': thumbnailUrl, // Imposta l'URL della miniatura
           },
         ],
       };
@@ -164,7 +198,7 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Errore durante il salvataggio: $e')),
       );
-      // Non fare nulla qui per mantenere lo stato corrente
+      // Mantieni lo stato corrente per permettere all'utente di correggere eventuali errori
     }
   }
 
@@ -198,9 +232,11 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
     if (newSubtopic != null && newSubtopic.isNotEmpty) {
       setState(() {
         _subtopics.add(newSubtopic);
+        _subtopicOrderMap[newSubtopic] = _subtopicOrderMap.length + 1; // Assegna il prossimo ordine disponibile
         _levels[index]['subtopic'] = newSubtopic;
         _levels[index]['levelNumber'] = 1; // Il primo livello per un nuovo subtopic
         _levelCountBySubtopic[newSubtopic] = 1; // Aggiungi alla mappa dei conteggi
+        _levels[index]['subtopicOrder'] = _subtopicOrderMap[newSubtopic]!; // Imposta subtopicOrder
       });
     }
   }
@@ -208,11 +244,17 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
   void _updateLevelNumber(int index, String subtopic) {
     setState(() {
       if (_levelCountBySubtopic.containsKey(subtopic)) {
-        _levels[index]['levelNumber'] = _levelCountBySubtopic[subtopic]! + 1;
+        _levelCountBySubtopic[subtopic] = _levelCountBySubtopic[subtopic]! + 1;
       } else {
-        _levels[index]['levelNumber'] = 1;
+        _levelCountBySubtopic[subtopic] = 1;
       }
+      _levels[index]['levelNumber'] = _levelCountBySubtopic[subtopic]!;
+      _levels[index]['subtopicOrder'] = _subtopicOrderMap[subtopic]!; // Assegna subtopicOrder
     });
+  }
+
+  String _getThumbnailUrl(String videoId) {
+    return 'https://img.youtube.com/vi/$videoId/0.jpg';
   }
 
   @override
@@ -248,6 +290,8 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                   _selectedTopic = value;
                   _levels.clear();
                   _subtopics.clear();
+                  _subtopicOrderMap.clear(); // Resetta la mappa dell'ordine dei subtopics
+                  _levelCountBySubtopic.clear(); // Resetta i conteggi
                 });
                 _loadSubtopics(value!);
               },
@@ -291,7 +335,7 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                                     } else {
                                       setState(() {
                                         _levels[index]['subtopic'] = value!;
-                                        _updateLevelNumber(index, value); // Aggiorna il levelNumber
+                                        _updateLevelNumber(index, value); // Aggiorna il levelNumber e subtopicOrder
                                       });
                                     }
                                   },
@@ -303,6 +347,11 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                               SizedBox(width: 10),
                               Text(
                                 'Livello: ${level['levelNumber']}',
+                                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                'Ordine Subtopic: ${level['subtopicOrder']}',
                                 style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                               ),
                             ],
@@ -329,10 +378,14 @@ class _BulkShortsScreenState extends State<BulkShortsScreen> {
                             onChanged: (value) {
                               setState(() {
                                 _levels[index]['videoId'] = value;
+                                _levels[index]['thumbnailUrl'] = _getThumbnailUrl(value); // Aggiorna l'URL della miniatura
                               });
                               _checkVideoExists(index, value); // Verifica in tempo reale
                             },
                           ),
+                          SizedBox(height: 10),
+                          if (level['thumbnailUrl'].isNotEmpty)
+                            Image.network(level['thumbnailUrl']),
                           SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
