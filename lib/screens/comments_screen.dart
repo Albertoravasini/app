@@ -24,84 +24,92 @@ class _CommentsScreenState extends State<CommentsScreen> {
   Map<String, bool> _showReplies = {};
 
   @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.7,
-      minChildSize: 0.3,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: const BoxDecoration(
-            color: Color(0xFF121212), // Sfondo scuro
-            borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Linea estetica in alto
-              Center(
-                child: Container(
-                  width: 50,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.yellowAccent, // Accento viola
-                    borderRadius: BorderRadius.circular(2.5),
-                  ),
+Widget build(BuildContext context) {
+  return DraggableScrollableSheet(
+    expand: false,
+    initialChildSize: 0.7,
+    minChildSize: 0.3,
+    maxChildSize: 0.95,
+    builder: (context, scrollController) {
+      // Ottieni il padding inferiore dalla tastiera
+      final bottomPadding = MediaQuery.of(context).viewInsets.bottom;
+
+      return Container(
+        padding: EdgeInsets.only(
+          left: 16.0,
+          right: 16.0,
+          top: 16.0,
+          bottom: bottomPadding + 16.0, // Aggiungi padding dinamico
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xFF121212), // Sfondo scuro
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Linea estetica in alto
+            Center(
+              child: Container(
+                width: 50,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent, // Accento viola
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: StreamBuilder<List<Map<String, dynamic>>>(
-                  stream: _commentService.getCommentsWithUsernames(widget.videoId),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return const Center(
-                        child: Text(
-                          'Error loading comments',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator(color: Colors.yellowAccent));
-                    }
-                    final comments = snapshot.data!;
-                    if (comments.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          'No comments found',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      );
-                    }
-                    return ListView.builder(
-                      controller: scrollController,
-                      itemCount: comments.length,
-                      itemBuilder: (context, index) {
-                        final commentData = comments[index];
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildCommentTile(
-                              commentData['comment'],
-                              commentData['username'],
-                            ),
-                          ],
-                        );
-                      },
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _commentService.getCommentsWithUsernames(widget.videoId),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text(
+                        'Error loading comments',
+                        style: TextStyle(color: Colors.white),
+                      ),
                     );
-                  },
-                ),
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator(color: Colors.yellowAccent));
+                  }
+                  final comments = snapshot.data!;
+                  if (comments.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'No comments found',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    controller: scrollController,
+                    itemCount: comments.length,
+                    itemBuilder: (context, index) {
+                      final commentData = comments[index];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildCommentTile(
+                            commentData['comment'],
+                            commentData['username'],
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
               ),
-              _buildCommentInput(),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+            _buildCommentInput(),
+          ],
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildCommentTile(Comment comment, String username) {
     final user = FirebaseAuth.instance.currentUser;
@@ -472,50 +480,50 @@ class _CommentsScreenState extends State<CommentsScreen> {
   }
 
   Widget _buildCommentInput() {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundImage: AssetImage('assets/images/default_avatar.png'), // Utilizza l'immagine di default
-          backgroundColor: Colors.grey[800],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      hintText: 'Add a comment...',
-                      hintStyle: TextStyle(color: Colors.white54),
-                      border: InputBorder.none,
-                    ),
+  return Row(
+    children: [
+      CircleAvatar(
+        radius: 20,
+        backgroundImage: AssetImage('assets/images/default_avatar.png'), // Utilizza l'immagine di default
+        backgroundColor: Colors.grey[800],
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Add a comment...',
+                    hintStyle: TextStyle(color: Colors.white54),
+                    border: InputBorder.none,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.send, color: Colors.yellowAccent),
-                  onPressed: () async {
-                    if (_commentController.text.trim().isNotEmpty) {
-                      await _commentService.addComment(widget.videoId, _commentController.text.trim());
-                      _commentController.clear();
-                    }
-                  },
-                ),
-              ],
-            ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.send, color: Colors.yellowAccent),
+                onPressed: () async {
+                  if (_commentController.text.trim().isNotEmpty) {
+                    await _commentService.addComment(widget.videoId, _commentController.text.trim());
+                    _commentController.clear();
+                  }
+                },
+              ),
+            ],
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   void _showDeleteDialog(String commentId, {bool isReply = false}) {
     showDialog(

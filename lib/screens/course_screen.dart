@@ -1,5 +1,6 @@
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/course_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -32,24 +33,25 @@ class _CourseScreenState extends State<CourseScreen> {
   }
  // Funzione per caricare l'utente corrente
   Future<void> _loadCurrentUser() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser; // Ottieni l'utente autenticato
-    if (user != null) {
-      final userSnapshot = await FirebaseFirestore.instance.collection('users').doc(user.uid).get(); // Usa l'UID reale dell'utente
-      if (userSnapshot.exists) {
-        setState(() {
-          _currentUser = UserModel.fromMap(userSnapshot.data()!); // Assegna l'utente trovato a _currentUser
-        });
+    try {
+      final user = FirebaseAuth.instance.currentUser; // Ottieni l'utente autenticato
+      if (user != null) {
+        final userSnapshot = await FirebaseFirestore.instance.collection('users').doc(user.uid).get(); // Usa l'UID reale dell'utente
+        if (userSnapshot.exists) {
+          setState(() {
+            _currentUser = UserModel.fromMap(userSnapshot.data()!); // Assegna l'utente trovato a _currentUser
+          });
+        } else {
+          print('Errore: utente non trovato in Firestore.');
+        }
       } else {
-        print('Errore: utente non trovato in Firestore.');
+        print('Errore: utente non autenticato.');
       }
-    } else {
-      print('Errore: utente non autenticato.');
+    } catch (e) {
+      print('Errore durante il caricamento dell\'utente: $e');
     }
-  } catch (e) {
-    print('Errore durante il caricamento dell\'utente: $e');
   }
-}
+
   // Funzione per caricare i topic da Firestore
   Future<void> _loadTopics() async {
     try {
@@ -66,9 +68,9 @@ class _CourseScreenState extends State<CourseScreen> {
     }
   }
 
-  // Funzione per caricare i corsi
+  // **Aggiornata** Funzione per caricare i corsi visibili
   Future<void> _loadCourses() async {
-    final fetchedCourses = await _courseService.getAllCourses();
+    final fetchedCourses = await _courseService.getVisibleCourses(); // Usa getVisibleCourses()
     setState(() {
       courses = fetchedCourses;
     });
@@ -303,7 +305,29 @@ class _CourseScreenState extends State<CourseScreen> {
   }
 
   // Funzione per costruire la miniatura del corso mantenendo il rapporto 9:16
-  Widget _buildCourseThumbnail(Course course) {
+Widget _buildCourseThumbnail(Course course) {
+  if (course.coverImageUrl != null && course.coverImageUrl!.isNotEmpty) {
+    return AspectRatio(
+      aspectRatio: 9 / 16, // Proporzione 9:16
+      child: Container(
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: CachedNetworkImage(
+          imageUrl: course.coverImageUrl!,
+          fit: BoxFit.cover, // Adatta l'immagine coprendo l'intera area
+          placeholder: (context, url) => Center(
+            child: CircularProgressIndicator(),
+          ),
+          errorWidget: (context, url, error) => Icon(Icons.error, color: Colors.red),
+          filterQuality: FilterQuality.high,
+        ),
+      ),
+    );
+  } else {
+    // Fallback al thumbnail del primo video
     final firstSection = course.sections.isNotEmpty ? course.sections.first : null;
     final firstVideoStep = firstSection?.steps.firstWhere(
       (step) => step.type == 'video',
@@ -312,17 +336,23 @@ class _CourseScreenState extends State<CourseScreen> {
     final thumbnailUrl = firstVideoStep?.thumbnailUrl ?? 'https://via.placeholder.com/167x290';
 
     return AspectRatio(
-      aspectRatio: 9/16, // Proporzione 9:16
+      aspectRatio: 9 / 16, // Proporzione 9:16
       child: Container(
         width: double.infinity,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          image: DecorationImage(
-            image: NetworkImage(thumbnailUrl),
-            fit: BoxFit.cover, // Zoom dell'immagine per coprire tutta la miniatura
-          ),
           borderRadius: BorderRadius.circular(20),
+        ),
+        child: CachedNetworkImage(
+          imageUrl: thumbnailUrl,
+          fit: BoxFit.cover, // Adatta l'immagine coprendo l'intera area
+          placeholder: (context, url) => Center(
+            child: CircularProgressIndicator(),
+          ),
+          errorWidget: (context, url, error) => Icon(Icons.error, color: Colors.red),
+          filterQuality: FilterQuality.high,
         ),
       ),
     );
-  }}
+  }
+}}

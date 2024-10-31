@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -12,6 +13,18 @@ class SubscriptionScreen extends StatefulWidget {
 class _SubscriptionScreenState extends State<SubscriptionScreen> {
   String selectedPlan = 'annual'; // Pre-selezionato il piano annuale
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+void initState() {
+  super.initState();
+  
+  FirebaseAnalytics.instance.logEvent(
+    name: 'subscription_screen_view',
+    parameters: {
+      'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
+    },
+  );
+}
 
   Future<void> _incrementClickCount() async {
   final user = FirebaseAuth.instance.currentUser;

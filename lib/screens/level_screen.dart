@@ -241,12 +241,18 @@ class _LevelScreenState extends State<LevelScreen> {
                     return Center(child: CircularProgressIndicator());
                   }
                   return VideoPlayerWidget(
-                    controller: _youtubeController!,
-                    onShowQuestion: () {},
-                    isLiked: false,
-                    likeCount: 0,
-                    isSaved: false,
-                  );
+  controller: _youtubeController!,
+  onShowQuestion: () {},
+  isLiked: false,
+  likeCount: 0,
+  isSaved: false,
+  onCoinsUpdate: (int newCoins) {
+    // Aggiungi la logica qui per gestire l'aggiornamento dei coins.
+    // Ad esempio, puoi stampare il nuovo numero di coins o aggiornarlo
+    print("Coins aggiornati: $newCoins");
+  },
+  topic: widget.section.title,  // Aggiungi il parametro topic qui
+);
                 } else if (step.type == 'question') {
                   // Return CourseQuestionCard
                   return CourseQuestionCard(

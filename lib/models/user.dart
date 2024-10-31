@@ -133,16 +133,18 @@ class Notification {
   }
 }
 
-// Modello per la gestione dei video guardati
+// models/video_watched.dart
 class VideoWatched {
   final String videoId;
   final String title;
   final DateTime watchedAt;
+  final bool completed;
 
   VideoWatched({
     required this.videoId,
     required this.title,
     required this.watchedAt,
+    this.completed = false,
   });
 
   factory VideoWatched.fromMap(Map<String, dynamic> data) {
@@ -150,6 +152,7 @@ class VideoWatched {
       videoId: data['videoId'] ?? '',
       title: data['title'] ?? '',
       watchedAt: DateTime.parse(data['watchedAt'] ?? DateTime.now().toIso8601String()),
+      completed: data['completed'] ?? false,
     );
   }
 
@@ -158,6 +161,7 @@ class VideoWatched {
       'videoId': videoId,
       'title': title,
       'watchedAt': watchedAt.toIso8601String(),
+      'completed': completed,
     };
   }
 }
