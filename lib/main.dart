@@ -1,12 +1,14 @@
+// main.dart
 import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:Just_Learn/screens/access/register_screen.dart';
 import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
 import 'package:Just_Learn/screens/access/splash_screen.dart';
 import 'package:Just_Learn/screens/course_screen.dart';
 import 'package:Just_Learn/screens/quiz_screen.dart';
-import 'package:Just_Learn/services/%20notification_service.dart';
+import 'package:Just_Learn/services/notification_service.dart';
 import 'package:Just_Learn/services/auth_service.dart';
 import 'package:Just_Learn/models/user.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +25,17 @@ import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navig
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+// Dichiara un'istanza globale di FirebaseAnalytics
+FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+
+// Funzione di gestione dei messaggi in background
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  print('Handling a background message: ${message.messageId}');
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -31,15 +44,19 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Ottenere l'utente corrente (se autenticato)
-  User? currentUser = FirebaseAuth.instance.currentUser;
+  // Imposta il gestore dei messaggi in background
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   // Inizializza il servizio notifiche
   final NotificationService notificationService = NotificationService();
   await notificationService.initialize();
 
+  // Ottenere l'utente corrente (se autenticato)
+  User? currentUser = FirebaseAuth.instance.currentUser;
+
   runApp(MyApp(user: currentUser));
 }
+
 class MyApp extends StatelessWidget {
   final User? user;
 

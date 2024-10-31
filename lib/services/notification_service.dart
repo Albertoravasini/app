@@ -1,3 +1,5 @@
+// notification_service.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,11 +12,11 @@ class NotificationService {
   // Inizializza il servizio di notifiche push
   Future<void> initialize() async {
     NotificationSettings settings = await _firebaseMessaging.requestPermission(
-  alert: true,
-  badge: true,
-  sound: true,
-);
-print('Permessi notifiche: ${settings.authorizationStatus}');
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    print('Permessi notifiche: ${settings.authorizationStatus}');
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       print('Permesso per le notifiche concesso');
@@ -27,9 +29,10 @@ print('Permessi notifiche: ${settings.authorizationStatus}');
         _showForegroundNotification(message);
       });
 
-      // Gestisci le notifiche quando l'app è in background
+      // Gestisci le notifiche quando l'app è in background o aperta tramite notifica
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         print('Notifica aperta dall\'utente: ${message.notification?.title}');
+        // Puoi aggiungere logica per navigare a una schermata specifica
       });
     } else {
       print('Permesso per le notifiche negato dall\'utente');
@@ -38,18 +41,18 @@ print('Permessi notifiche: ${settings.authorizationStatus}');
 
   // Ottenere il token FCM e inviarlo al server
   void _getToken() async {
-  try {
-    String? token = await _firebaseMessaging.getToken();
-    print("FCM Token: $token");
+    try {
+      String? token = await _firebaseMessaging.getToken();
+      print("FCM Token: $token");
 
-    if (token != null) {
-      String uid = "ID_UNICO_UTENTE";  // Replace with authenticated user UID
-      await updateLastAccess(uid, token);
+      if (token != null) {
+        String uid = FirebaseAuth.instance.currentUser?.uid ?? "ID_UNICO_DEFAULT";  // Usa UID dell'utente autenticato o un valore di default
+        await updateLastAccess(uid, token);
+      }
+    } catch (e) {
+      print("Error getting FCM token: $e");
     }
-  } catch (e) {
-    print("Error getting FCM token: $e");
   }
-}
 
   // Mostra una notifica in foreground
   void _showForegroundNotification(RemoteMessage message) {
@@ -70,16 +73,16 @@ print('Permessi notifiche: ${settings.authorizationStatus}');
     }
   }
 
-// Aggiungi una funzione per disabilitare le notifiche
+  // Funzione per disabilitare le notifiche
   Future<void> disableNotifications() async {
     await _firebaseMessaging.unsubscribeFromTopic('all');
   }
 
-  // Aggiungi una funzione per abilitare le notifiche
+  // Funzione per abilitare le notifiche
   Future<void> enableNotifications() async {
     await _firebaseMessaging.subscribeToTopic('all');
   }
-  
+
   // Funzione per inviare l'UID e il token FCM al backend
   Future<void> updateLastAccess(String uid, String fcmToken) async {
     final url = Uri.parse('http://167.99.131.91:3000/update_last_access');  // 10.0.2.2 per emulatore Android

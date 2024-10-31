@@ -24,7 +24,7 @@ class _SplashScreenState extends State<SplashScreen> {
     _navigateToNextScreen();
   }
 
-  Future<void> _navigateToNextScreen() async {
+Future<void> _navigateToNextScreen() async {
   // Inizia a caricare l'utente contemporaneamente al delay
   Future<UserModel?> userModelFuture = _loadUserData();
 
@@ -46,17 +46,13 @@ class _SplashScreenState extends State<SplashScreen> {
     final difference = todayDate.difference(lastAccessDate).inDays;
 
     if (difference >= 1) { 
-      // Se è passata almeno una giornata (qualsiasi ora del giorno successivo)
-      setState(() {
-        _previousConsecutiveDays = userModel.consecutiveDays;
-      });
-
+      // Se è passata almeno una giornata
       if (difference == 1) {
         // Incrementa consecutiveDays solo se è passato un solo giorno
         userModel.consecutiveDays += 1;
       } else {
-        // Se è passato più di un giorno, resetta il conteggio
-        userModel.consecutiveDays = 1;
+        // Se è passato più di un giorno, resetta il conteggio a 0
+        userModel.consecutiveDays = 0;
       }
 
       // Aggiorna lastAccess e consecutiveDays nel database
@@ -65,38 +61,40 @@ class _SplashScreenState extends State<SplashScreen> {
         'lastAccess': now.toIso8601String(),
       });
 
-      // Mostra la schermata di streak
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => StreakScreen(
-            consecutiveDays: userModel.consecutiveDays,
-            coins: userModel.coins,
-            userModel: userModel, // Passa l'UserModel
-            onCollectCoins: () async {
-  print('onCollectCoins called'); // Debugging
+      if (difference == 1) {
+        // Mostra la schermata di streak solo se la serie è incrementata
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => StreakScreen(
+              consecutiveDays: userModel.consecutiveDays,
+              coins: userModel.coins,
+              userModel: userModel, // Passa l'UserModel
+              onCollectCoins: () async {
+                print('onCollectCoins called'); // Debugging
 
-  // Aumenta i coins quando l'utente raccoglie la ricompensa
-  try {
-    await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
-      'coins': FieldValue.increment(userModel.consecutiveDays),
-    });
-    print('Coins updated in Firestore'); // Debugging
-  } catch (e) {
-    print('Error updating coins: $e'); // Debugging
-  }
+                // Aumenta i coins quando l'utente raccoglie la ricompensa
+                try {
+                  await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
+                    'coins': FieldValue.increment(10 + (userModel.consecutiveDays - 1) * 5),
+                  });
+                  print('Coins updated in Firestore'); // Debugging
+                } catch (e) {
+                  print('Error updating coins: $e'); // Debugging
+                }
 
-  // Naviga alla schermata principale dopo aver raccolto i coin
-  _navigateToMainScreen(userModel);
-},
+                // Naviga alla schermata principale dopo aver raccolto i coin
+                _navigateToMainScreen(userModel);
+              },
+            ),
           ),
-        ),
-      );
-      return; // Interrompi l'esecuzione per evitare la navigazione immediata
-    } else {
-      // Se non c'è un nuovo giorno, continua con la navigazione normale
-      _navigateToMainScreen(userModel);
+        );
+        return; // Interrompi l'esecuzione per evitare la navigazione immediata
+      }
     }
+
+    // Se difference >=1 ma !=1, oppure difference <1
+    _navigateToMainScreen(userModel);
   } else {
     // Se non c'è un utente loggato o non esiste l'utente, mostra l'OnboardingScreen
     Navigator.pushReplacement(

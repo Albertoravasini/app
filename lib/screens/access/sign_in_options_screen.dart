@@ -13,7 +13,7 @@ import 'register_screen.dart'; // Import your registration screen
 import 'login_screen.dart'; // Import your login screen
 import 'topic_selection_screen.dart'; // Import the topic selection screen
 import 'package:sign_in_with_apple/sign_in_with_apple.dart'; // Import Sign in with Apple
-import 'dart:io' show Platform; // Import Platform for conditional rendering
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 
 class SignInOptionsScreen extends StatelessWidget {
   const SignInOptionsScreen({Key? key}) : super(key: key);
@@ -175,7 +175,7 @@ class SignInOptionsScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 19),
                     // Conditionally display "Sign in with Apple" on iOS devices
-                    if (Platform.isIOS)
+                    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
                       GestureDetector(
                         onTap: () async {
                           try {

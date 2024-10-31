@@ -1,36 +1,19 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const redis = require('redis');
+// notification_service.js
+
+/**
+ * notification_service.js
+ * 
+ * This file encapsulates all notification-related functionalities.
+ */
+
 const admin = require('firebase-admin');
-const compression = require('compression');
-const generateQuestionsRouter = require('./questions/generate_questions'); // Importa il router
-const path = require('path');
 
-const app = express();
-const port = process.env.PORT || 3000;
-
-// Inizializza Firebase Admin SDK
-const serviceAccount = require('./Firebase_AdminSDK.json');
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://app-just-learn.firebaseio.com"
-});
-
-app.use(bodyParser.json());
-app.use(compression());
-
-const redisClient = redis.createClient();
-redisClient.on('error', (err) => console.error('Redis error:', err));
-redisClient.on('connect', () => console.log('Connected to Redis'));
-
-(async () => {
-  await redisClient.connect();
-})();
-
-// Usa il router per l'endpoint /generate_questions
-app.use('/generate_questions', generateQuestionsRouter);
-
-// Funzione per inviare notifiche push
+/**
+ * Sends a push notification to a specific device.
+ * @param {string} token - The device token.
+ * @param {string} title - The notification title.
+ * @param {string} body - The notification body.
+ */
 async function sendPushNotification(token, title, body) {
   const message = {
     notification: {
@@ -48,28 +31,38 @@ async function sendPushNotification(token, title, body) {
   }
 }
 
-// Funzione per calcolare il prossimo ritardo di notifica utilizzando backoff esponenziale
+/**
+ * Calculates the next notification delay using exponential backoff.
+ * @param {number|null} lastNotificationDelay - The last delay in milliseconds.
+ * @returns {number} - The next delay in milliseconds.
+ */
 function getNextNotificationDelay(lastNotificationDelay) {
   if (lastNotificationDelay == null) {
-    return 6 * 60 * 60 * 1000; // 6 ore in millisecondi
+    return 6 * 60 * 60 * 1000; // 6 hours in milliseconds
   } else if (lastNotificationDelay < 24 * 60 * 60 * 1000) {
-    return lastNotificationDelay * 2; // Raddoppia l'intervallo
+    return lastNotificationDelay * 2; // Double the interval
   } else {
-    return 24 * 60 * 60 * 1000; // Massimo 24 ore in millisecondi
+    return 24 * 60 * 60 * 1000; // Maximum 24 hours in milliseconds
   }
 }
 
-// Programma una notifica con un ritardo specificato, evitando ore notturne
+/**
+ * Schedules a push notification with a specified delay, avoiding nighttime hours.
+ * @param {string} token - The device token.
+ * @param {string} title - The notification title.
+ * @param {string} body - The notification body.
+ * @param {number} delay - The delay in milliseconds.
+ */
 function scheduleNotification(token, title, body, delay) {
   let sendTime = Date.now() + delay;
   let sendDate = new Date(sendTime);
   let hours = sendDate.getHours();
 
-  // Se l'ora è tra le 22 e le 8 del mattino, posticipa la notifica alle 8 del mattino successivo
+  // If the time is between 10 PM and 8 AM, postpone to the next 8 AM
   if (hours >= 22 || hours < 8) {
     let nextMorning = new Date(sendDate);
     if (hours >= 22) {
-      // Aggiungi un giorno se sono dopo le 22
+      // Add a day if it's after 10 PM
       nextMorning.setDate(nextMorning.getDate() + 1);
     }
     nextMorning.setHours(8, 0, 0, 0);
@@ -84,8 +77,14 @@ function scheduleNotification(token, title, body, delay) {
   }, delay);
 }
 
-// Funzione per programmare la notifica con la nuova logica
-async function schedulePushNotification(uid, token) {
+/**
+ * Schedules a push notification for a user based on their last notification delay.
+ * @param {string} uid - The user ID.
+ * @param {string} token - The device token.
+ * @param {FirebaseFirestore.Firestore} db - Firestore instance.
+ * @param {RedisClientType} redisClient - Redis client instance.
+ */
+async function schedulePushNotification(uid, token, db, redisClient) {
   console.log(`Scheduling notifications for user ${uid} with token ${token}`);
   const lastAccess = await redisClient.get(`user_last_access_${uid}`);
 
@@ -96,20 +95,20 @@ async function schedulePushNotification(uid, token) {
 
   console.log(`Last access for user ${uid}: ${lastAccess}`);
 
-  // Ottieni l'ultimo ritardo di notifica
+  // Get the last notification delay
   let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
   lastNotificationDelay = lastNotificationDelay ? parseInt(lastNotificationDelay) : null;
 
-  // Calcola il prossimo ritardo di notifica
+  // Calculate the next notification delay
   const nextNotificationDelay = getNextNotificationDelay(lastNotificationDelay);
 
-  // Salva il prossimo ritardo di notifica
+  // Save the next notification delay
   await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay);
 
-  // Recupera informazioni sull'utente per personalizzare la notifica
+  // Retrieve user information to personalize the notification
   let userName = 'Amico';
   try {
-    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    const userDoc = await db.collection('users').doc(uid).get();
     if (userDoc.exists) {
       const userData = userDoc.data();
       userName = userData.name || 'Amico';
@@ -118,11 +117,11 @@ async function schedulePushNotification(uid, token) {
     console.error(`Error fetching user data for uid ${uid}:`, error);
   }
 
-  // Personalizza il messaggio della notifica
+  // Customize the notification message
   const notificationTitle = `⏰ Time’s Ticking!`;
   const notificationBody = `Don’t let another minute go to waste. Enhance your skills now! 💡📱`;
 
-  // Programma la notifica
+  // Schedule the notification
   scheduleNotification(
     token,
     notificationTitle,
@@ -131,7 +130,7 @@ async function schedulePushNotification(uid, token) {
   );
 }
 
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
+module.exports = {
+  sendPushNotification,
+  schedulePushNotification,
+};

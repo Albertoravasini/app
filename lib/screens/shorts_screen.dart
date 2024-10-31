@@ -1,3 +1,4 @@
+import 'package:Just_Learn/controllers/scroll_physics.dart';
 import 'package:Just_Learn/models/course.dart';
 import 'package:Just_Learn/screens/course_detail_screen.dart';
 import 'package:Just_Learn/widgets/course_question_card.dart';
@@ -266,45 +267,46 @@ Future<void> _loadAllShortSteps() async {
 }
 
 
-  void _onVideoChanged(int index) async {
+  void _onVideoChanged(int index) {
   if (index >= 0 && index < allShortSteps.length) {
     // Pausa il video corrente
-    final currentIndex = _pageController.page?.toInt(); // Ottieni l'indice corrente
+    final currentIndex = _pageController.page?.toInt();
     if (currentIndex != null && currentIndex >= 0 && currentIndex < _youtubeControllers.length) {
       print("Mettendo in pausa il video con index: $currentIndex");
-      _youtubeControllers[currentIndex].pause(); // Metti in pausa il video attuale
+      _youtubeControllers[currentIndex].pause();
     }
 
-    // Riprendi il nuovo video
-    final currentStep = allShortSteps[index];
-    final currentVideoId = currentStep['step'].content;
-    final currentVideoTitle = currentStep['level'].title;
-    final currentVideoTopic = currentStep['level'].topic;
-
-    // Segna il video come visto
-    await _shortsController.markVideoAsWatched(currentVideoId, currentVideoTitle, currentVideoTopic);
-
-    // Aggiorna lo stato di like e passa i dati aggiornati al VideoPlayerWidget
-    await _updateLikeState(currentVideoId);
-
-    // Riproduci automaticamente il video corrente
-    print("Riproducendo il video corrente con index: $index, videoId: $currentVideoId");
-    _youtubeControllers[index].play(); // Riproduci il video attuale
+    // Riproduci il nuovo video immediatamente
+    print("Riproducendo il video corrente con index: $index, videoId: ${allShortSteps[index]['step'].content}");
+    _youtubeControllers[index].play();
 
     // Aggiorna il titolo del video corrente
-    if (mounted) {
-      setState(() {
-        selectedChoice = null;
-        widget.onVideoTitleChange(currentVideoTitle);
-      });
-    }
+    final currentStep = allShortSteps[index];
+    final currentVideoTitle = (currentStep['level'] as Level).title;
+    widget.onVideoTitleChange(currentVideoTitle);
 
     // Precarica il video successivo se disponibile
     if (index + 1 < allShortSteps.length) {
       print("Precaricando il video successivo con index: ${index + 1}");
       _preloadNextVideo(index + 1);
     }
+
+    // Esegui le operazioni asincrone in background
+    _handleAsyncOperations(index);
   }
+}
+
+Future<void> _handleAsyncOperations(int index) async {
+  final currentStep = allShortSteps[index];
+  final currentVideoId = (currentStep['step'] as LevelStep).content;
+  final currentVideoTitle = (currentStep['level'] as Level).title;
+  final currentVideoTopic = (currentStep['level'] as Level).topic;
+
+  // Segna il video come visto
+  await _shortsController.markVideoAsWatched(currentVideoId, currentVideoTitle, currentVideoTopic);
+
+  // Aggiorna lo stato di like
+  await _updateLikeState(currentVideoId);
 }
 
 void _preloadNextVideo(int nextIndex) {
@@ -443,20 +445,25 @@ Future<void> _updateLikeState(String videoId) async {
     children: [
       // Il lettore video
       VideoPlayerWidget(
-        controller: controller,
-        isLiked: isLiked,
-        likeCount: likeCount,
-        questionStep: questionStep,
-        isSaved: isSaved, // Passiamo lo stato isSaved
-        onShowQuestion: () {
-          setState(() {
-            if (questionStep != null) {
-              allShortSteps[index]['step'] = questionStep;
-              allShortSteps[index]['showQuestion'] = true;
-            }
-          });
-        },
-      ),
+  controller: controller,
+  isLiked: isLiked,
+  likeCount: likeCount,
+  questionStep: questionStep,
+  isSaved: isSaved,
+  onShowQuestion: () {
+    setState(() {
+      if (questionStep != null) {
+        allShortSteps[index]['step'] = questionStep;
+        allShortSteps[index]['showQuestion'] = true;
+      }
+    });
+  },
+  onVideoUnsaved: () {
+    // Implementa se necessario
+  },
+  onCoinsUpdate: widget.onCoinsUpdate,
+  topic: allShortSteps[index]['level'].topic,  // Aggiungi il parametro topic qui
+),
       
       // Aggiungi il pulsante "Go To Course" se il video è parte di un corso
       if (course != null)
@@ -556,7 +563,7 @@ Future<void> _updateLikeState(String videoId) async {
           : PageView.builder(
   controller: _pageController,
   scrollDirection: Axis.vertical,
-  physics: const BouncingScrollPhysics(), // Fisica per uno scroll fluido
+  physics: const TikTokScrollPhysics(parent: BouncingScrollPhysics()),
   onPageChanged: _onVideoChanged,
   itemCount: allShortSteps.length,
   itemBuilder: (context, index) {

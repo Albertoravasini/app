@@ -1,6 +1,7 @@
 // lib/services/auth_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -45,6 +46,11 @@ class AuthService {
             'lastAccess': DateTime.now().toIso8601String(),
           });
         }
+        // Imposta le proprietà utente
+    await FirebaseAnalytics.instance.setUserId(id: user.uid);
+    await FirebaseAnalytics.instance.setUserProperty(name: 'email', value: user.email);
+    await FirebaseAnalytics.instance.setUserProperty(name: 'name', value: user.displayName ?? '');
+  
       }
 
       return user;

@@ -1,6 +1,7 @@
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
@@ -15,40 +16,50 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   UserModel? currentUser;
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
   }
+
   final List<Map<String, dynamic>> quizzes = [
-  {
-    'title': 'JustLearn',
-    'description': 'Explore the world and test your culture',
-    'image': 'assets/General Culture.png',
-  },
-  {
-    'title': 'History',
-    'description': 'Test your knowledge about historical events and figures.',
-    'image': 'assets/History.png',
-  },
-  {
-    'title': 'Fitness',
-    'description': 'Answer questions about diet and fitness',
-    'image': 'assets/Fitnes.png',
-  },
-  {
-    'title': 'Daily Quiz',
-    'description': '',
-    'isQuestionMark': true,
-  },
-  {
-    'title': 'Train Your Mistakes',
-    'description': '',
-    'isQuestionMark': true,
-  },
-];
-Future<void> _loadCurrentUser() async {
+    {
+      'title': 'JustLearn',
+      'description': 'Explore the world and test your culture',
+      'image': 'assets/General Culture.png',
+    },
+    {
+      'title': 'History',
+      'description': 'Test your knowledge about historical events and figures.',
+      'image': 'assets/History.png',
+    },
+    {
+      'title': 'Fitness',
+      'description': 'Learn about diet and fitness',
+      'image': 'assets/Fitnes.png',
+    },
+    {
+      'title': 'Business',
+      'description': 'Learn about investments, entrepreneurship, finance and more ',
+      'image': 'assets/business.png',
+    },
+    {
+      'title': 'Daily Quiz',
+      'description': 'Test what you have learned about your recent viewed videos',
+      'isQuestionMark': true,
+      'cost': 50, // Costo in coin
+    },
+    {
+      'title': 'Train Your Mistakes',
+      'description': '',
+      'isQuestionMark': true,
+      'cost': 100
+    },
+  ];
+
+  Future<void> _loadCurrentUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
@@ -70,6 +81,85 @@ Future<void> _loadCurrentUser() async {
       setState(() {
         currentUser!.coins -= amount;
       });
+    }
+  }
+
+  Future<void> _handleLastViewedVideosQuiz() async {
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('you have to be logged to have access to this functionallity '),
+        ),
+      );
+      return;
+    }
+
+    if (currentUser!.coins < 100) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('You do not have enough coins to access this quiz.'),
+        ),
+      );
+      return;
+    }
+
+    // Deduce 100 coin
+    await _subtractCoins(100);
+
+    // Recupera gli ultimi 5 video completati
+    List<VideoWatched> completedVideos = currentUser!.WatchedVideos.values
+        .expand((videoList) => videoList)
+        .where((video) => video.completed)
+        .toList();
+
+    // Ordina per watchedAt decrescente
+    completedVideos.sort((a, b) => b.watchedAt.compareTo(a.watchedAt));
+
+    // Prendi gli ultimi 5
+    completedVideos = completedVideos.take(5).toList();
+
+    // Controlla se ci sono almeno 3 video completati
+    if (completedVideos.length < 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('You must complete at least 3 videos to access this quiz.'),
+        ),
+      );
+      return;
+    }
+
+    // Raccogli gli ID dei video
+    List<String> videoIds = completedVideos.map((video) => video.videoId).toList();
+
+    // Naviga a QuestionScreen passando gli ID dei video
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuestionScreen(topic: 'Daily Quiz', videoIds: videoIds),
+      ),
+    );
+  }
+
+  void _startQuiz(String quizTitle) async {
+    // Log dell'evento 'quiz_start'
+    _analytics.logEvent(
+      name: 'quiz_start',
+      parameters: {
+        'quiz_title': quizTitle,
+        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
+      },
+    );
+
+    if (quizTitle == 'Daily Quiz') {
+      await _handleLastViewedVideosQuiz();
+    } else {
+      // Naviga a QuestionScreen per altri quiz basati su topic
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QuestionScreen(topic: quizTitle),
+        ),
+      );
     }
   }
 
@@ -150,109 +240,157 @@ Future<void> _loadCurrentUser() async {
     );
   }
 
-  Widget _buildMysteryCard(double width, String title, String description) {
-  return GestureDetector(
-    onTap: () {
-      if (title == 'Daily Quiz' || title == 'Train Your Mistakes') {
-        // Mostra un messaggio che la carta non è disponibile per entrambi i titoli
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('This card is not yet available.'),
-          ),
-        );
-      }
-    },
-    child: Stack(
-      children: [
-        Container(
-          width: width,
-          margin: const EdgeInsets.symmetric(vertical: 0),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.yellow.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                '?',
-                style: TextStyle(
-                  fontSize: 100,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.black87,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Montserrat',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                description,
-                style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 16,
-                  fontFamily: 'Montserrat',
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        Positioned(
-          top: 10,
-          left: 10,
-          child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
+  Widget _buildMysteryCard(double width, String title, String description, int cost) {
+    return GestureDetector(
+      onTap: () async {
+        if (title == 'Train Your Mistakes') {
+          // Mostra un messaggio che la carta non è disponibile per questi titoli
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('This card is not yet available.'),
             ),
-            child: Row(
+          );
+        } else if (title == 'Daily Quiz') {
+          // Gestisci l'acquisto del quiz Last Viewed Videos
+          await _handleLastViewedVideosQuiz();
+        }
+      },
+      child: Stack(
+        children: [
+          Container(
+            width: width,
+            margin: const EdgeInsets.symmetric(vertical: 0),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.yellow.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
-                const SizedBox(width: 8),
-                Text(
-                  '100', // Costo della carta in coins
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
+                const Text(
+                  '?',
+                  style: TextStyle(
+                    fontSize: 100,
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
                   ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Montserrat',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: Colors.black54,
+                    fontSize: 16,
+                    fontFamily: 'Montserrat',
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
           ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$cost', // Costo della carta in coin
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCarousel() {
+    return Expanded(
+      child: CarouselSlider.builder(
+        itemCount: quizzes.length,
+        itemBuilder: (BuildContext context, int index, int realIndex) {
+          final quiz = quizzes[index];
+          final isCenter = index == _current;
+          final width = isCenter ? 350.0 : 300.0;
+
+          if (quiz['isQuestionMark'] == true) {
+            return _buildMysteryCard(
+              width,
+              quiz['title'],
+              quiz['description'],
+              quiz['cost'] ?? 0, // Passa il costo, default a 0 se non definito
+            );
+          } else {
+            return GestureDetector(
+              onTap: () {
+                _startQuiz(quiz['title']!);
+              },
+              child: QuizCard(
+                title: quiz['title']!,
+                description: quiz['description']!,
+                imagePath: quiz['image'] ?? 'assets/default.png', // Gestisci le carte senza immagine
+                width: width,
+              ),
+            );
+          }
+        },
+        options: CarouselOptions(
+          height: 450,
+          enlargeCenterPage: true,
+          enableInfiniteScroll: true,
+          viewportFraction: 0.85,
+          onPageChanged: (index, reason) {
+            setState(() {
+              _current = index;
+            });
+          },
         ),
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
   // Costruisce la card per l'upgrade
 // Costruisce la card per l'upgrade
 // Costruisce la card per l'upgrade
 Widget _buildUpgradeProCard() {
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16), // Padding contenuto
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), // Padding contenuto
     decoration: BoxDecoration(
       color: Colors.white.withOpacity(0.05),
       borderRadius: BorderRadius.circular(12), // Bordi arrotondati
@@ -336,51 +474,7 @@ Widget _buildUpgradeProCard() {
   );
 }
 
-  // Costruisce il carousel dei quiz
-  Widget _buildCarousel() {
-  return Expanded(
-    child: CarouselSlider.builder(
-      itemCount: quizzes.length,
-      itemBuilder: (BuildContext context, int index, int realIndex) {
-        final quiz = quizzes[index];
-        final isCenter = index == _current;
-        final width = isCenter ? 350.0 : 300.0;
 
-        if (quiz['isQuestionMark'] == true) {
-          return _buildMysteryCard(width, quiz['title'], quiz['description']);
-        } else {
-          return GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => QuestionScreen(topic: quiz['title']!),
-                ),
-              );
-            },
-            child: QuizCard(
-              title: quiz['title']!,
-              description: quiz['description']!,
-              imagePath: quiz['image']!,
-              width: width,
-            ),
-          );
-        }
-      },
-      options: CarouselOptions(
-        height: 450,
-        enlargeCenterPage: true,
-        enableInfiniteScroll: true,
-        viewportFraction: 0.85,
-        onPageChanged: (index, reason) {
-          setState(() {
-            _current = index;
-          });
-        },
-      ),
-    ),
-  );
-}
 }
 
 // Design della card del quiz

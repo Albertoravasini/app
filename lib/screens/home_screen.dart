@@ -112,23 +112,26 @@ void _updateCoins(int newCoins) {
   }
 }
 
-  Future<void> _updateConsecutiveDays(UserModel user) async {
-    final now = DateTime.now();
-    final lastAccess = user.lastAccess;
-    final difference = DateTime(now.year, now.month, now.day)
-        .difference(DateTime(lastAccess.year, lastAccess.month, lastAccess.day))
-        .inDays;
+Future<void> _updateConsecutiveDays(UserModel user) async {
+  final now = DateTime.now();
+  final lastAccess = user.lastAccess;
+  final difference = DateTime(now.year, now.month, now.day)
+      .difference(DateTime(lastAccess.year, lastAccess.month, lastAccess.day))
+      .inDays;
 
-    if (difference == 1) {
-      user.consecutiveDays += 1;
-    } else if (difference > 1) {
-      user.consecutiveDays = 1;
-    }
-
-    user.lastAccess = now;
-
-    await FirebaseFirestore.instance.collection('users').doc(user.uid).update(user.toMap());
+  if (difference == 1) {
+    // Incrementa se l'accesso è avvenuto il giorno successivo
+    user.consecutiveDays += 1;
+  } else if (difference > 1) {
+    // Resetta a 0 se sono passati più di un giorno
+    user.consecutiveDays = 0;
   }
+  // Se difference == 0, nessuna modifica
+
+  user.lastAccess = now;
+
+  await FirebaseFirestore.instance.collection('users').doc(user.uid).update(user.toMap());
+}
 
   Future<void> _loadAllTopics() async {
     final querySnapshot = await FirebaseFirestore.instance.collection('topics').get();
@@ -216,11 +219,13 @@ void _updateCoins(int newCoins) {
     });
   }
 
-  void _updateVideoTitle(String newTitle) {
+ void _updateVideoTitle(String newTitle) {
+  if (mounted) { // Controlla se il widget è ancora montato
     setState(() {
       videoTitle = newTitle;
     });
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +270,7 @@ void _updateCoins(int newCoins) {
             ),
             child: Row(
               children: [
-                const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
+                const Icon(Icons.stars_rounded, color: Colors.yellowAccent, size: 25),
                 const SizedBox(width: 8),
                 Text(
                   '${currentUser?.coins ?? 0}', // Mostra il numero di coins

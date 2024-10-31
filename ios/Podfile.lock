@@ -1476,6 +1476,7 @@ DEPENDENCIES:
   - device_info_plus (from `.symlinks/plugins/device_info_plus/ios`)
   - Firebase/Analytics
   - Firebase/Core
+  - Firebase/Messaging
   - firebase_analytics (from `.symlinks/plugins/firebase_analytics/ios`)
   - firebase_auth (from `.symlinks/plugins/firebase_auth/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
@@ -1623,6 +1624,6 @@ SPEC CHECKSUMS:
   video_player_avfoundation: 7c6c11d8470e1675df7397027218274b6d2360b3
   wakelock_plus: 78ec7c5b202cab7761af8e2b2b3d0671be6c4ae1
 
-PODFILE CHECKSUM: 6803472753d22843d4cf5abce9cc68d55baf4bb6
+PODFILE CHECKSUM: 5901ff303fdcef1c85c7f29fce0693f47ea3a9d2
 
 COCOAPODS: 1.15.2

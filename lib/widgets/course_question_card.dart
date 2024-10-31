@@ -1,6 +1,7 @@
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:Just_Learn/models/course.dart';
@@ -285,6 +286,9 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
 
       await _addCoinsToUser();
     }
+    // Registra l'evento di risposta alla domanda
+ 
+
 
     await _saveAnsweredQuestion();
   }
