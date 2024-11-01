@@ -416,7 +416,7 @@ Future<void> _updateLikeState(String videoId) async {
   
 
 
-   Widget _buildVideoPlayer(int index) {
+  Widget _buildVideoPlayer(int index) {
   if (allShortSteps[index]['showQuestion'] == true) {
     return const SizedBox.shrink();
   }
@@ -428,7 +428,8 @@ Future<void> _updateLikeState(String videoId) async {
 
   final currentStep = allShortSteps[index]['step'] as LevelStep;
   final level = allShortSteps[index]['level'] as Level;
-
+  final videoId = currentStep.content; // Estrai l'ID del video
+  
   final steps = level.steps;
   final currentStepIndex = steps.indexOf(currentStep);
 
@@ -437,15 +438,15 @@ Future<void> _updateLikeState(String videoId) async {
     questionStep = steps[currentStepIndex + 1];
   }
 
-  // Controlliamo se il video è parte di un corso
   final step = allShortSteps[index]['step'] as LevelStep;
   final course = allShortSteps[index]['course'];
+
 
   return Stack(
     children: [
       // Il lettore video
       VideoPlayerWidget(
-  controller: controller,
+        videoId: videoId, // Aggiungi questo parametro
   isLiked: isLiked,
   likeCount: likeCount,
   questionStep: questionStep,
@@ -493,10 +494,10 @@ Future<void> _updateLikeState(String videoId) async {
                   ),
                 ],
               ),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(width: 10), // Spazio tra icona e testo
+                  SizedBox(width: 10), // Spazio tra icona e testo
                   Text(
                     'Go To Course',
                     style: TextStyle(
