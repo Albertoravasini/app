@@ -9,6 +9,7 @@ import '../models/course.dart';
 import 'level_screen.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CourseDetailScreen extends StatefulWidget {
   final Course course;
@@ -23,25 +24,41 @@ class CourseDetailScreen extends StatefulWidget {
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
   bool _isCourseUnlocked = false;
   int _currentPage = 0;
+  late UserModel _currentUser;
 
   @override
   void initState() {
     super.initState();
-    _isCourseUnlocked = widget.user.unlockedCourses.contains(widget.course.id);
+    _currentUser = widget.user;
+    _isCourseUnlocked = _currentUser.unlockedCourses.contains(widget.course.id);
     // Registra l'evento di visualizzazione del corso
     FirebaseAnalytics.instance.logEvent(
       name: 'course_view',
       parameters: {
         'course_id': widget.course.id,
         'course_title': widget.course.title,
-        'user_id': widget.user.uid,
+        'user_id': _currentUser.uid,
       },
     );
   }
 
+  // Funzione per ricaricare i dati utente da Firestore
+  Future<void> _reloadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userSnapshot = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userSnapshot.exists) {
+        setState(() {
+          _currentUser = UserModel.fromMap(userSnapshot.data()!);
+          _isCourseUnlocked = _currentUser.unlockedCourses.contains(widget.course.id);
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    _isCourseUnlocked = widget.user.unlockedCourses.contains(widget.course.id);
+    _isCourseUnlocked = _currentUser.unlockedCourses.contains(widget.course.id);
 
     return Scaffold(
       body: Stack(
@@ -177,17 +194,17 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
 
   /// Funzione per sbloccare il corso
   void _unlockCourse() async {
-    if (widget.user.coins >= widget.course.cost) {
-      int newCoins = widget.user.coins - widget.course.cost;
-      List<String> newUnlockedCourses = List.from(widget.user.unlockedCourses)..add(widget.course.id);
+    if (_currentUser.coins >= widget.course.cost) {
+      int newCoins = _currentUser.coins - widget.course.cost;
+      List<String> newUnlockedCourses = List.from(_currentUser.unlockedCourses)..add(widget.course.id);
 
       setState(() {
-        widget.user.coins = newCoins;
-        widget.user.unlockedCourses = newUnlockedCourses;
+        _currentUser.coins = newCoins;
+        _currentUser.unlockedCourses = newUnlockedCourses;
         _isCourseUnlocked = true;
       });
 
-      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
+      await FirebaseFirestore.instance.collection('users').doc(_currentUser.uid).update({
         'coins': newCoins,
         'unlockedCourses': newUnlockedCourses,
       });
@@ -206,14 +223,14 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       parameters: {
         'course_id': widget.course.id,
         'course_title': widget.course.title,
-        'user_id': widget.user.uid,
+        'user_id': _currentUser.uid,
       },
     );
   }
 
   /// Funzione per ottenere il currentStep per una sezione
   int _getCurrentStepForSection(String sectionTitle) {
-    return widget.user.currentSteps[sectionTitle] ?? 0; // Se non c'è progresso, restituisce 0
+    return _currentUser.currentSteps[sectionTitle] ?? 0; // Se non c'è progresso, restituisce 0
   }
 
   /// Funzione per calcolare il tempo totale per completare una sezione
@@ -225,68 +242,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     return totalTime.ceil(); // Arrotonda per eccesso
   }
 
-  /// Costruisce le sezioni del corso
-  Widget _buildSections() {
-    return Column(
-      children: widget.course.sections.map((section) {
-        int totalTime = _calculateTotalTime(section);
-        int totalVideos = section.steps.where((step) => step.type == 'video').length;
-        int totalQuestions = section.steps.where((step) => step.type == 'question').length;
 
-        // Ottieni il currentStep per la sezione dall'utente
-        int currentStep = _getCurrentStepForSection(section.title);
-        bool isCompleted = currentStep >= section.steps.length;
-
-        // Usa l'icona corretta in base al completamento della sezione
-        String iconAsset = isCompleted
-            ? 'assets/solar_verified-check-linear.svg'
-            : 'assets/ph_arrow-up-bold.svg';
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 20.0),
-          child: GestureDetector(
-            onTap: _isCourseUnlocked
-                ? () async {
-                    bool? result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LevelScreen(section: section),
-                      ),
-                    );
-
-                    if (result == true) {
-                      // User completed the section or made progress
-                      setState(() {
-                        // Force re-render to update progress bars
-                      });
-                    }
-                  }
-                : null, // Disabilita il clic se non sono stati sbloccati i corsi
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
-              decoration: ShapeDecoration(
-                color: const Color(0xFF181819),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(29),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle(section.title, iconAsset),
-                  const SizedBox(height: 13),
-                  _buildSectionDetails(totalTime, totalVideos, totalQuestions),
-                  const SizedBox(height: 13),
-                  _buildProgressBar(currentStep, section.steps.length),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
 
   /// Costruisce il titolo della sezione con l'icona accanto
   Widget _buildSectionTitle(String title, String iconAsset) {
@@ -373,28 +329,30 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       ],
     );
   }
-/// Costruisce il pulsante di informazioni (icona "i")
-Widget _buildInfoButton() {
-  return Positioned(
-    top: 30, // Allinea con il back button
-    right: 16, // Posiziona sulla destra
-    child: GestureDetector(
-      onTap: _showCourseDescription,
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.5),
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(
-          Icons.info_outline_rounded,
-          color: Colors.white,
-          size: 30,
+
+  /// Costruisce il pulsante di informazioni (icona "i")
+  Widget _buildInfoButton() {
+    return Positioned(
+      top: 30, // Allinea con il back button
+      right: 16, // Posiziona sulla destra
+      child: GestureDetector(
+        onTap: _showCourseDescription,
+        child: Container(
+          padding: const EdgeInsets.all(8.0),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.info_outline_rounded,
+            color: Colors.white,
+            size: 30,
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
   /// Costruisce il pulsante di ritorno
   Widget _buildBackButton() {
     return Positioned(
@@ -515,6 +473,68 @@ Widget _buildInfoButton() {
           );
         }),
       ),
+    );
+  }
+
+  /// Costruisce le barre di progresso delle sezioni
+  Widget _buildSections() {
+    return Column(
+      children: widget.course.sections.map((section) {
+        int totalTime = _calculateTotalTime(section);
+        int totalVideos = section.steps.where((step) => step.type == 'video').length;
+        int totalQuestions = section.steps.where((step) => step.type == 'question').length;
+
+        // Ottieni il currentStep per la sezione dall'utente
+        int currentStep = _getCurrentStepForSection(section.title);
+        bool isCompleted = currentStep >= section.steps.length;
+
+        // Usa l'icona corretta in base al completamento della sezione
+        String iconAsset = isCompleted
+            ? 'assets/solar_verified-check-linear.svg'
+            : 'assets/ph_arrow-up-bold.svg';
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 20.0),
+          child: GestureDetector(
+            onTap: _isCourseUnlocked
+                ? () async {
+                    bool? result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => LevelScreen(section: section),
+                      ),
+                    );
+
+                    // Sempre ricaricare i dati utente dopo il ritorno
+                    await _reloadUserData();
+                    setState(() {
+                      // Forza il re-render per aggiornare le barre di progresso
+                    });
+                  }
+                : null, // Disabilita il clic se il corso non è sbloccato
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+              decoration: ShapeDecoration(
+                color: const Color(0xFF181819),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(29),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle(section.title, iconAsset),
+                  const SizedBox(height: 13),
+                  _buildSectionDetails(totalTime, totalVideos, totalQuestions),
+                  const SizedBox(height: 13),
+                  _buildProgressBar(currentStep, section.steps.length),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
