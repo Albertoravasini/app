@@ -27,6 +27,10 @@ redisClient.on('connect', () => console.log('Connected to Redis'));
   await redisClient.connect();
 })();
 
+// backend/server.js
+const shortsRouter = require('./shorts');
+app.use('/', shortsRouter);
+
 // Usa il router per l'endpoint /generate_questions
 app.use('/generate_questions', generateQuestionsRouter);
 

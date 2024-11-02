@@ -1,26 +1,28 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Level {
-  final String? id; // ID del documento Firestore
-  int levelNumber; // Numero del livello (ordine dei livelli all'interno di un subtopic)
-  final String topic; // Topic di appartenenza
-  String subtopic; // Rimuovi `final` da qui
-  final String title; // Titolo del livello
-  final List<LevelStep> steps; // Passi del livello
-  final int subtopicOrder; // Ordine del subtopic (ordine dei subtopic all'interno di un topic)
-  int get numberOfQuestions {
-    return steps.where((step) => step.type == 'question').length;
-  }
+  final String? id;
+  int levelNumber;
+  final String topic;
+  String subtopic;
+  final String title;
+  final List<LevelStep> steps;
+  final int subtopicOrder;
 
   Level({
     this.id,
     required this.levelNumber,
     required this.topic,
-    required this.subtopic, // Può essere modificato ora
+    required this.subtopic,
     required this.title,
     required this.steps,
-    required this.subtopicOrder, 
+    required this.subtopicOrder,
   });
+
+  // Getter to count the number of questions in steps
+  int get numberOfQuestions {
+    return steps.where((step) => step.type == 'question').length;
+  }
 
   factory Level.fromFirestore(DocumentSnapshot doc) {
     Map data = doc.data() as Map;
@@ -28,15 +30,29 @@ class Level {
       id: doc.id,
       levelNumber: data['levelNumber'] ?? 0,
       topic: data['topic'] ?? '',
-      subtopic: data['subtopic'] ?? '', // Subtopic
+      subtopic: data['subtopic'] ?? '',
       title: data['title'] ?? '',
       steps: List<LevelStep>.from(data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []),
       subtopicOrder: data['subtopicOrder'] ?? 0,
     );
   }
 
+  factory Level.fromMap(Map<String, dynamic> data) {
+    return Level(
+      id: data['id'] as String?,
+      levelNumber: data['levelNumber'] ?? 0,
+      topic: data['topic'] ?? '',
+      subtopic: data['subtopic'] ?? '',
+      title: data['title'] ?? '',
+      steps: List<LevelStep>.from(
+          data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []),
+      subtopicOrder: data['subtopicOrder'] ?? 0,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'levelNumber': levelNumber,
       'topic': topic,
       'subtopic': subtopic,
@@ -50,56 +66,55 @@ class Level {
 class LevelStep {
   final String type;
   final String content;
-  final String? videoUrl; // Aggiungi questo campo
+  final String? videoUrl;
   final List<String>? choices;
   final String? correctAnswer;
   final String? explanation;
   final String? thumbnailUrl;
   final bool isShort;
   final String? fullText;
-  String? topic; // Aggiungi questo campo se non esiste
-  
+  String? topic;
 
   LevelStep({
     required this.type,
     required this.content,
-    this.videoUrl, // Assicurati che questo campo sia incluso nel costruttore
+    this.videoUrl,
     this.choices,
     this.correctAnswer,
     this.explanation,
     this.thumbnailUrl,
     this.isShort = false,
     this.fullText,
-    this.topic, // Aggiungi questo parametro nel costruttore
+    this.topic,
   });
 
   factory LevelStep.fromMap(Map<String, dynamic> data) {
     return LevelStep(
       type: data['type'] ?? '',
       content: data['content'] ?? '',
-      videoUrl: data['videoUrl'], // Mappalo dal database
+      videoUrl: data['videoUrl'],
       choices: List<String>.from(data['choices'] ?? []),
       correctAnswer: data['correctAnswer'],
       explanation: data['explanation'],
       thumbnailUrl: data['thumbnailUrl'],
       isShort: data['isShort'] ?? false,
       fullText: data['fullText'],
-      topic: data['topic'], // Assicurati che questo venga estratto correttamente
+      topic: data['topic'],
     );
   }
-  
 
   Map<String, dynamic> toMap() {
     return {
       'type': type,
       'content': content,
-      'videoUrl': videoUrl, // Assicurati che venga mappato correttamente
+      'videoUrl': videoUrl,
       'choices': choices,
       'correctAnswer': correctAnswer,
       'explanation': explanation,
       'thumbnailUrl': thumbnailUrl,
       'isShort': isShort,
       'fullText': fullText,
+      'topic': topic,
     };
   }
 }

@@ -1,6 +1,7 @@
 import 'package:Just_Learn/controllers/scroll_physics.dart';
 import 'package:Just_Learn/models/course.dart';
 import 'package:Just_Learn/screens/course_detail_screen.dart';
+import 'package:Just_Learn/services/shorts_service.dart';
 import 'package:Just_Learn/widgets/course_question_card.dart';
 import 'package:Just_Learn/widgets/video_player_widget.dart';
 import 'package:Just_Learn/controllers/shorts_controller.dart';
@@ -80,189 +81,90 @@ class _ShortsScreenState extends State<ShortsScreen> {
   }
 }
 
+// Inside _ShortsScreenState
+
 Future<void> _loadAllShortSteps() async {
   if (isLoadingMore) return;
-  if (!mounted) return; // Verifica se il widget è ancora montato
+  if (!mounted) return;
   setState(() {
     isLoadingMore = true;
   });
 
-  // Fetch Levels Collection
-  final levelsCollection = FirebaseFirestore.instance.collection('levels');
-  Query query = levelsCollection;
-
-  if (widget.selectedTopic != null && widget.selectedTopic != 'Just Learn') {
-    query = query.where('topic', isEqualTo: widget.selectedTopic);
-  }
-
-  if (widget.selectedSubtopic != null && widget.selectedSubtopic != 'tutti') {
-    query = query.where('subtopic', isEqualTo: widget.selectedSubtopic);
-  }
-
-  // Fetch all levels matching the query
-  final querySnapshot = await query.orderBy('subtopicOrder').orderBy('levelNumber').get();
-  final levels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
-
-  // Fetch Courses Collection and filter by topic
-  final coursesCollection = FirebaseFirestore.instance.collection('courses');
-  Query coursesQuery = coursesCollection;
-
-  if (widget.selectedTopic != null && widget.selectedTopic != 'Just Learn') {
-    coursesQuery = coursesQuery.where('topic', isEqualTo: widget.selectedTopic);
-  }
-
-  final coursesSnapshot = await coursesQuery.get();
-  final courses = coursesSnapshot.docs.map((doc) => Course.fromFirestore(doc)).toList();
-
-  // Combine short steps from Levels
-  List<LevelStep> shortSteps = levels
-      .expand((level) => level.steps.where((step) => step.type == 'video' && step.isShort))
-      .toList();
-
-  // Combine steps from course sections
-  List<LevelStep> courseShortSteps = courses
-      .expand((course) => course.sections
-          .expand((section) => section.steps)
-          .where((step) => step.type == 'video' && step.isShort))
-      .toList();
-
-  // Combine steps from both Levels and Courses
-  final combinedShortSteps = [...shortSteps, ...courseShortSteps];
-
-  // Get the current user to check for watched and saved videos
   final user = FirebaseAuth.instance.currentUser;
-  List<VideoWatched> allWatchedVideos = [];
-  List<LevelStep> unWatchedSteps = [];
-  List<LevelStep> watchedSteps = [];
-  Set<String> savedVideoIds = {};
-  List<dynamic> savedVideos = [];
 
-  if (user != null) {
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    if (userDoc.exists) {
-      final userData = userDoc.data() as Map<String, dynamic>;
-      final userModel = UserModel.fromMap(userData);
-
-      savedVideos = userData['SavedVideos'] ?? [];
-      savedVideoIds = savedVideos.map((video) => video['videoId'].toString()).toSet();
-
-      // Load the watched videos
-      if (widget.selectedTopic == 'Just Learn') {
-        for (var watchedVideosByTopic in userModel.WatchedVideos.values) {
-          allWatchedVideos.addAll(watchedVideosByTopic);
-        }
-      } else {
-        allWatchedVideos = userModel.WatchedVideos[widget.selectedTopic] ?? [];
-      }
-
-      final watchedVideoIds = allWatchedVideos.map((video) => video.videoId).toSet();
-
-      // Se è abilitata la visualizzazione dei video salvati, filtra solo i video salvati
-      if (widget.showSavedVideos) {
-        // Filtra i video salvati per topic
-        unWatchedSteps = combinedShortSteps.where((step) => savedVideoIds.contains(step.content)).toList();
-      } else {
-        // Divide videos into watched and unwatched
-        unWatchedSteps = combinedShortSteps.where((step) => !watchedVideoIds.contains(step.content)).toList();
-        watchedSteps = combinedShortSteps.where((step) => watchedVideoIds.contains(step.content)).toList();
-
-        // Shuffle unwatched videos so they appear first randomly
-        unWatchedSteps.shuffle();
-
-        // Optionally shuffle watched videos as well
-        watchedSteps.shuffle();
-      }
-    }
+  if (user == null) {
+    // Handle unauthenticated user
+    return;
   }
 
-  final List<Map<String, dynamic>> shortStepsWithMetadata = [];
+  try {
+    final shortsService = ShortsService(baseUrl: 'http://167.99.131.91:3000');
+    final shortStepsWithMetadata = await shortsService.getShortSteps(
+      selectedTopic: widget.selectedTopic,
+      selectedSubtopic: widget.selectedSubtopic,
+      uid: user.uid,
+      showSavedVideos: widget.showSavedVideos,
+    );
 
-  // Funzione per aggiungere i metadati e associare eventuali corsi
-  void addStepsWithMetadata(List<LevelStep> steps, bool isWatched) {
-    for (var step in steps) {
-      // Trova il livello corrispondente per questo step
-      final level = levels.firstWhere(
-        (l) => l.steps.contains(step),
-        orElse: () => Level(
-          id: null,
-          levelNumber: 0,
-          topic: 'Unknown Topic',
-          subtopic: 'Unknown Subtopic',
-          title: 'Unknown Level',
-          subtopicOrder: 0,
-          steps: [],
-        ),
-      );
+    // Convert the `step` field from Map<String, dynamic> to LevelStep
+    // Inside _loadAllShortSteps
+final convertedShortStepsWithMetadata = shortStepsWithMetadata.map((item) {
+  final stepMap = item['step'] as Map<String, dynamic>;
+  final levelStep = LevelStep.fromMap(stepMap);
 
-      // Trova se il video è associato a un corso
-      Course? associatedCourse;
-      for (var course in courses) {
-        for (var section in course.sections) {
-          if (section.steps.contains(step)) {
-            associatedCourse = course;
-            break;
-          }
+  return {
+    'step': levelStep,
+    'level': item['level'] != null ? Level.fromMap(item['level']) : null,
+    'showQuestion': item['showQuestion'],
+    'isSaved': item['isSaved'],
+    'isWatched': item['isWatched'],
+  };
+}).toList();
+
+    // Update the state and manage YouTube controllers
+    if (mounted) {
+      setState(() {
+        allShortSteps = convertedShortStepsWithMetadata;
+        currentLoadedVideos = allShortSteps.length;
+        _youtubeControllers = allShortSteps.map((shortStep) {
+          final videoId = (shortStep['step'] as LevelStep).content;
+          return YoutubePlayerController(
+            initialVideoId: videoId,
+            flags: const YoutubePlayerFlags(
+              autoPlay: true,
+              mute: false,
+            ),
+          );
+        }).toList();
+
+        // Preload the second video if available
+        if (allShortSteps.length > 1) {
+          _preloadNextVideo(1);
         }
-        if (associatedCourse != null) break;
-      }
 
-      shortStepsWithMetadata.add({
-        'step': step,
-        'level': level,
-        'course': associatedCourse,  // Aggiungi il corso associato (se esiste)
-        'showQuestion': false,
-        'isSaved': savedVideoIds.contains(step.content),
-        'isWatched': isWatched,
+        isLoadingMore = false;
       });
     }
-  }
 
-  // Aggiungi prima i video non visti
-  addStepsWithMetadata(unWatchedSteps, false);
+    // If there are videos, update the title and mark it as watched
+    if (allShortSteps.isNotEmpty && mounted) {
+      final firstStep = allShortSteps.first;
+      final firstVideoId = (firstStep['step'] as LevelStep).content;
+      final firstVideoTitle = firstStep['level'] != null
+          ? (firstStep['level'] as Level).title
+          : 'Untitled';
+      final firstVideoTopic = firstStep['level'] != null
+          ? (firstStep['level'] as Level).topic
+          : 'General';
 
-  // Aggiungi i video visti
-  addStepsWithMetadata(watchedSteps, true);
-
-  // Se `showSavedVideos` è true e non ci sono video caricati, aggiungi solo i video salvati relativi al topic selezionato
-  if (widget.showSavedVideos && shortStepsWithMetadata.isEmpty) {
-    unWatchedSteps = combinedShortSteps.where((step) => savedVideoIds.contains(step.content)).toList();
-    addStepsWithMetadata(unWatchedSteps, false);
-  }
-
-  // Aggiorna lo stato e gestisci i controller di YouTube
-  if (mounted) {
+      await _shortsController.markVideoAsWatched(firstVideoId, firstVideoTitle, firstVideoTopic);
+      widget.onVideoTitleChange(firstVideoTitle); // Update the video title
+    }
+  } catch (e) {
+    print('Error loading short steps: $e');
     setState(() {
-  allShortSteps = shortStepsWithMetadata;
-  currentLoadedVideos = allShortSteps.length;
-  _youtubeControllers = allShortSteps.map((shortStep) {
-    final videoId = (shortStep['step'] as LevelStep).content;
-    return YoutubePlayerController(
-      initialVideoId: videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true, // Il primo video si avvia automaticamente
-        mute: false,
-      ),
-    );
-  }).toList();
-
-  // Precarica il secondo video se disponibile
-  if (allShortSteps.length > 1) {
-    _preloadNextVideo(1);
-  }
-
-  isLoadingMore = false;
-});
-  }
-
-  // Se ci sono video, aggiorna il titolo e segnalo come visto
-  if (allShortSteps.isNotEmpty && mounted) {
-    final firstStep = allShortSteps.first;
-    final firstVideoId = (firstStep['step'] as LevelStep).content;
-    final firstVideoTitle = (firstStep['level'] != null) ? (firstStep['level'] as Level).title : 'Untitled';
-    final firstVideoTopic = (firstStep['level'] != null) ? (firstStep['level'] as Level).topic : 'General';
-
-    await _shortsController.markVideoAsWatched(firstVideoId, firstVideoTitle, firstVideoTopic);
-    widget.onVideoTitleChange(firstVideoTitle); // Aggiorna il titolo del video
+      isLoadingMore = false;
+    });
   }
 }
 
