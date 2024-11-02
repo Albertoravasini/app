@@ -663,35 +663,26 @@ The TikTok for education, but Better ⚡️''';
                 ),
               ),
             // Overlay per il feedback del seeking
-            if (_isDragging)
-              Positioned.fill(
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _seekOffset.inSeconds >= 0
-                              ? Icons.fast_forward
-                              : Icons.fast_rewind,
-                          color: Colors.white,
-                          size: 50,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          '${_seekOffset.isNegative ? '-' : '+'}${_seekOffset.abs().inSeconds} sec',
-                          style: TextStyle(color: Colors.white, fontSize: 20),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            // Overlay per il feedback del seeking
+if (_isDragging)
+  Positioned(
+    top: 20, // Posiziona in alto
+    right: 20, // Posiziona a destra
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5), // Quasi trasparente
+        borderRadius: BorderRadius.circular(10), // Bordi arrotondati
+      ),
+      child: Text(
+        '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+        ),
+      ),
+    ),
+  ),
           ],
         );
       },
