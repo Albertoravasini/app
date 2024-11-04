@@ -117,4 +117,22 @@ class LevelStep {
       'topic': topic,
     };
   }
+
+  // Override di == e hashCode
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LevelStep &&
+          runtimeType == other.runtimeType &&
+          type == other.type &&
+          content == other.content &&
+          videoUrl == other.videoUrl &&
+          isShort == other.isShort;
+
+  @override
+  int get hashCode =>
+      type.hashCode ^
+      content.hashCode ^
+      (videoUrl?.hashCode ?? 0) ^
+      isShort.hashCode;
 }
