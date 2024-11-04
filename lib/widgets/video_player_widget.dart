@@ -447,7 +447,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
                     child: ProgressBorder(
                       progress: _progress,
                       borderWidth: 5.0,
-                      borderColor: const Color.fromARGB(164, 255, 255, 0),
+                      borderColor: Colors.yellowAccent,
                       borderRadius: BorderRadius.circular(16),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
