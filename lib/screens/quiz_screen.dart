@@ -25,6 +25,12 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   final List<Map<String, dynamic>> quizzes = [
+     {
+      'title': 'Daily Quiz',
+      'description': 'Test what you have learned about your recent viewed videos',
+      'isQuestionMark': true,
+      'cost': 50, // Costo in coin
+    },
     {
       'title': 'JustLearn',
       'description': 'Explore the world and test your culture',
@@ -44,12 +50,6 @@ class _QuizScreenState extends State<QuizScreen> {
       'title': 'Business',
       'description': 'Learn about investments, entrepreneurship, finance and more ',
       'image': 'assets/business.png',
-    },
-    {
-      'title': 'Daily Quiz',
-      'description': 'Test what you have learned about your recent viewed videos',
-      'isQuestionMark': true,
-      'cost': 50, // Costo in coin
     },
     {
       'title': 'Train Your Mistakes',
@@ -162,15 +162,19 @@ Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
 
   // Naviga a QuestionScreen passando gli ID dei video
   Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => QuestionScreen(topic: 'Daily Quiz', videoIds: videoIds),
-    ),
-  );
+  context,
+  MaterialPageRoute(
+    builder: (context) => QuestionScreen(topic: 'Daily Quiz', videoIds: videoIds),
+  ),
+).then((_) {
+  // Quando si ritorna al QuizScreen, aggiorna lo stato per ricaricare il costo
+  setState(() {
+    _loadCurrentUser(); // Ricarica l'utente per aggiornare i dati come il costo
+  });
+});
 }
 
 void _startQuiz(String quizTitle) async {
-  // Log dell'evento 'quiz_start'
   _analytics.logEvent(
     name: 'quiz_start',
     parameters: {
@@ -180,14 +184,16 @@ void _startQuiz(String quizTitle) async {
   );
 
   if (quizTitle == 'Daily Quiz' && currentUser != null) {
-    // Determina se il quiz giornaliero è gratuito o meno
     int requiredVideosForNextFreeUnlock = 3 + (currentUser!.dailyQuizFreeUses * 5);
     bool isFree = currentUser!.dailyVideosCompleted >= requiredVideosForNextFreeUnlock;
 
-    // Chiamata con parametro isFree
-    await _handleLastViewedVideosQuiz(isFree);
+    await _handleLastViewedVideosQuiz(isFree).then((_) {
+      // Forza l'aggiornamento della UI al ritorno
+      setState(() {
+        _loadCurrentUser(); // Ricarica l'utente per assicurarsi che sia aggiornato
+      });
+    });
   } else {
-    // Naviga a QuestionScreen per altri quiz basati su topic
     Navigator.push(
       context,
       MaterialPageRoute(
