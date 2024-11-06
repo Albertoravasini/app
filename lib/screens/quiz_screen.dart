@@ -295,7 +295,6 @@ Widget _buildMysteryCard(double width, String title, String description, int cos
       if (title == 'Daily Quiz') {
         await _handleLastViewedVideosQuiz(isFree);
       } else if (title == 'Train Your Mistakes') {
-        // Mostra un messaggio che la carta non è ancora disponibile
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Questa carta non è ancora disponibile.'),
@@ -372,15 +371,33 @@ Widget _buildMysteryCard(double width, String title, String description, int cos
               children: [
                 const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
                 const SizedBox(width: 8),
-                Text(
-                  isFree ? 'FREE' : '$cost',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
+                if (isFree) ...[
+                  const Text(
+                    'FREE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Image.asset(
+                    'assets/free_icon.png', // Percorso dell'icona
+                    width: 24,
+                    height: 24,
+                  ),
+                ] else ...[
+                  Text(
+                    '$cost',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
