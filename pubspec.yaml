@@ -39,7 +39,7 @@ dependencies:
   sign_in_with_apple: ^6.1.3
   firebase_analytics: ^11.3.3
   font_awesome_flutter: ^10.1.0
-  flutter_local_notifications: ^12.0.0
+  overlay_support: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -87,3 +87,4 @@ flutter:
     - assets/ai_icon.svg
     - assets/success_sound.mp3
     - assets/business.png
+    - assets/free_icon.png
