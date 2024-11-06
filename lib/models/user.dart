@@ -16,6 +16,8 @@ class UserModel {
   final List<Notification> notifications;
   List<String> unlockedCourses; // Remove 'final' to allow updates
   int coins;
+    int dailyVideosCompleted;
+  int dailyQuizFreeUses;
 
   UserModel({
     required this.uid,
@@ -32,7 +34,10 @@ class UserModel {
     this.notifications = const [],
     this.unlockedCourses = const [],
     required this.coins,
-  });
+    this.dailyVideosCompleted = 0,
+    this.dailyQuizFreeUses = 0,
+  }) ;
+ 
 
   // Factory per creare un UserModel dai dati Firestore
   factory UserModel.fromMap(Map<String, dynamic> data) {
@@ -65,6 +70,8 @@ class UserModel {
       notifications: notifications,
       coins: data['coins'] ?? 0,  // Assicurati che il campo coins sia nel database
       unlockedCourses: List<String>.from(data['unlockedCourses'] ?? []),
+      dailyVideosCompleted: data['dailyVideosCompleted'] ?? 0,
+      dailyQuizFreeUses: data['dailyQuizFreeUses'] ?? 0,
     );
   }
 
@@ -85,6 +92,8 @@ class UserModel {
       'notifications': notifications.map((notification) => notification.toMap()).toList(),
       'coins': coins,
       'unlockedCourses': unlockedCourses,
+      'dailyVideosCompleted': dailyVideosCompleted,
+      'dailyQuizFreeUses': dailyQuizFreeUses,
     };
   }
 }

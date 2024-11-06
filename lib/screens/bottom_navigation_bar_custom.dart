@@ -25,6 +25,9 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
       return const SizedBox.shrink();
     }
 
+    // Determina se mostrare il pallino basato sui video completati
+    bool showDot = widget.currentUser!.dailyVideosCompleted >= 3;
+
     return Container(
       width: double.infinity,
       height: 55,
@@ -53,12 +56,29 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
           ),
           const SizedBox(width: 59),  // Spaziatura tra le icone
 
-          // Icona per la schermata Quiz
+          // Icona per la schermata Quiz con pallino
           GestureDetector(
             onTap: () => widget.onItemTapped(2),  // Schermata Quiz
-            child: _buildNavItem(
-              'assets/ic_round-quiz.svg',  // Icona per la schermata Quiz (puoi cambiare l'icona)
-              widget.selectedIndex == 2,
+            child: Stack(
+              children: [
+                _buildNavItem(
+                  'assets/ic_round-quiz.svg',  // Icona per la schermata Quiz (puoi cambiare l'icona)
+                  widget.selectedIndex == 2,
+                ),
+                if (showDot)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.yellowAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(width: 59),  // Spaziatura tra le icone
@@ -86,17 +106,6 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
           assetPath,
           color: isSelected ? Colors.white : const Color(0xFF434348),
         ),
-        if (isSelected)
-          const SizedBox(height: 3),
-        if (isSelected)
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const ShapeDecoration(
-              color: Colors.white,
-              shape: OvalBorder(),
-            ),
-          ),
       ],
     );
   }

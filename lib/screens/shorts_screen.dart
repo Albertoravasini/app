@@ -50,11 +50,17 @@ class _ShortsScreenState extends State<ShortsScreen> {
  UserModel? _currentUser;
  
 
-  @override
+@override
   void initState() {
     super.initState();
     _loadAllShortSteps();
     _loadCurrentUser();
+    _pageController.addListener(_pageListener);
+  }
+
+  void _pageListener() {
+    final index = _pageController.page?.round() ?? 0;
+    _onVideoChanged(index);
   }
 
  Future<void> _loadCurrentUser() async {
@@ -107,37 +113,51 @@ Future<void> _loadAllShortSteps() async {
     );
 
     // Convert the `step` field from Map<String, dynamic> to LevelStep
-    // Inside _loadAllShortSteps
-final convertedShortStepsWithMetadata = shortStepsWithMetadata.map((item) {
-  final stepMap = item['step'] as Map<String, dynamic>;
-  final levelStep = LevelStep.fromMap(stepMap);
+    final convertedShortStepsWithMetadata = shortStepsWithMetadata.map((item) {
+      final stepMap = item['step'] as Map<String, dynamic>;
+      final levelStep = LevelStep.fromMap(stepMap);
 
-  return {
-    'step': levelStep,
-    'level': item['level'] != null ? Level.fromMap(item['level']) : null,
-    'showQuestion': item['showQuestion'],
-    'isSaved': item['isSaved'],
-    'isWatched': item['isWatched'],
-  };
-}).toList();
+      return {
+        'step': levelStep,
+        'level': item['level'] != null ? Level.fromMap(item['level']) : null,
+        'showQuestion': item['showQuestion'],
+        'isSaved': item['isSaved'],
+        'isWatched': item['isWatched'],
+      };
+    }).toList();
 
     // Update the state and manage YouTube controllers
     if (mounted) {
       setState(() {
         allShortSteps = convertedShortStepsWithMetadata;
         currentLoadedVideos = allShortSteps.length;
-        _youtubeControllers = allShortSteps.map((shortStep) {
-          final videoId = (shortStep['step'] as LevelStep).content;
-          return YoutubePlayerController(
-            initialVideoId: videoId,
-            flags: const YoutubePlayerFlags(
-              autoPlay: true,
-              mute: false,
-            ),
-          );
-        }).toList();
+        // Initialize only the first 3 controllers: current, next, and previous (if any)
+        _youtubeControllers = List.generate(allShortSteps.length, (index) {
+          if (index == 0 || index == 1) {
+            // Initialize current and next controllers
+            return YoutubePlayerController(
+              initialVideoId: (allShortSteps[index]['step'] as LevelStep).content,
+              flags: const YoutubePlayerFlags(
+                autoPlay: false, // Non avviare automaticamente
+                mute: false,
+                disableDragSeek: true, // Disabilita il drag seek se non necessario
+        hideControls: true, // Nascondi i controlli per migliorare la performance
+        hideThumbnail: true, // Nascondi la miniatura per velocizzare il caricamento
+              ),
+            );
+          } else {
+            // Placeholder controllers, to be initialized when needed
+            return YoutubePlayerController(
+              initialVideoId: '',
+              flags: const YoutubePlayerFlags(
+                autoPlay: false,
+                mute: false,
+              ),
+            );
+          }
+        });
 
-        // Preload the second video if available
+        // Preload the next video
         if (allShortSteps.length > 1) {
           _preloadNextVideo(1);
         }
@@ -169,32 +189,43 @@ final convertedShortStepsWithMetadata = shortStepsWithMetadata.map((item) {
 }
 
 
-  void _onVideoChanged(int index) {
-  if (index >= 0 && index < allShortSteps.length) {
-    // Pausa il video corrente
-    final currentIndex = _pageController.page?.toInt();
-    if (currentIndex != null && currentIndex >= 0 && currentIndex < _youtubeControllers.length) {
-      print("Mettendo in pausa il video con index: $currentIndex");
-      _youtubeControllers[currentIndex].pause();
+@override
+void _onVideoChanged(int index) {
+  // Pausa il video corrente
+  _pauseAllVideos();
+
+  // Riproduci il nuovo video
+  _youtubeControllers[index].play();
+
+  // Dispose dei controller non necessari
+  _disposeUnusedControllers(index);
+
+  // Precarica il video successivo
+  _preloadNextVideo(index + 1);
+}
+
+void _pauseAllVideos() {
+  for (var controller in _youtubeControllers) {
+    if (controller.value.isPlaying) {
+      controller.pause();
     }
+  }
+}
 
-    // Riproduci il nuovo video immediatamente
-    print("Riproducendo il video corrente con index: $index, videoId: ${allShortSteps[index]['step'].content}");
-    _youtubeControllers[index].play();
-
-    // Aggiorna il titolo del video corrente
-    final currentStep = allShortSteps[index];
-    final currentVideoTitle = (currentStep['level'] as Level).title;
-    widget.onVideoTitleChange(currentVideoTitle);
-
-    // Precarica il video successivo se disponibile
-    if (index + 1 < allShortSteps.length) {
-      print("Precaricando il video successivo con index: ${index + 1}");
-      _preloadNextVideo(index + 1);
+void _disposeUnusedControllers(int currentIndex) {
+  for (int i = 0; i < _youtubeControllers.length; i++) {
+    if (i < currentIndex - 1 || i > currentIndex + 1) {
+      if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
+        _youtubeControllers[i].dispose();
+        _youtubeControllers[i] = YoutubePlayerController(
+          initialVideoId: '',
+          flags: const YoutubePlayerFlags(
+            autoPlay: false,
+            mute: false,
+          ),
+        );
+      }
     }
-
-    // Esegui le operazioni asincrone in background
-    _handleAsyncOperations(index);
   }
 }
 
@@ -216,21 +247,22 @@ void _preloadNextVideo(int nextIndex) {
     final nextStep = allShortSteps[nextIndex];
     final nextVideoId = (nextStep['step'] as LevelStep).content;
 
-    // Inizializza solo il controller del prossimo video
-    final nextController = YoutubePlayerController(
-      initialVideoId: nextVideoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,  // Precarica il video ma non avviarlo automaticamente
-        mute: false,     // Mantieni muto per ridurre il consumo di risorse
-      ),
-    );
+    // Verifica se il controller è già stato inizializzato
+    if (_youtubeControllers[nextIndex].initialVideoId.isEmpty) {
+      final nextController = YoutubePlayerController(
+        initialVideoId: nextVideoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false, // Non avviare automaticamente
+          mute: false,
+        ),
+      );
 
-    // Aggiungi il controller precaricato alla lista
-    setState(() {
-      _youtubeControllers[nextIndex] = nextController;
-    });
+      setState(() {
+        _youtubeControllers[nextIndex] = nextController;
+      });
 
-    print("Video successivo precaricato con index: $nextIndex, videoId: $nextVideoId");
+      print("Video successivo precaricato con index: $nextIndex, videoId: $nextVideoId");
+    }
   }
 }
 
@@ -269,12 +301,15 @@ Future<void> _updateLikeState(String videoId) async {
   }
 
   @override
-  void dispose() {
-    for (var controller in _youtubeControllers) {
+void dispose() {
+  for (var controller in _youtubeControllers) {
+    if (controller.initialVideoId.isNotEmpty) {
+      controller.dispose();
     }
-    _pageController.dispose();
-    super.dispose();
   }
+  _pageController.dispose();
+  super.dispose();
+}
 
   void _onContinuePressed(int index) {
     if (!hasSwiped && mounted) { // Verifica se il widget è ancora montato
@@ -464,50 +499,40 @@ Future<void> _updateLikeState(String videoId) async {
       body: allShortSteps.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : PageView.builder(
-  controller: _pageController,
-  scrollDirection: Axis.vertical,
-  physics: const TikTokScrollPhysics(parent: BouncingScrollPhysics()),
-  onPageChanged: _onVideoChanged,
-  itemCount: allShortSteps.length,
-  itemBuilder: (context, index) {
-    final showQuestion = allShortSteps[index]['showQuestion'] ?? false;
-    
-
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              physics: const TikTokScrollPhysics(parent: BouncingScrollPhysics()),
+              itemCount: allShortSteps.length,
+              itemBuilder: (context, index) {
+                final showQuestion = allShortSteps[index]['showQuestion'] ?? false;
                 return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (_) {
-        hasSwiped = false;
-      },
-      onHorizontalDragUpdate: (details) {
-        if (details.delta.dx.abs() > details.delta.dy.abs()) {
-          if (!showQuestion) {
-            if (details.delta.dx > 10 && !hasSwiped) {
-              if (mounted) {
-                setState(() {
-                });
-              }
-              hasSwiped = true;
-            } 
-          } else {
-            if (details.delta.dx > 10 && !hasSwiped) {
-              _onPreviousPressed(index);
-              hasSwiped = true;
-            } else if (details.delta.dx < -10 && !hasSwiped) {
-              _onContinuePressed(index);
-              hasSwiped = true;
-            }
-          }
-        }
-      },
-      onHorizontalDragEnd: (_) {
-        hasSwiped = false;
-      },
-      child: showQuestion
-          ? _buildQuestionCard(allShortSteps[index]['step'], allShortSteps[index]['level'])
-          : _buildVideoPlayer(index),
-    );
-  },
-)
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragStart: (_) => hasSwiped = false,
+                  onHorizontalDragUpdate: (details) {
+                    if (details.delta.dx.abs() > details.delta.dy.abs()) {
+                      if (!showQuestion) {
+                        if (details.delta.dx > 10 && !hasSwiped) {
+                          setState(() {}); // Aggiornamento minimo
+                          hasSwiped = true;
+                        }
+                      } else {
+                        if (details.delta.dx > 10 && !hasSwiped) {
+                          _onPreviousPressed(index);
+                          hasSwiped = true;
+                        } else if (details.delta.dx < -10 && !hasSwiped) {
+                          _onContinuePressed(index);
+                          hasSwiped = true;
+                        }
+                      }
+                    }
+                  },
+                  onHorizontalDragEnd: (_) => hasSwiped = false,
+                  child: showQuestion
+                      ? _buildQuestionCard(allShortSteps[index]['step'], allShortSteps[index]['level'])
+                      : _buildVideoPlayer(index),
+                );
+              },
+            ),
     );
   }
 }

@@ -24,6 +24,7 @@ class _LevelScreenState extends State<LevelScreen> {
   bool sectionCompleted = false;
   PageController? _pageController;
   LevelStep? currentStepData;
+  String currentTitle = ''; // Aggiungi questa variabile
 
   @override
   void initState() {
@@ -38,37 +39,35 @@ class _LevelScreenState extends State<LevelScreen> {
   }
 
   // Carica il progresso dell'utente da Firestore
-  Future<void> _loadUserProgress() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final snapshot = await userDoc.get();
+Future<void> _loadUserProgress() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final snapshot = await userDoc.get();
 
-      if (snapshot.exists) {
-        final userData = snapshot.data()!;
-        // Verifica che 'currentSteps' sia una mappa
-        if (userData['currentSteps'] is Map) {
-          final currentStepsMap = Map<String, dynamic>.from(userData['currentSteps']);
-          setState(() {
-            _currentStep = currentStepsMap[widget.section.title]?.toInt() ?? 0;
-            sectionCompleted = (userData['completedSections'] ?? []).contains(widget.section.title);
-            _pageController = PageController(initialPage: _currentStep);
-            print('Loaded currentStep for ${widget.section.title}: $_currentStep');
-          });
-        } else {
-          setState(() {
-            _currentStep = 0;
-            sectionCompleted = false;
-            _pageController = PageController(initialPage: _currentStep);
-            print('currentSteps is not a Map. Defaulting to 0.');
-          });
-        }
+    if (snapshot.exists) {
+      final userData = snapshot.data()!;
+      // Verifica che 'currentSteps' sia una mappa
+      if (userData['currentSteps'] is Map) {
+        final currentStepsMap = Map<String, dynamic>.from(userData['currentSteps']);
+        setState(() {
+          _currentStep = currentStepsMap[widget.section.title]?.toInt() ?? 0;
+          sectionCompleted = (userData['completedSections'] ?? []).contains(widget.section.title);
+          _pageController = PageController(initialPage: _currentStep);
+          currentStepData = widget.section.steps.length > _currentStep
+              ? widget.section.steps[_currentStep]
+              : null;
+          currentTitle = currentStepData?.type == 'video' ? currentStepData!.content : widget.section.title;
+          print('Loaded currentStep for ${widget.section.title}: $_currentStep');
+        });
       } else {
         setState(() {
           _currentStep = 0;
           sectionCompleted = false;
           _pageController = PageController(initialPage: _currentStep);
-          print('User document does not exist. Defaulting to step 0.');
+          currentStepData = widget.section.steps.isNotEmpty ? widget.section.steps[0] : null;
+          currentTitle = currentStepData?.type == 'video' ? currentStepData!.content : widget.section.title;
+          print('currentSteps is not a Map. Defaulting to 0.');
         });
       }
     } else {
@@ -76,10 +75,22 @@ class _LevelScreenState extends State<LevelScreen> {
         _currentStep = 0;
         sectionCompleted = false;
         _pageController = PageController(initialPage: _currentStep);
-        print('User not authenticated. Defaulting to step 0.');
+        currentStepData = widget.section.steps.isNotEmpty ? widget.section.steps[0] : null;
+        currentTitle = currentStepData?.type == 'video' ? currentStepData!.content : widget.section.title;
+        print('User document does not exist. Defaulting to step 0.');
       });
     }
+  } else {
+    setState(() {
+      _currentStep = 0;
+      sectionCompleted = false;
+      _pageController = PageController(initialPage: _currentStep);
+      currentStepData = widget.section.steps.isNotEmpty ? widget.section.steps[0] : null;
+      currentTitle = currentStepData?.type == 'video' ? currentStepData!.content : widget.section.title;
+      print('User not authenticated. Defaulting to step 0.');
+    });
   }
+}
 
   // Salva il progresso dell'utente su Firestore
   Future<void> _saveUserProgress() async {
@@ -131,74 +142,68 @@ class _LevelScreenState extends State<LevelScreen> {
                 const SizedBox(height: 30),
 
                 // Barra di progresso personalizzata con pulsante "indietro"
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Pulsante indietro
-                      GestureDetector(
-                        onTap: () async {
-                          await _saveUserProgress();
-                          Navigator.pop(context, true);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8.0),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      Expanded(
-                        child: Container(
-                          height: 15,
-                          decoration: ShapeDecoration(
-                            color: const Color(0xFF181819),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: ((MediaQuery.of(context).size.width - 80) *
-                                        (_currentStep + 1) /
-                                        steps.length)
-                                    .clamp(0.0, MediaQuery.of(context).size.width - 80),
-                                height: 15,
-                                decoration: ShapeDecoration(
-                                  color: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                // Barra di progresso personalizzata con pulsante "indietro"
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 0),
+  child: Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      // Pulsante indietro
+      GestureDetector(
+        onTap: () async {
+          await _saveUserProgress();
+          Navigator.pop(context, true);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.arrow_back,
+            color: Colors.white,
+            size: 30,
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Container(
+          height: 15,
+          decoration: ShapeDecoration(
+            color: const Color(0xFF181819),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+          ),
+          child: FractionallySizedBox(
+            widthFactor: (_currentStep + 1) / steps.length,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              height: 15,
+              decoration: ShapeDecoration(
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
                 ),
-
-                const SizedBox(height: 5),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
 
                 // Titolo della sezione
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                   decoration: ShapeDecoration(
                     color: const Color(0xFF1E1E1E),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: Center(
@@ -206,7 +211,7 @@ class _LevelScreenState extends State<LevelScreen> {
                       widget.section.title,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 20,
                         fontFamily: 'Montserrat',
                         fontWeight: FontWeight.w800,
                         height: 1.2,
@@ -217,83 +222,86 @@ class _LevelScreenState extends State<LevelScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 5),
+                const SizedBox(height: 8),
 
                 // Corpo principale con PageView verticale
                 Expanded(
                   child: PageView.builder(
-                    scrollDirection: Axis.vertical,
-                    itemCount: steps.length,
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentStep = index;
-                        currentStepData = steps[index];
+  scrollDirection: Axis.vertical,
+  itemCount: steps.length,
+  controller: _pageController,
+  onPageChanged: (index) {
+    setState(() {
+      _currentStep = index;
+      currentStepData = steps[index];
+      
+      // Aggiorna il titolo corrente
+      currentTitle = currentStepData?.type == 'video' ? currentStepData!.content : widget.section.title;
 
-                        // Controlla se l'ultimo step è stato raggiunto
-                        if (_currentStep == steps.length - 1) {
-                          sectionCompleted = true;
-                        } else {
-                          sectionCompleted = false;
-                        }
+      // Controlla se l'ultimo step è stato raggiunto
+      if (_currentStep == steps.length - 1) {
+        sectionCompleted = true;
+      } else {
+        sectionCompleted = false;
+      }
 
-                        _saveUserProgress();
-                        print('Page changed to $_currentStep');
-                      });
-                    },
-                    itemBuilder: (context, index) {
-                      final step = steps[index];
+      _saveUserProgress();
+      print('Page changed to $_currentStep');
+    });
+  },
+  itemBuilder: (context, index) {
+    final step = steps[index];
 
-                      if (step.type == 'video') {
-                        final videoId = YoutubePlayer.convertUrlToId(step.content) ?? '';
-                        if (videoId.isEmpty) {
-                          return Center(
-                            child: Text(
-                              'URL video non valido',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          );
-                        }
-                        return VideoPlayerWidget(
-                          videoId: videoId,
-                          onShowQuestion: () {},
-                          isLiked: false,
-                          likeCount: 0,
-                          isSaved: false,
-                          onCoinsUpdate: (int newCoins) {
-                            // Gestisci l'aggiornamento dei coins
-                            print("Coins aggiornati: $newCoins");
-                          },
-                          topic: widget.section.title,
-                        );
-                      } else if (step.type == 'question') {
-                        // Restituisce CourseQuestionCard
-                        return CourseQuestionCard(
-                          step: step,
-                          onAnswered: (isCorrect) {
-                            if (isCorrect) {
-                              _onCompleteStep();
-                            }
-                          },
-                          onCompleteStep: _onCompleteStep,
-                          topic: widget.section.title,
-                        );
-                      } else {
-                        // Gestisce altri tipi di step se presenti
-                        return Center(
-                          child: Text(
-                            'Unknown step type',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        );
-                      }
-                    },
-                  ),
+    if (step.type == 'video') {
+      final videoId = YoutubePlayer.convertUrlToId(step.content) ?? '';
+      if (videoId.isEmpty) {
+        return Center(
+          child: Text(
+            'URL video non valido',
+            style: TextStyle(color: Colors.white),
+          ),
+        );
+      }
+      return VideoPlayerWidget(
+        videoId: videoId,
+        onShowQuestion: () {},
+        isLiked: false,
+        likeCount: 0,
+        isSaved: false,
+        onCoinsUpdate: (int newCoins) {
+          // Gestisci l'aggiornamento dei coins
+          print("Coins aggiornati: $newCoins");
+        },
+        topic: widget.section.title,
+      );
+    } else if (step.type == 'question') {
+      // Restituisce CourseQuestionCard
+      return CourseQuestionCard(
+        step: step,
+        onAnswered: (isCorrect) {
+          if (isCorrect) {
+            _onCompleteStep();
+          }
+        },
+        onCompleteStep: _onCompleteStep,
+        topic: widget.section.title,
+      );
+    } else {
+      // Gestisce altri tipi di step se presenti
+      return Center(
+        child: Text(
+          'Unknown step type',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
+    }
+  },
+),
                 ),
 
                 // Pulsante "Next" (opzionale, può essere rimosso se non necessario)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 15.0),
                   child: SizedBox(),
                 ),
               ],

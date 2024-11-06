@@ -3,42 +3,69 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Just_Learn/models/user.dart';
 import '../models/level.dart';
 
+
 class ShortsController {
   // Metodo per segnare un video come visto
-  Future<void> markVideoAsWatched(String videoId, String title, String topic, {bool completed = false}) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>;
-        final userModel = UserModel.fromMap(userData);
+Future<void> markVideoAsWatched(String videoId, String title, String topic, {bool completed = false}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final userDoc = await userDocRef.get();
+    if (userDoc.exists) {
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final userModel = UserModel.fromMap(userData);
 
-        userModel.WatchedVideos[topic] ??= [];
-        final existingVideoIndex = userModel.WatchedVideos[topic]!.indexWhere((video) => video.videoId == videoId);
+      DateTime now = DateTime.now();
+      
+      // Imposta la data corrente e l'ultimo accesso a mezzanotte per il confronto
+      DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
+      DateTime lastAccessAtMidnight = DateTime(
+        userModel.lastAccess.year,
+        userModel.lastAccess.month,
+        userModel.lastAccess.day,
+      );
 
-        if (existingVideoIndex != -1) {
-          // Aggiorna il video esistente
-          userModel.WatchedVideos[topic]![existingVideoIndex] = VideoWatched(
-            videoId: videoId,
-            title: title,
-            watchedAt: DateTime.now(),
-            completed: userModel.WatchedVideos[topic]![existingVideoIndex].completed || completed,
-          );
-        } else {
-          // Aggiungi un nuovo video visto
-          userModel.WatchedVideos[topic]!.add(VideoWatched(
-            videoId: videoId,
-            title: title,
-            watchedAt: DateTime.now(),
-            completed: completed,
-          ));
-        }
-
-        // Aggiorna Firestore
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update(userModel.toMap());
+      // Verifica se è un nuovo giorno per resettare i contatori giornalieri
+      if (todayAtMidnight.isAfter(lastAccessAtMidnight)) {
+        userModel.dailyVideosCompleted = 0;
+        userModel.dailyQuizFreeUses = 0;
       }
+
+      // Se il video è completato, incrementa il conteggio giornaliero
+      if (completed) {
+        userModel.dailyVideosCompleted += 1;
+      }
+
+      // Aggiorna la lista dei video visti
+      userModel.WatchedVideos[topic] ??= [];
+      final existingVideoIndex = userModel.WatchedVideos[topic]!.indexWhere((video) => video.videoId == videoId);
+
+      if (existingVideoIndex != -1) {
+        // Aggiorna il video esistente
+        userModel.WatchedVideos[topic]![existingVideoIndex] = VideoWatched(
+          videoId: videoId,
+          title: title,
+          watchedAt: now,
+          completed: userModel.WatchedVideos[topic]![existingVideoIndex].completed || completed,
+        );
+      } else {
+        // Aggiungi un nuovo video visto
+        userModel.WatchedVideos[topic]!.add(VideoWatched(
+          videoId: videoId,
+          title: title,
+          watchedAt: now,
+          completed: completed,
+        ));
+      }
+
+      // Aggiorna lastAccess con la data corrente
+      userModel.lastAccess = now;
+
+      // Aggiorna Firestore con i nuovi dati utente
+      await userDocRef.update(userModel.toMap());
     }
   }
+}
 
   // Metodo per ottenere lo stato del like di un video
   Future<bool> getLikeStatus(String videoId) async {

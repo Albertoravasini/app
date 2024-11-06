@@ -41,7 +41,6 @@ void main() async {
 
   // Inizializza Firebase
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // Imposta il gestore dei messaggi in background
@@ -174,6 +173,45 @@ class _MainScreenState extends State<MainScreen> {
       _selectedIndex = index;  // Cambia l'indice selezionato
     });
   }
+    @override
+  void initState() {
+    super.initState();
+    _checkDailyReset();
+  }
+
+void _checkDailyReset() async {
+  DateTime now = DateTime.now();
+  
+  // Imposta la data corrente e l'ultimo accesso a mezzanotte per il confronto
+  DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
+  DateTime lastAccessAtMidnight = DateTime(
+    widget.userModel.lastAccess.year,
+    widget.userModel.lastAccess.month,
+    widget.userModel.lastAccess.day,
+  );
+
+  // Se la data di oggi a mezzanotte è successiva all'ultimo accesso
+  if (todayAtMidnight.isAfter(lastAccessAtMidnight)) {
+    // Effettua il reset giornaliero
+    widget.userModel.dailyVideosCompleted = 0;
+    widget.userModel.dailyQuizFreeUses = 0;
+
+    // Aggiorna lastAccess a oggi, rappresentato da oggi a mezzanotte
+    widget.userModel.lastAccess = todayAtMidnight;
+
+    // Salva su Firestore solo i campi modificati
+    await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+      'dailyVideosCompleted': 0,
+      'dailyQuizFreeUses': 0,
+      'lastAccess': todayAtMidnight.toIso8601String(),
+    });
+  } else {
+    // Aggiorna solo lastAccess per indicare l'accesso senza reset
+    await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+      'lastAccess': now.toIso8601String(),
+    });
+  }
+}
 
   @override
   Widget build(BuildContext context) {
