@@ -41,7 +41,6 @@ void main() async {
 
   // Inizializza Firebase
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // Imposta il gestore dei messaggi in background
