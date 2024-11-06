@@ -1,6 +1,7 @@
 // lib/screens/course_detail_screen.dart
 
 import 'package:Just_Learn/models/level.dart';
+import 'package:Just_Learn/screens/course_info_dialog.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +42,18 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
       },
     );
   }
+/// Verifica se tutte le sezioni precedenti sono completate
+bool _arePreviousSectionsCompleted(int currentIndex) {
+  for (int i = 0; i < currentIndex; i++) {
+    String previousSectionTitle = widget.course.sections[i].title;
+    int currentStep = _getCurrentStepForSection(previousSectionTitle);
+    int totalSteps = widget.course.sections[i].steps.length;
+    if (currentStep < totalSteps) {
+      return false;
+    }
+  }
+  return true;
+}
 
   // Funzione per ricaricare i dati utente da Firestore
   Future<void> _reloadUserData() async {
@@ -254,7 +267,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
             title,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 18,
               fontFamily: 'Montserrat',
               fontWeight: FontWeight.w800,
               letterSpacing: 0.66,
@@ -284,31 +297,31 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   /// Costruisce la barra di progresso
-  Widget _buildProgressBar(int currentStep, int totalSteps) {
-    return Container(
-      width: double.infinity,
-      height: 6,
-      clipBehavior: Clip.antiAlias,
-      decoration: ShapeDecoration(
-        color: const Color(0xFF434348),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+/// Costruisce la barra di progresso
+Widget _buildProgressBar(int currentStep, int totalSteps) {
+  bool isCompleted = currentStep >= totalSteps; // Determina se la sezione è completata
+
+  return Container(
+    width: double.infinity,
+    height: 6,
+    clipBehavior: Clip.antiAlias,
+    decoration: ShapeDecoration(
+      color: const Color(0xFF434348),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    ),
+    child: FractionallySizedBox(
+      widthFactor: currentStep / totalSteps, // Proporzione basata sugli step completati
+      alignment: Alignment.centerLeft,
+      child: Container(
+        height: 6,
+        decoration: ShapeDecoration(
+          color: isCompleted ? Colors.yellowAccent : Colors.white, // Colore dinamico
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: currentStep >= totalSteps
-                ? MediaQuery.of(context).size.width * 0.9 // Usa la larghezza dinamica
-                : (MediaQuery.of(context).size.width * 0.9 * currentStep / totalSteps).clamp(0.0, double.infinity), // Calcola proporzione
-            height: 6,
-            decoration: ShapeDecoration(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
+}
 
   /// Costruisce un elemento con icona e testo
   Widget _buildDetailIconText(IconData icon, String text) {
@@ -423,26 +436,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   void _showCourseDescription() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Text(
-          'Course Description',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          widget.course.description,
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: Colors.yellowAccent),
-            ),
-          ),
-        ],
-      ),
+      builder: (context) => CourseInfoDialog(course: widget.course),
     );
   }
 
@@ -477,64 +471,95 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
   }
 
   /// Costruisce le barre di progresso delle sezioni
-  Widget _buildSections() {
-    return Column(
-      children: widget.course.sections.map((section) {
-        int totalTime = _calculateTotalTime(section);
-        int totalVideos = section.steps.where((step) => step.type == 'video').length;
-        int totalQuestions = section.steps.where((step) => step.type == 'question').length;
+/// Costruisce le barre di progresso delle sezioni
+Widget _buildSections() {
+  return Column(
+    children: widget.course.sections.asMap().entries.map((entry) {
+      int index = entry.key;
+      Section section = entry.value;
 
-        // Ottieni il currentStep per la sezione dall'utente
-        int currentStep = _getCurrentStepForSection(section.title);
-        bool isCompleted = currentStep >= section.steps.length;
+      int totalTime = _calculateTotalTime(section);
+      int totalVideos = section.steps.where((step) => step.type == 'video').length;
+      int totalQuestions = section.steps.where((step) => step.type == 'question').length;
 
-        // Usa l'icona corretta in base al completamento della sezione
-        String iconAsset = isCompleted
-            ? 'assets/solar_verified-check-linear.svg'
-            : 'assets/ph_arrow-up-bold.svg';
+      // Ottieni il currentStep per la sezione dall'utente
+      int currentStep = _getCurrentStepForSection(section.title);
+      bool isCompleted = currentStep >= section.steps.length;
 
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 20.0),
-          child: GestureDetector(
-            onTap: _isCourseUnlocked
-                ? () async {
-                    bool? result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => LevelScreen(section: section),
-                      ),
-                    );
+      // Usa l'icona corretta in base al completamento della sezione
+      String iconAsset = isCompleted
+          ? 'assets/solar_verified-check-linear.svg'
+          : 'assets/ph_arrow-up-bold.svg';
 
-                    // Sempre ricaricare i dati utente dopo il ritorno
-                    await _reloadUserData();
-                    setState(() {
-                      // Forza il re-render per aggiornare le barre di progresso
-                    });
-                  }
-                : null, // Disabilita il clic se il corso non è sbloccato
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
-              decoration: ShapeDecoration(
-                color: const Color(0xFF181819),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(29),
+      // Determina se la sezione è accessibile
+      bool isFirstSection = index == 0;
+      bool hasPurchased = _isCourseUnlocked;
+      bool hasCompletedPrevious = _arePreviousSectionsCompleted(index);
+      bool isAccessible = isFirstSection || (hasPurchased && hasCompletedPrevious);
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 20.0),
+        child: GestureDetector(
+          onTap: isAccessible
+              ? () async {
+                  bool? result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LevelScreen(section: section),
+                    ),
+                  );
+
+                  // Sempre ricaricare i dati utente dopo il ritorno
+                  await _reloadUserData();
+                  setState(() {
+                    // Forza il re-render per aggiornare le barre di progresso
+                  });
+                }
+              : null, // Disabilita il clic se la sezione non è accessibile
+          child: Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+                decoration: ShapeDecoration(
+                  color: const Color(0xFF181819),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(29),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle(section.title, iconAsset),
+                    const SizedBox(height: 13),
+                    _buildSectionDetails(totalTime, totalVideos, totalQuestions),
+                    const SizedBox(height: 13),
+                    _buildProgressBar(currentStep, section.steps.length),
+                  ],
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSectionTitle(section.title, iconAsset),
-                  const SizedBox(height: 13),
-                  _buildSectionDetails(totalTime, totalVideos, totalQuestions),
-                  const SizedBox(height: 13),
-                  _buildProgressBar(currentStep, section.steps.length),
-                ],
-              ),
-            ),
+              // Se la sezione non è accessibile, sovrapponi un lucchetto
+              if (!isAccessible)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(29),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.lock,
+                        color: Colors.grey,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        );
-      }).toList(),
-    );
-  }
+        ),
+      );
+    }).toList(),
+  );
+}
 }

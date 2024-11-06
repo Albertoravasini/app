@@ -84,84 +84,118 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
-  Future<void> _handleLastViewedVideosQuiz() async {
-    if (currentUser == null) {
+Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
+  if (currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Devi essere loggato per accedere a questa funzionalità.'),
+      ),
+    );
+    return;
+  }
+
+  DateTime now = DateTime.now();
+  DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
+  DateTime lastAccessAtMidnight = DateTime(
+    currentUser!.lastAccess.year,
+    currentUser!.lastAccess.month,
+    currentUser!.lastAccess.day,
+  );
+
+  // Verifica se è un nuovo giorno e resetta i campi giornalieri se necessario
+  if (todayAtMidnight.isAfter(lastAccessAtMidnight)) {
+    currentUser!.dailyVideosCompleted = 0;
+    currentUser!.dailyQuizFreeUses = 0;
+    currentUser!.lastAccess = todayAtMidnight;
+
+    await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).update({
+      'dailyVideosCompleted': 0,
+      'dailyQuizFreeUses': 0,
+      'lastAccess': todayAtMidnight.toIso8601String(),
+    });
+  }
+
+  // Gestisci l'uso gratuito del quiz giornaliero
+  if (!isFree) {
+    if (currentUser!.coins < 50) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('you have to be logged to have access to this functionallity '),
+          content: Text('Non hai abbastanza coin per accedere a questo quiz.'),
         ),
       );
       return;
+    } else {
+      await _subtractCoins(50);
     }
+  } else {
+    // Incrementa gli utilizzi gratuiti del quiz giornaliero
+    currentUser!.dailyQuizFreeUses += 1;
+    await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).update({
+      'dailyQuizFreeUses': currentUser!.dailyQuizFreeUses,
+    });
+  }
 
-    if (currentUser!.coins < 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('You do not have enough coins to access this quiz.'),
-        ),
-      );
-      return;
-    }
+  // Recupera gli ultimi video completati
+  List<VideoWatched> completedVideos = currentUser!.WatchedVideos.values
+      .expand((videoList) => videoList)
+      .where((video) => video.completed)
+      .toList();
 
-    // Deduce 100 coin
-    await _subtractCoins(100);
+  // Ordina per watchedAt decrescente
+  completedVideos.sort((a, b) => b.watchedAt.compareTo(a.watchedAt));
 
-    // Recupera gli ultimi 5 video completati
-    List<VideoWatched> completedVideos = currentUser!.WatchedVideos.values
-        .expand((videoList) => videoList)
-        .where((video) => video.completed)
-        .toList();
+  // Prendi gli ultimi 5
+  completedVideos = completedVideos.take(5).toList();
 
-    // Ordina per watchedAt decrescente
-    completedVideos.sort((a, b) => b.watchedAt.compareTo(a.watchedAt));
+  // Controlla se ci sono almeno 3 video completati
+  if (completedVideos.length < 3) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Devi completare almeno 3 video per accedere a questo quiz.'),
+      ),
+    );
+    return;
+  }
 
-    // Prendi gli ultimi 5
-    completedVideos = completedVideos.take(5).toList();
+  // Raccogli gli ID dei video
+  List<String> videoIds = completedVideos.map((video) => video.videoId).toList();
 
-    // Controlla se ci sono almeno 3 video completati
-    if (completedVideos.length < 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('You must complete at least 3 videos to access this quiz.'),
-        ),
-      );
-      return;
-    }
+  // Naviga a QuestionScreen passando gli ID dei video
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => QuestionScreen(topic: 'Daily Quiz', videoIds: videoIds),
+    ),
+  );
+}
 
-    // Raccogli gli ID dei video
-    List<String> videoIds = completedVideos.map((video) => video.videoId).toList();
+void _startQuiz(String quizTitle) async {
+  // Log dell'evento 'quiz_start'
+  _analytics.logEvent(
+    name: 'quiz_start',
+    parameters: {
+      'quiz_title': quizTitle,
+      'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
+    },
+  );
 
-    // Naviga a QuestionScreen passando gli ID dei video
+  if (quizTitle == 'Daily Quiz' && currentUser != null) {
+    // Determina se il quiz giornaliero è gratuito o meno
+    int requiredVideosForNextFreeUnlock = 3 + (currentUser!.dailyQuizFreeUses * 5);
+    bool isFree = currentUser!.dailyVideosCompleted >= requiredVideosForNextFreeUnlock;
+
+    // Chiamata con parametro isFree
+    await _handleLastViewedVideosQuiz(isFree);
+  } else {
+    // Naviga a QuestionScreen per altri quiz basati su topic
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => QuestionScreen(topic: 'Daily Quiz', videoIds: videoIds),
+        builder: (context) => QuestionScreen(topic: quizTitle),
       ),
     );
   }
-
-  void _startQuiz(String quizTitle) async {
-    // Log dell'evento 'quiz_start'
-    _analytics.logEvent(
-      name: 'quiz_start',
-      parameters: {
-        'quiz_title': quizTitle,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-      },
-    );
-
-    if (quizTitle == 'Daily Quiz') {
-      await _handleLastViewedVideosQuiz();
-    } else {
-      // Naviga a QuestionScreen per altri quiz basati su topic
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => QuestionScreen(topic: quizTitle),
-        ),
-      );
-    }
-  }
+}
 
   int _current = 0;
 
@@ -240,105 +274,115 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildMysteryCard(double width, String title, String description, int cost) {
-    return GestureDetector(
-      onTap: () async {
-        if (title == 'Train Your Mistakes') {
-          // Mostra un messaggio che la carta non è disponibile per questi titoli
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('This card is not yet available.'),
-            ),
-          );
-        } else if (title == 'Daily Quiz') {
-          // Gestisci l'acquisto del quiz Last Viewed Videos
-          await _handleLastViewedVideosQuiz();
-        }
-      },
-      child: Stack(
-        children: [
-          Container(
-            width: width,
-            margin: const EdgeInsets.symmetric(vertical: 0),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.yellow.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  '?',
-                  style: TextStyle(
-                    fontSize: 100,
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.black87,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Montserrat',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  style: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 16,
-                    fontFamily: 'Montserrat',
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 10,
-            left: 10,
-            child: Container(
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$cost', // Costo della carta in coin
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+Widget _buildMysteryCard(double width, String title, String description, int cost) {
+  bool isFree = false;
+
+  if (title == 'Daily Quiz' && currentUser != null) {
+    int requiredVideosForNextFreeUnlock = 3 + (currentUser!.dailyQuizFreeUses * 5);
+    if (currentUser!.dailyVideosCompleted >= requiredVideosForNextFreeUnlock) {
+      isFree = true;
+    }
   }
+
+  return GestureDetector(
+    onTap: () async {
+      if (title == 'Daily Quiz') {
+        await _handleLastViewedVideosQuiz(isFree);
+      } else if (title == 'Train Your Mistakes') {
+        // Mostra un messaggio che la carta non è ancora disponibile
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Questa carta non è ancora disponibile.'),
+          ),
+        );
+      } else {
+        // Altre logiche per altri quiz se necessario
+      }
+    },
+    child: Stack(
+      children: [
+        Container(
+          width: width,
+          margin: const EdgeInsets.symmetric(vertical: 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.yellow.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                '?',
+                style: TextStyle(
+                  fontSize: 100,
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Montserrat',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 16,
+                  fontFamily: 'Montserrat',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.stars_rounded, color: Colors.yellow, size: 25),
+                const SizedBox(width: 8),
+                Text(
+                  isFree ? 'FREE' : '$cost',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildCarousel() {
     return Expanded(
