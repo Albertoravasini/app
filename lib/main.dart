@@ -31,18 +31,26 @@ FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
 // Funzione di gestione dei messaggi in background
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
   print('Handling a background message: ${message.messageId}');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inizializza Firebase
-  await Firebase.initializeApp(
-  );
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (e) {
+    // Ignora l'errore solo se è un errore di duplicazione
+    if (e is FirebaseException && e.code == 'duplicate-app') {
+      print("Firebase app already initialized");
+    } else {
+      rethrow; // Propaga altri tipi di errore
+    }
+  }
 
   // Imposta il gestore dei messaggi in background
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

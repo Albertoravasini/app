@@ -2,7 +2,7 @@ name: Just_Learn
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 2.3.7+40
+version: 2.3.9+42
 
 environment:
   sdk: '>=3.4.3 <4.0.0'
@@ -38,7 +38,6 @@ dependencies:
   audioplayers: ^6.1.0 
   sign_in_with_apple: ^6.1.3
   firebase_analytics: ^11.3.3
-  font_awesome_flutter: ^10.1.0
   overlay_support: ^2.1.0
 
 dev_dependencies:

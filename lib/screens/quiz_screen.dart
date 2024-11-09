@@ -88,7 +88,7 @@ Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
   if (currentUser == null) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Devi essere loggato per accedere a questa funzionalità.'),
+        content: Text('You must be logged in to access this feature.'),
       ),
     );
     return;
@@ -120,7 +120,7 @@ Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
     if (currentUser!.coins < 50) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Non hai abbastanza coin per accedere a questo quiz.'),
+          content: Text('You do not have enough coins to access this quiz.'),
         ),
       );
       return;
@@ -151,7 +151,7 @@ Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
   if (completedVideos.length < 3) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Devi completare almeno 3 video per accedere a questo quiz.'),
+        content: Text('You must complete at least 3 videos to access this quiz.'),
       ),
     );
     return;
@@ -297,7 +297,7 @@ Widget _buildMysteryCard(double width, String title, String description, int cos
       } else if (title == 'Train Your Mistakes') {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Questa carta non è ancora disponibile.'),
+            content: Text('This card is not yet available.'),
           ),
         );
       } else {
