@@ -25,8 +25,12 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
       return const SizedBox.shrink();
     }
 
-    // Determina se mostrare il pallino basato sui video completati
-    bool showDot = widget.currentUser!.dailyVideosCompleted >= 3;
+    // Controlla se il quiz è gratuito
+    int requiredVideosForNextFreeUnlock = 3 + (widget.currentUser!.dailyQuizFreeUses * 5);
+    bool isQuizFree = widget.currentUser!.dailyVideosCompleted >= requiredVideosForNextFreeUnlock;
+
+    // Determina se mostrare il pallino solo quando il quiz è gratuito
+    bool showDot = isQuizFree && widget.currentUser!.dailyVideosCompleted >= 3;
 
     return Container(
       width: double.infinity,

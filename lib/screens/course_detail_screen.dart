@@ -502,6 +502,15 @@ Widget _buildSections() {
         child: GestureDetector(
           onTap: isAccessible
               ? () async {
+                  // Registra l'evento di visualizzazione della sezione
+                  FirebaseAnalytics.instance.logEvent(
+                    name: 'section_view',
+                    parameters: {
+                      'course_id': widget.course.id,
+                      'section_title': section.title,
+                      'user_id': _currentUser.uid,
+                    },
+                  );
                   bool? result = await Navigator.push(
                     context,
                     MaterialPageRoute(

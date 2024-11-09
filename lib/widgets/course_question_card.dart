@@ -264,34 +264,40 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
     );
   }
 
-  Future<void> _onAnswered(String choice) async {
-    setState(() {
-      selectedAnswer = choice;
-      isCorrect = _checkAnswer(choice);
-      hasAnswered = true;
-      widget.onAnswered(isCorrect);
-    });
+ Future<void> _onAnswered(String choice) async {
+  setState(() {
+    selectedAnswer = choice;
+    isCorrect = _checkAnswer(choice);
+    hasAnswered = true;
+    widget.onAnswered(isCorrect);
+  });
 
-    if (isCorrect) {
-      if (await Vibration.hasVibrator() ?? false) {
-        Vibration.vibrate(duration: 100);
-      }
-
-       _audioPlayer?.play(AssetSource('success_sound.mp3'));
-
-      setState(() {
-        _showCoins = true;
-      });
-      _animationController?.forward(from: 0);
-
-      await _addCoinsToUser();
+  if (isCorrect) {
+    if (await Vibration.hasVibrator() ?? false) {
+      Vibration.vibrate(duration: 100);
     }
-    // Registra l'evento di risposta alla domanda
- 
+    _audioPlayer?.play(AssetSource('success_sound.mp3'));
+    setState(() {
+      _showCoins = true;
+    });
+    _animationController?.forward(from: 0);
 
-
-    await _saveAnsweredQuestion();
+    await _addCoinsToUser();
   }
+
+  // Registra l'evento di risposta alla domanda
+  FirebaseAnalytics.instance.logEvent(
+    name: 'question_answered',
+    parameters: {
+      'question_content': widget.step.content,
+      'topic': widget.topic,
+      'is_correct': isCorrect,
+      'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
+    },
+  );
+
+  await _saveAnsweredQuestion();
+}
 
   Future<void> _addCoinsToUser() async {
     final user = FirebaseAuth.instance.currentUser;

@@ -1,3 +1,4 @@
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 
 class TopicSelectionSheet extends StatefulWidget {
@@ -26,17 +27,27 @@ class _TopicSelectionSheetState extends State<TopicSelectionSheet> {
     _selectedTopic = widget.selectedTopic;
   }
 
-  void _handleSelectTopic(String topic) {
-    setState(() {
-      if (_selectedTopic == topic) {
-        _selectedTopic = null;  // Deseleziona se è già selezionato
-      } else {
-        _selectedTopic = topic;
-      }
-    });
-    widget.onSelectTopic(_selectedTopic ?? 'Just Learn');
-    Navigator.pop(context);  // Chiude il foglio di selezione
-  }
+void _handleSelectTopic(String topic) {
+  setState(() {
+    if (_selectedTopic == topic) {
+      _selectedTopic = null; // Deseleziona se è già selezionato
+    } else {
+      _selectedTopic = topic;
+    }
+  });
+  
+  widget.onSelectTopic(_selectedTopic ?? 'Just Learn');
+  
+  // Registra l'evento di selezione del topic su Firebase Analytics
+  FirebaseAnalytics.instance.logEvent(
+    name: 'topic_selected',
+    parameters: {
+      'topic': _selectedTopic ?? 'Just Learn',
+    },
+  );
+  
+  Navigator.pop(context); // Chiude il foglio di selezione
+}
 
   @override
   Widget build(BuildContext context) {
