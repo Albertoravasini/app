@@ -45,125 +45,107 @@ void dispose() {
 }
 
 Future<void> _loadQuestions() async {
-    final user = FirebaseAuth.instance.currentUser;
-    print("Caricamento delle domande iniziato...");
+  final user = FirebaseAuth.instance.currentUser;
+  print("Caricamento delle domande iniziato...");
 
-    if (user != null) {
-      print("Utente autenticato: ${user.uid}");
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        setState(() {
-          currentUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
-        });
-        print("Dati utente caricati correttamente: ${currentUser?.name}");
-      } else {
-        print("Documento utente non trovato!");
-      }
+  if (user != null) {
+    print("Utente autenticato: ${user.uid}");
+    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      setState(() {
+        currentUser = UserModel.fromMap(userDoc.data() as Map<String, dynamic>);
+      });
+      print("Dati utente caricati correttamente: ${currentUser?.name}");
     } else {
-      print("Nessun utente autenticato.");
+      print("Documento utente non trovato!");
+      return;
     }
+  } else {
+    print("Nessun utente autenticato.");
+    return;
+  }
 
-    List<Map<String, dynamic>> allStepsWithLevels = [];
+  List<Map<String, dynamic>> allStepsWithLevels = [];
 
+  // Recupera i livelli
+  QuerySnapshot levelsSnapshot;
+
+  if (widget.topic == 'JustLearn') {
+    levelsSnapshot = await FirebaseFirestore.instance.collection('levels').get();
+    print("Tutti i livelli caricati per il topic 'JustLearn'.");
+  } else if (widget.topic == 'Daily Quiz') {
+    levelsSnapshot = await FirebaseFirestore.instance.collection('levels').get();
+    print("Livelli caricati per il 'Daily Quiz'.");
+  } else {
+    levelsSnapshot = await FirebaseFirestore.instance
+        .collection('levels')
+        .where('topic', isEqualTo: widget.topic)
+        .get();
+    print("Livelli caricati per il topic '${widget.topic}'.");
+  }
+
+  for (var levelDoc in levelsSnapshot.docs) {
+    final level = Level.fromFirestore(levelDoc);
+
+    // Filtra i livelli in base al topic per quiz diversi da "Daily Quiz" e "JustLearn"
     if (widget.topic == 'Daily Quiz' && widget.videoIds != null && widget.videoIds!.isNotEmpty) {
-      // Recupera tutti i livelli
-      final levelsSnapshot = await FirebaseFirestore.instance.collection('levels').get();
-      for (var levelDoc in levelsSnapshot.docs) {
-        final level = Level.fromFirestore(levelDoc);
-        for (int i = 0; i < level.steps.length; i++) {
-          final step = level.steps[i];
-          if (step.type == 'video' && widget.videoIds!.contains(step.content)) {
-            if (i + 1 < level.steps.length) {
-              final questionStep = level.steps[i + 1];
-              if (questionStep.type == 'question') {
-                allStepsWithLevels.add({'step': questionStep, 'level': level});
-              }
+      // Carica domande solo per gli ultimi video completati
+      for (int i = 0; i < level.steps.length; i++) {
+        final step = level.steps[i];
+
+        if (step.type == 'video' && widget.videoIds!.contains(step.content)) {
+          for (int j = i + 1; j < level.steps.length; j++) {
+            final questionStep = level.steps[j];
+            if (questionStep.type == 'question') {
+              allStepsWithLevels.add({'step': questionStep, 'level': level});
             }
           }
         }
       }
-
-      print("Numero totale di domande selezionate: ${allStepsWithLevels.length}");
-
-      // Mescola le domande selezionate
-      allStepsWithLevels.shuffle();
-
-      // Prendi le prime 5 domande o quante ne sono disponibili
-      setState(() {
-        selectedQuestionsWithLevels = allStepsWithLevels.take(5).toList();
-      });
-
-      if (selectedQuestionsWithLevels.isEmpty) {
-        print("Errore: Nessuna domanda selezionata per 'Daily Quiz'.");
-      } else {
-        print("Caricamento completato, domande pronte per essere mostrate.");
-      }
     } else {
-      // Logica esistente per altri topic
-      QuerySnapshot querySnapshot;
-
-      if (widget.topic == 'JustLearn') {
-        querySnapshot = await FirebaseFirestore.instance.collection('levels').get();
-        print("Tutti i livelli caricati per il topic 'JustLearn'.");
-      } else {
-        querySnapshot = await FirebaseFirestore.instance
-            .collection('levels')
-            .where('topic', isEqualTo: widget.topic)
-            .get();
-        print("Livelli caricati per il topic '${widget.topic}'.");
-      }
-
-      // Raccogli tutte le domande
-      final allStepsWithLevelsOther = querySnapshot.docs
-          .map((doc) {
-            final level = Level.fromFirestore(doc);
-            return level.steps
-                .where((step) => step.type == 'question')
-                .map((step) => {'step': step, 'level': level})
-                .toList();
-          })
-          .expand((e) => e)
-          .toList();
-
-      print("Numero totale di domande trovate: ${allStepsWithLevelsOther.length}");
-
-      if (allStepsWithLevelsOther.isEmpty) {
-        print("Errore: Nessuna domanda trovata per il topic ${widget.topic}.");
-      }
-
-      allStepsWithLevelsOther.shuffle();
-
-      // Filtra solo le domande non ancora risposte
-      final unansweredSteps = allStepsWithLevelsOther.where((item) {
-        final step = item['step'] as LevelStep;
-        return !(currentUser?.answeredQuestions[widget.topic]?.contains(step.content) ?? false);
-      }).toList();
-
-      print("Domande non risposte trovate: ${unansweredSteps.length}");
-
-      // Se ci sono meno di 5 domande non risposte, aggiungi altre domande
-      final remainingStepsCount = 5 - unansweredSteps.length;
-      if (remainingStepsCount > 0) {
-        final answeredSteps = allStepsWithLevelsOther
-            .where((item) => !unansweredSteps.contains(item))
-            .toList();
-        answeredSteps.shuffle();
-        unansweredSteps.addAll(answeredSteps.take(remainingStepsCount));
-      }
-
-      print("Domande selezionate: ${unansweredSteps.take(5).length}");
-
-      setState(() {
-        selectedQuestionsWithLevels = unansweredSteps.take(5).toList();
-      });
-
-      if (selectedQuestionsWithLevels.isEmpty) {
-        print("Errore: Nessuna domanda selezionata.");
-      } else {
-        print("Caricamento completato, domande pronte per essere mostrate.");
+      // Aggiungi tutte le domande del livello per JustLearn o per il topic specifico
+      for (int i = 0; i < level.steps.length; i++) {
+        final step = level.steps[i];
+        if (step.type == 'question') {
+          allStepsWithLevels.add({'step': step, 'level': level});
+        }
       }
     }
   }
+
+  print("Numero totale di domande selezionate: ${allStepsWithLevels.length}");
+
+  // Mescola le domande selezionate e limita a 5
+  allStepsWithLevels.shuffle();
+
+  // Filtra per domande non ancora risposte
+  final unansweredSteps = allStepsWithLevels.where((item) {
+    final step = item['step'] as LevelStep;
+    return !(currentUser?.answeredQuestions[widget.topic]?.contains(step.content) ?? false);
+  }).toList();
+
+  print("Domande non risposte trovate: ${unansweredSteps.length}");
+
+  // Se ci sono meno di 5 domande non risposte, aggiungi altre domande risposte fino a 5
+  final remainingStepsCount = 5 - unansweredSteps.length;
+  if (remainingStepsCount > 0) {
+    final answeredSteps = allStepsWithLevels.where((item) => !unansweredSteps.contains(item)).toList();
+    answeredSteps.shuffle();
+    unansweredSteps.addAll(answeredSteps.take(remainingStepsCount));
+  }
+
+  print("Domande selezionate: ${unansweredSteps.take(5).length}");
+
+  setState(() {
+    selectedQuestionsWithLevels = unansweredSteps.take(5).toList();
+  });
+
+  if (selectedQuestionsWithLevels.isEmpty) {
+    print("Errore: Nessuna domanda selezionata.");
+  } else {
+    print("Caricamento completato, domande pronte per essere mostrate.");
+  }
+}
 
   void _initializeVideo(Level currentLevel) {
   final videoStep = currentLevel.steps.firstWhere(

@@ -1,8 +1,10 @@
+// lib/models/course.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'level.dart'; // Importa LevelStep da level.dart
+import 'level.dart'; // Assicurati che LevelStep sia importato correttamente
 
 class Course {
-  final String id;
+   String id;
   String title;
   String description;
   int cost;
@@ -11,9 +13,15 @@ class Course {
   String topic;
   String subtopic;
   String? thumbnailUrl;
-  String? coverImageUrl; // Nuovo campo per l'immagine di copertina
+  String? coverImageUrl;
 
-  // Costruttore aggiornato
+  // Additional fields
+  List<String> sources;
+  List<String> acknowledgments;
+  List<String> recommendedBooks;
+  List<String> recommendedPodcasts;
+  List<String> recommendedWebsites;
+
   Course({
     required this.id,
     required this.title,
@@ -24,14 +32,23 @@ class Course {
     required this.topic,
     required this.subtopic,
     this.thumbnailUrl,
-    this.coverImageUrl, // Aggiungi questo campo
+    this.coverImageUrl,
+    this.sources = const [],
+    this.acknowledgments = const [],
+    this.recommendedBooks = const [],
+    this.recommendedPodcasts = const [],
+    this.recommendedWebsites = const [],
   });
 
-  // Aggiornamento del metodo fromFirestore
   factory Course.fromFirestore(DocumentSnapshot doc) {
-    Map data = doc.data() as Map;
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return Course.fromMap(data)..id = doc.id;
+  }
+
+  // Add the fromMap constructor here
+  factory Course.fromMap(Map<String, dynamic> data) {
     return Course(
-      id: doc.id,
+      id: data['id'] ?? '', // Use empty string as default if ID is not provided
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       cost: data['cost'] ?? 0,
@@ -42,11 +59,15 @@ class Course {
       topic: data['topic'] ?? '',
       subtopic: data['subtopic'] ?? '',
       thumbnailUrl: data['thumbnailUrl'],
-      coverImageUrl: data['coverImageUrl'], // Aggiungi questo campo
+      coverImageUrl: data['coverImageUrl'],
+      sources: List<String>.from(data['sources'] ?? []),
+      acknowledgments: List<String>.from(data['acknowledgments'] ?? []),
+      recommendedBooks: List<String>.from(data['recommendedBooks'] ?? []),
+      recommendedPodcasts: List<String>.from(data['recommendedPodcasts'] ?? []),
+      recommendedWebsites: List<String>.from(data['recommendedWebsites'] ?? []),
     );
   }
 
-  // Aggiornamento del metodo toMap
   Map<String, dynamic> toMap() {
     return {
       'title': title,
@@ -57,15 +78,20 @@ class Course {
       'topic': topic,
       'subtopic': subtopic,
       'thumbnailUrl': thumbnailUrl,
-      'coverImageUrl': coverImageUrl, // Aggiungi questo campo
+      'coverImageUrl': coverImageUrl,
+      'sources': sources,
+      'acknowledgments': acknowledgments,
+      'recommendedBooks': recommendedBooks,
+      'recommendedPodcasts': recommendedPodcasts,
+      'recommendedWebsites': recommendedWebsites,
     };
   }
 }
 
 class Section {
-   String title;
-  final List<LevelStep> steps; // Sostituisci StepItem con LevelStep
-  String? imageUrl; // Aggiungi questo campo
+  String title;
+  final List<LevelStep> steps;
+  String? imageUrl;
 
   Section({
     required this.title,
@@ -76,7 +102,7 @@ class Section {
   factory Section.fromMap(Map<String, dynamic> data) {
     return Section(
       title: data['title'] ?? '',
-      steps: List<LevelStep>.from(data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []), // Usa LevelStep
+      steps: List<LevelStep>.from(data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []),
       imageUrl: data['imageUrl'],
     );
   }
