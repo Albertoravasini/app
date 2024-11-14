@@ -162,11 +162,20 @@ void initState() {
             ),
 
             // Pulsante Subscribe
-            SizedBox(
+SizedBox(
   width: double.infinity, // Larghezza piena
   child: ElevatedButton(
     onPressed: () async {
-      await _incrementClickCount(); // Incrementa il contatore quando l'utente si abbona
+      await _incrementClickCount(); // Incrementa il contatore per l'utente
+
+      // Registra l'evento su Firebase Analytics
+      FirebaseAnalytics.instance.logEvent(
+        name: 'subscribe_click',
+        parameters: {
+          'selected_plan': selectedPlan,
+          'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
+        },
+      );
 
       // Mostra la Snackbar quando l'utente clicca su "Subscribe"
       ScaffoldMessenger.of(context).showSnackBar(

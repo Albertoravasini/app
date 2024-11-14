@@ -23,8 +23,14 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   List<String> _topics = [];
   List<Section> _sections = [];
   bool _isEditing = false;
-  // Aggiungi questa variabile nello stato della classe
-String? _coverImageUrl;
+  String? _coverImageUrl;
+
+  // Nuovi campi per fonti, ringraziamenti e approfondimenti
+  List<String> _sources = [];
+  List<String> _acknowledgments = [];
+  List<String> _recommendedBooks = [];
+  List<String> _recommendedPodcasts = [];
+  List<String> _recommendedWebsites = [];
 
   @override
   void initState() {
@@ -38,7 +44,14 @@ String? _coverImageUrl;
       _courseDescription = widget.course!.description;
       _courseCost = widget.course!.cost;
       _sections = widget.course!.sections;
-      _coverImageUrl = widget.course!.coverImageUrl; // Inizializza la copertina
+      _coverImageUrl = widget.course!.coverImageUrl;
+
+      // Inizializza i nuovi campi
+      _sources = List.from(widget.course!.sources);
+      _acknowledgments = List.from(widget.course!.acknowledgments);
+      _recommendedBooks = List.from(widget.course!.recommendedBooks);
+      _recommendedPodcasts = List.from(widget.course!.recommendedPodcasts);
+      _recommendedWebsites = List.from(widget.course!.recommendedWebsites);
     }
   }
 
@@ -47,6 +60,67 @@ String? _coverImageUrl;
     final querySnapshot = await topicsCollection.get();
     setState(() {
       _topics = querySnapshot.docs.map((doc) => doc.id).toList();
+    });
+  }
+
+  // Funzione per aggiungere elementi alle liste
+  void _addItemDialog(String title, Function(String) onAdd) {
+    String? newItem;
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: Text(
+            title,
+            style: TextStyle(color: Colors.white),
+          ),
+          content: TextFormField(
+            decoration: InputDecoration(
+              labelText: title,
+              labelStyle: TextStyle(color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white54),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.blueAccent),
+              ),
+            ),
+            style: TextStyle(color: Colors.white),
+            onChanged: (value) {
+              newItem = value;
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Annulla',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                if (newItem != null && newItem!.isNotEmpty) {
+                  onAdd(newItem!);
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(
+                'Aggiungi',
+                style: TextStyle(color: Colors.blueAccent),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Funzione per rimuovere elementi dalle liste
+  void _removeItem(List<String> list, int index) {
+    setState(() {
+      list.removeAt(index);
     });
   }
 
@@ -67,16 +141,14 @@ String? _coverImageUrl;
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
-                decoration:
-                    const InputDecoration(labelText: 'Titolo Capitolo'),
+                decoration: const InputDecoration(labelText: 'Titolo Capitolo'),
                 style: TextStyle(color: Colors.white),
                 onChanged: (value) {
                   sectionTitle = value;
                 },
               ),
               TextFormField(
-                decoration: const InputDecoration(
-                    labelText: 'URL Immagine (opzionale)'),
+                decoration: const InputDecoration(labelText: 'URL Immagine (opzionale)'),
                 style: TextStyle(color: Colors.white),
                 onChanged: (value) {
                   imageUrl = value;
@@ -278,10 +350,7 @@ String? _coverImageUrl;
                         style: TextStyle(color: Colors.white),
                         onChanged: (value) {
                           videoUrl = value;
-                          setState(() {
-                            thumbnailUrl =
-                                'https://img.youtube.com/vi/$value/0.jpg';
-                          });
+                          
                         },
                       ),
                       TextFormField(
@@ -608,7 +677,7 @@ String? _coverImageUrl;
     );
   }
 
-  void _saveCourse() {
+void _saveCourse() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
@@ -619,7 +688,12 @@ String? _coverImageUrl;
         'topic': _selectedTopic!,
         'visible': widget.course?.visible ?? true,
         'sections': _sections.map((section) => section.toMap()).toList(),
-        'coverImageUrl': _coverImageUrl, // Aggiungi questo campo
+        'coverImageUrl': _coverImageUrl,
+        'sources': _sources,
+        'acknowledgments': _acknowledgments,
+        'recommendedBooks': _recommendedBooks,
+        'recommendedPodcasts': _recommendedPodcasts,
+        'recommendedWebsites': _recommendedWebsites,
       };
 
       if (_isEditing) {
@@ -663,7 +737,7 @@ String? _coverImageUrl;
         title: Text(_isEditing ? 'Modifica Corso' : 'Crea Corso'),
         backgroundColor: Colors.grey[900],
       ),
-      body: Padding(
+      body: SingleChildScrollView( // Aggiunto per evitare overflow
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
@@ -758,8 +832,7 @@ String? _coverImageUrl;
               ),
               SizedBox(height: 16),
               TextFormField(
-                initialValue:
-                    _courseCost != null ? _courseCost.toString() : null,
+                initialValue: _courseCost != null ? _courseCost.toString() : null,
                 decoration: const InputDecoration(
                   labelText: 'Costo in coins',
                   labelStyle: TextStyle(color: Colors.white),
@@ -786,23 +859,250 @@ String? _coverImageUrl;
                 },
               ),
               SizedBox(height: 16),
-            TextFormField(
-              initialValue: _coverImageUrl,
-              decoration: const InputDecoration(
-                labelText: 'URL Immagine di Copertina (opzionale)',
-                labelStyle: TextStyle(color: Colors.white),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white54),
+              TextFormField(
+                initialValue: _coverImageUrl,
+                decoration: const InputDecoration(
+                  labelText: 'URL Immagine di Copertina (opzionale)',
+                  labelStyle: TextStyle(color: Colors.white),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white54),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.blueAccent),
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.blueAccent),
+                style: TextStyle(color: Colors.white),
+                onSaved: (value) {
+                  _coverImageUrl = value;
+                },
+              ),
+              SizedBox(height: 20),
+
+              // Sezione per Fonti
+              Text(
+                'Fonti',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Column(
+                children: _sources.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String source = entry.value;
+                  return ListTile(
+                    title: Text(source, style: TextStyle(color: Colors.white)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _removeItem(_sources, index),
+                    ),
+                  );
+                }).toList(),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  iconColor: Colors.blueAccent,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _addItemDialog('Aggiungi Fonte', (value) {
+                  setState(() {
+                    _sources.add(value);
+                  });
+                }),
+                child: const Text(
+                  'Aggiungi Fonte',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              style: TextStyle(color: Colors.white),
-              onSaved: (value) {
-                _coverImageUrl = value;
-              },),
+              SizedBox(height: 16),
+
+              // Sezione per Ringraziamenti
+              Text(
+                'Ringraziamenti',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Column(
+                children: _acknowledgments.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String acknowledgment = entry.value;
+                  return ListTile(
+                    title: Text(acknowledgment, style: TextStyle(color: Colors.white)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _removeItem(_acknowledgments, index),
+                    ),
+                  );
+                }).toList(),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  iconColor: Colors.blueAccent,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _addItemDialog('Aggiungi Ringraziamento', (value) {
+                  setState(() {
+                    _acknowledgments.add(value);
+                  });
+                }),
+                child: const Text(
+                  'Aggiungi Ringraziamento',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+
+              // Sezione per Approfondimenti
+              Text(
+                'Approfondimenti',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+
+              // Libri
+              Text(
+                'Libri Consigliati',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              Column(
+                children: _recommendedBooks.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String book = entry.value;
+                  return ListTile(
+                    title: Text(book, style: TextStyle(color: Colors.white)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _removeItem(_recommendedBooks, index),
+                    ),
+                  );
+                }).toList(),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  iconColor: Colors.blueAccent,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _addItemDialog('Aggiungi Libro', (value) {
+                  setState(() {
+                    _recommendedBooks.add(value);
+                  });
+                }),
+                child: const Text(
+                  'Aggiungi Libro',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(height: 8),
+
+              // Podcast
+              Text(
+                'Podcast Consigliati',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              Column(
+                children: _recommendedPodcasts.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String podcast = entry.value;
+                  return ListTile(
+                    title: Text(podcast, style: TextStyle(color: Colors.white)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _removeItem(_recommendedPodcasts, index),
+                    ),
+                  );
+                }).toList(),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  iconColor: Colors.blueAccent,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _addItemDialog('Aggiungi Podcast', (value) {
+                  setState(() {
+                    _recommendedPodcasts.add(value);
+                  });
+                }),
+                child: const Text(
+                  'Aggiungi Podcast',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(height: 8),
+
+              // Siti Web
+              Text(
+                'Siti Web Consigliati',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              Column(
+                children: _recommendedWebsites.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String website = entry.value;
+                  return ListTile(
+                    title: Text(website, style: TextStyle(color: Colors.white)),
+                    trailing: IconButton(
+                      icon: Icon(Icons.delete, color: Colors.redAccent),
+                      onPressed: () => _removeItem(_recommendedWebsites, index),
+                    ),
+                  );
+                }).toList(),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  iconColor: Colors.blueAccent,
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => _addItemDialog('Aggiungi Sito Web', (value) {
+                  setState(() {
+                    _recommendedWebsites.add(value);
+                  });
+                }),
+                child: const Text(
+                  'Aggiungi Sito Web',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
               SizedBox(height: 20),
+
+              // Sezione per Capitoli (esistente)
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   iconColor: Colors.green,
@@ -823,78 +1123,78 @@ String? _coverImageUrl;
                 ),
               ),
               SizedBox(height: 16),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _sections.length,
-                  itemBuilder: (context, index) {
-                    final section = _sections[index];
-                    return ExpansionTile(
-                      backgroundColor: Colors.grey[850],
-                      title: Text(
-                        section.title,
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: _sections.length,
+                itemBuilder: (context, index) {
+                  final section = _sections[index];
+                  return ExpansionTile(
+                    backgroundColor: Colors.grey[850],
+                    title: Text(
+                      section.title,
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(Icons.edit, color: Colors.white),
+                      onPressed: () {
+                        _editSection(section, index);
+                      },
+                    ),
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          iconColor: Colors.blueAccent,
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: () => _addStepDialog(section, index),
+                        child: const Text(
+                          'Aggiungi Step',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
-                      trailing: IconButton(
-                        icon: Icon(Icons.edit, color: Colors.white),
-                        onPressed: () {
-                          _editSection(section, index);
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: section.steps.length,
+                        itemBuilder: (context, stepIndex) {
+                          final step = section.steps[stepIndex];
+                          return ListTile(
+                            title: Text(
+                              '${step.type == 'video' ? 'Video' : 'Domanda'}: ${step.content}',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.edit, color: Colors.white),
+                                  onPressed: () {
+                                    _editStepDialog(section, index, step, stepIndex);
+                                  },
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.delete, color: Colors.redAccent),
+                                  onPressed: () {
+                                    _deleteStep(index, stepIndex);
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
                         },
                       ),
-                      children: [
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            iconColor: Colors.blueAccent,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () => _addStepDialog(section, index),
-                          child: const Text(
-                            'Aggiungi Step',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: section.steps.length,
-                          itemBuilder: (context, stepIndex) {
-                            final step = section.steps[stepIndex];
-                            return ListTile(
-                              title: Text(
-                                '${step.type == 'video' ? 'Video' : 'Domanda'}: ${step.content}',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(Icons.edit, color: Colors.white),
-                                    onPressed: () {
-                                      _editStepDialog(section, index, step, stepIndex);
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.delete, color: Colors.redAccent),
-                                    onPressed: () {
-                                      _deleteStep(index, stepIndex);
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                    ],
+                  );
+                },
               ),
               SizedBox(height: 16),
               Center(
@@ -924,4 +1224,7 @@ String? _coverImageUrl;
       ),
     );
   }
+
+
+
 }

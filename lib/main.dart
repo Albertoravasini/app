@@ -12,6 +12,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:overlay_support/overlay_support.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,18 +31,20 @@ FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
 // Funzione di gestione dei messaggi in background
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
   print('Handling a background message: ${message.messageId}');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inizializza Firebase
-  await Firebase.initializeApp(
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Se Firebase è già inizializzato, continua con l'esecuzione
+    print('Firebase già inizializzato: $e');
+  }
 
   // Imposta il gestore dei messaggi in background
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -63,94 +66,96 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<AuthService>(
-          create: (_) => AuthService(),
+    return OverlaySupport.global(
+      child: MultiProvider(
+        providers: [
+          Provider<AuthService>(
+            create: (_) => AuthService(),
+          ),
+          StreamProvider<User?>(
+            create: (context) => context.read<AuthService>().user,
+            initialData: null,
+          ),
+        ],
+        child: MaterialApp(
+          title: 'Education App',
+          debugShowCheckedModeBanner: false,
+          navigatorKey: navigatorKey,
+          theme: ThemeData(
+            primaryColor: Colors.white,
+            scaffoldBackgroundColor: Colors.black,
+            fontFamily: 'Montserrat',
+            iconTheme: const IconThemeData(
+              color: Colors.white,
+            ),
+            appBarTheme: const AppBarTheme(
+              color: Colors.black,
+              titleTextStyle: TextStyle(
+                fontSize: 20.0,
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              iconTheme: IconThemeData(
+                color: Colors.white,
+              ),
+            ),
+            floatingActionButtonTheme: const FloatingActionButtonThemeData(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+            ),
+            bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+              backgroundColor: Colors.black,
+              selectedItemColor: Colors.white,
+              unselectedItemColor: Colors.white54,
+            ),
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(
+                fontSize: 14.0,
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.normal,
+                color: Colors.white,
+              ),
+              bodyMedium: TextStyle(
+                fontSize: 16.0,
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.normal,
+                color: Colors.white,
+              ),
+              titleLarge: TextStyle(
+                fontSize: 20.0,
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            progressIndicatorTheme: const ProgressIndicatorThemeData(
+              color: Colors.white,
+            ),
+            textSelectionTheme: const TextSelectionThemeData(
+              selectionColor: Color.fromARGB(130, 158, 158, 158),
+              selectionHandleColor: Color.fromARGB(130, 158, 158, 158),
+              cursorColor: Colors.white,
+            ),
+            snackBarTheme: SnackBarThemeData(
+              backgroundColor: Colors.white,
+              contentTextStyle: const TextStyle(color: Colors.black),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          ),
+          home: const SplashScreen(),
+          routes: {
+            '/home': (context) => const HomeScreen(),
+            '/login': (context) => const LoginScreen(),
+            '/register': (context) => const RegisterScreen(),
+            '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
+            '/admin': (context) => const AdminPanelScreen(),
+            '/privacy-policy': (context) => const PrivacyPolicyScreen(),
+          },
         ),
-        StreamProvider<User?>(
-          create: (context) => context.read<AuthService>().user,
-          initialData: null,
-        ),
-      ],
-      child: MaterialApp(
-        title: 'Education App',
-        debugShowCheckedModeBanner: false,
-        navigatorKey: navigatorKey,
-        theme: ThemeData(
-          primaryColor: Colors.white,
-          scaffoldBackgroundColor: Colors.black,
-          fontFamily: 'Montserrat',
-          iconTheme: const IconThemeData(
-            color: Colors.white,
-          ),
-          appBarTheme: const AppBarTheme(
-            color: Colors.black,
-            titleTextStyle: TextStyle(
-              fontSize: 20.0,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-            iconTheme: IconThemeData(
-              color: Colors.white,
-            ),
-          ),
-          floatingActionButtonTheme: const FloatingActionButtonThemeData(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-          ),
-          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-            backgroundColor: Colors.black,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.white54,
-          ),
-          textTheme: const TextTheme(
-            bodyLarge: TextStyle(
-              fontSize: 14.0,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.normal,
-              color: Colors.white,
-            ),
-            bodyMedium: TextStyle(
-              fontSize: 16.0,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.normal,
-              color: Colors.white,
-            ),
-            titleLarge: TextStyle(
-              fontSize: 20.0,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          progressIndicatorTheme: const ProgressIndicatorThemeData(
-            color: Colors.white,
-          ),
-          textSelectionTheme: const TextSelectionThemeData(
-            selectionColor: Color.fromARGB(130, 158, 158, 158),
-            selectionHandleColor: Color.fromARGB(130, 158, 158, 158),
-            cursorColor: Colors.white,
-          ),
-          snackBarTheme: SnackBarThemeData(
-            backgroundColor: Colors.white,
-            contentTextStyle: const TextStyle(color: Colors.black),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        ),
-        home: const SplashScreen(),
-        routes: {
-          '/home': (context) => const HomeScreen(),
-          '/login': (context) => const LoginScreen(),
-          '/register': (context) => const RegisterScreen(),
-          '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
-          '/admin': (context) => const AdminPanelScreen(),
-          '/privacy-policy': (context) => const PrivacyPolicyScreen(),
-        },
       ),
     );
   }
@@ -158,21 +163,63 @@ class MyApp extends StatelessWidget {
 
 class MainScreen extends StatefulWidget {
   final UserModel userModel;
+  final int initialIndex;
 
-  const MainScreen({super.key, required this.userModel});
+  const MainScreen({super.key, required this.userModel, this.initialIndex = 1});
 
   @override
   _MainScreenState createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 1;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex; // Usa l'indice iniziale passato
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;  // Cambia l'indice selezionato
+      _checkDailyReset();  // Chiama il controllo del reset giornaliero
     });
   }
+  
+void _checkDailyReset() async {
+  DateTime now = DateTime.now();
+  
+  // Imposta la data corrente e l'ultimo accesso a mezzanotte per il confronto
+  DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
+  DateTime lastAccessAtMidnight = DateTime(
+    widget.userModel.lastAccess.year,
+    widget.userModel.lastAccess.month,
+    widget.userModel.lastAccess.day,
+  );
+
+  // Se la data di oggi a mezzanotte è successiva all'ultimo accesso
+  if (todayAtMidnight.isAfter(lastAccessAtMidnight)) {
+    // Effettua il reset giornaliero
+    widget.userModel.dailyVideosCompleted = 0;
+    widget.userModel.dailyQuizFreeUses = 0;
+
+    // Aggiorna lastAccess a oggi, rappresentato da oggi a mezzanotte
+    widget.userModel.lastAccess = todayAtMidnight;
+
+    // Salva su Firestore solo i campi modificati
+    await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+      'dailyVideosCompleted': 0,
+      'dailyQuizFreeUses': 0,
+      'lastAccess': todayAtMidnight.toIso8601String(),
+    });
+  } else {
+    // Aggiorna solo lastAccess per indicare l'accesso senza reset
+    await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+      'lastAccess': now.toIso8601String(),
+    });
+  }
+}
 
   @override
   Widget build(BuildContext context) {

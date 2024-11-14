@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "771313118088",
     "project_id": "app-just-learn",
-    "storage_bucket": "app-just-learn.appspot.com"
+    "storage_bucket": "app-just-learn.firebasestorage.app"
   },
   "client": [
     {

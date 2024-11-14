@@ -1,5 +1,3 @@
-// lib/widgets/video_player_widget.dart
-
 import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
@@ -242,14 +240,21 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     );
   }
 
-  void _onQuestionIconTap() {
-    // Reverse the scale animation for a quick shrinking effect before showing the question
-    _animationController.reverse().then((_) {
-      _animationController.forward();
-      // Callback to show the question after the animation
-      widget.onShowQuestion();
-    });
-  }
+void _onQuestionIconTap() {
+  _animationController.reverse().then((_) {
+    _animationController.forward();
+    widget.onShowQuestion();
+
+    // Registra l'evento di clic sul tasto della domanda
+    FirebaseAnalytics.instance.logEvent(
+      name: 'question_icon_click',
+      parameters: {
+        'video_id': widget.videoId,
+        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
+      },
+    );
+  });
+}
 
   // Funzione per aggiornare lo stato del like
   Future<void> _toggleLike() async {
@@ -425,17 +430,23 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: false,
-        onReady: () {
-          // Eventuale logica quando il player è pronto
-          print("Youtube Player is ready.");
-        },
-      ),
+@override
+Widget build(BuildContext context) {
+  return YoutubePlayerBuilder(
+    player: YoutubePlayer(
+      controller: _controller,
+      showVideoProgressIndicator: false,
+      onReady: () {
+        // Logica quando il player è pronto
+        print("Youtube Player è pronto.");
+      },
+      onEnded: (metaData) {
+        if (!_completionHandled) {
+          _completionHandled = true;
+          _handleProgressCompletion();
+        }
+      },
+    ),
       builder: (context, player) {
         return Stack(
           children: [
@@ -443,11 +454,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
               children: [
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(5.0),
                     child: ProgressBorder(
                       progress: _progress,
                       borderWidth: 5.0,
-                      borderColor: const Color.fromARGB(164, 255, 255, 0),
+                      borderColor: Colors.yellowAccent,
                       borderRadius: BorderRadius.circular(16),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
