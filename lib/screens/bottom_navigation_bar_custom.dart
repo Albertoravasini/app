@@ -34,8 +34,9 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
 
     return Container(
       width: double.infinity,
-      height: 55,
+      height: 55 + (MediaQuery.of(context).padding.bottom / 2),
       color: Colors.black,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom / 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,

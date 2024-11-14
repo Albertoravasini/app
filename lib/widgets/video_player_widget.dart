@@ -74,6 +74,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         autoPlay: true,
         mute: false,
         enableCaption: true,
+        forceHD: true,
+        showLiveFullscreenButton: false,
+        hideThumbnail: true
       ),
     )..addListener(_videoListener);
 
@@ -436,8 +439,8 @@ Widget build(BuildContext context) {
     player: YoutubePlayer(
       controller: _controller,
       showVideoProgressIndicator: false,
+      aspectRatio: 9/16,
       onReady: () {
-        // Logica quando il player è pronto
         print("Youtube Player è pronto.");
       },
       onEnded: (metaData) {
@@ -447,247 +450,251 @@ Widget build(BuildContext context) {
         }
       },
     ),
-      builder: (context, player) {
-        return Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      // Layer invisibile per tapping e dragging
-                      GestureDetector(
-                        onTap: () {
-                          if (_controller.value.isPlaying) {
-                            _controller.pause();
-                          } else {
-                            _controller.play();
-                          }
-                        },
-                        onHorizontalDragStart: _onHorizontalDragStart,
-                        onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                        onHorizontalDragEnd: _onHorizontalDragEnd,
-                        child: Container(
-                          color: Colors.transparent,
-                          width: double.infinity,
-                          height: double.infinity,
+    builder: (context, player) {
+      return Stack(
+        children: [
+          Column(
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Contenitore per il player con overflow nascosto
+                    ClipRect(
+                      child: Transform.scale(
+                        scale: 1.21,
+                        child: IgnorePointer(
+                          ignoring: true,
+                          child: Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            child: player,
+                          ),
                         ),
                       ),
-                      // YoutubePlayer widget
-                      IgnorePointer(
-                        ignoring: true,
-                        child: Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          child: player,
-                        ),
+                    ),
+                    // Layer invisibile per tapping e dragging
+                    GestureDetector(
+                      onTap: () {
+                        if (_controller.value.isPlaying) {
+                          _controller.pause();
+                        } else {
+                          _controller.play();
+                        }
+                      },
+                      onHorizontalDragStart: _onHorizontalDragStart,
+                      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                      onHorizontalDragEnd: _onHorizontalDragEnd,
+                      child: Container(
+                        color: Colors.transparent,
+                        width: double.infinity,
+                        height: double.infinity,
                       ),
-                      // Bottoni e overlay
-                      Positioned(
-                        bottom: 5,
-                        right: 5,
-                        child: Column(
-                          children: [
-                            // Icona della domanda
-                            if (showQuestionIcon && widget.questionStep != null)
-                              GestureDetector(
-                                onTap: _onQuestionIconTap,
-                                child: AnimatedBuilder(
-                                  animation: _animationController,
-                                  builder: (context, child) {
-                                    return Transform.scale(
-                                      scale: _scaleAnimation.value,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(5),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.1),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.stars_rounded,
-                                          color: Colors.yellowAccent,
-                                          size: 35,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            const SizedBox(height: 20),
-                            // Bottone like
+                    ),
+                    // Bottoni e overlay
+                    Positioned(
+                      bottom: 5,
+                      right: 5,
+                      child: Column(
+                        children: [
+                          // Icona della domanda
+                          if (showQuestionIcon && widget.questionStep != null)
                             GestureDetector(
-                              onTap: _toggleLike,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 300),
-                                transitionBuilder:
-                                    (Widget child, Animation<double> animation) {
-                                  return ScaleTransition(scale: animation, child: child);
-                                },
-                                child: isLiked
-                                    ? Icon(
-                                        Icons.favorite,
-                                        key: ValueKey<int>(1),
-                                        color: Colors.red,
-                                        size: 40,
-                                      )
-                                    : Icon(
-                                        Icons.favorite_border,
-                                        key: ValueKey<int>(2),
-                                        color: Colors.white70,
-                                        size: 40,
+                              onTap: _onQuestionIconTap,
+                              child: AnimatedBuilder(
+                                animation: _animationController,
+                                builder: (context, child) {
+                                  return Transform.scale(
+                                    scale: _scaleAnimation.value,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        shape: BoxShape.circle,
                                       ),
-                              ),
-                            ),
-                            Text(
-                              likeCount.toString(),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            // Bottone commenti
-                            GestureDetector(
-                              onTap: () => _openComments(context),
-                              child: Column(
-                                children: [
-                                  SvgPicture.asset(
-                                    'assets/comment_icon.svg',
-                                    color: Colors.white70,
-                                    width: 25,
-                                    height: 30,
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      '$commentCount',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                      child: const Icon(
+                                        Icons.stars_rounded,
+                                        color: Colors.yellowAccent,
+                                        size: 35,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  );
+                                },
                               ),
                             ),
-                            const SizedBox(height: 10),
-                            // Bottone per salvare il video
-                            GestureDetector(
-                              onTap: () {
-                                if (isSaved) {
-                                  _unsaveVideo();
-                                } else {
-                                  _saveVideo();
-                                }
+                          const SizedBox(height: 20),
+                          // Bottone like
+                          GestureDetector(
+                            onTap: _toggleLike,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 300),
+                              transitionBuilder:
+                                  (Widget child, Animation<double> animation) {
+                                return ScaleTransition(scale: animation, child: child);
                               },
-                              child: Column(
-                                children: [
-                                  SvgPicture.asset(
-                                    'assets/mingcute_bookmark-fill.svg',
-                                    color:
-                                        isSaved ? Colors.yellow : Colors.white70,
-                                    width: 30,
-                                    height: 35,
-                                  ),
-                                  const SizedBox(height: 5),
-                                ],
-                              ),
+                              child: isLiked
+                                  ? Icon(
+                                      Icons.favorite,
+                                      key: ValueKey<int>(1),
+                                      color: Colors.red,
+                                      size: 40,
+                                    )
+                                  : Icon(
+                                      Icons.favorite_border,
+                                      key: ValueKey<int>(2),
+                                      color: Colors.white70,
+                                      size: 40,
+                                    ),
                             ),
-                            const SizedBox(height: 20),
-                            // Bottone per condividere il video
-                            GestureDetector(
-                              onTap: () {
-                                // Implementa la funzione di condivisione
-                                String videoUrl =
-                                    'https://www.youtube.com/watch?v=${widget.videoId}';
-                                String customMessage = '''
+                          ),
+                          Text(
+                            likeCount.toString(),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Bottone commenti
+                          GestureDetector(
+                            onTap: () => _openComments(context),
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/comment_icon.svg',
+                                  color: Colors.white70,
+                                  width: 25,
+                                  height: 30,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    '$commentCount',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          // Bottone per salvare il video
+                          GestureDetector(
+                            onTap: () {
+                              if (isSaved) {
+                                _unsaveVideo();
+                              } else {
+                                _saveVideo();
+                              }
+                            },
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/mingcute_bookmark-fill.svg',
+                                  color:
+                                      isSaved ? Colors.yellow : Colors.white70,
+                                  width: 30,
+                                  height: 35,
+                                ),
+                                const SizedBox(height: 5),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // Bottone per condividere il video
+                          GestureDetector(
+                            onTap: () {
+                              // Implementa la funzione di condivisione
+                              String videoUrl =
+                                  'https://www.youtube.com/watch?v=${widget.videoId}';
+                              String customMessage = '''
 Take a look: $videoUrl
 
 I Found it on JustLearn: https://apps.apple.com/it/app/justlearn/id6508169503
 
 The TikTok for education, but Better ⚡️''';
 
-                                Share.share(customMessage);
-                              },
-                              child: Column(
-                                children: [
-                                  SvgPicture.asset(
-                                    'assets/icona_share.svg',
-                                    color: Colors.white70,
-                                    width: 30,
-                                    height: 35,
-                                  ),
-                                  const SizedBox(height: 10),
-                                ],
-                              ),
+                              Share.share(customMessage);
+                            },
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/icona_share.svg',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 35,
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                // Barra di progresso sotto il video
-                Container(
-                  height: 3, // Altezza della barra di progresso
-                  width: double.infinity,
-                  child: LinearProgressIndicator(
-                    value: _progress,
-                    backgroundColor: Colors.grey[800],
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
-                  ),
-                ),
-              ],
-            ),
-            // Overlay per l'animazione delle monete
-            if (_showCoinsCompletion)
-              Positioned.fill(
-                child: Center(
-                  child: AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: 1.0 - _animationController.value,
-                        child: Transform.translate(
-                          offset: Offset(0, -150 * _animationController.value),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: Icon(
-                      Icons.stars_rounded,
-                      size: 100,
-                      color: Colors.yellowAccent,
                     ),
+                  ],
+                ),
+              ),
+              // Barra di progresso sotto il video
+              Container(
+                height: 3, // Altezza della barra di progresso
+                width: double.infinity,
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  backgroundColor: Colors.grey[800],
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+                ),
+              ),
+            ],
+          ),
+          // Overlay per l'animazione delle monete
+          if (_showCoinsCompletion)
+            Positioned.fill(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _animationController,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: 1.0 - _animationController.value,
+                      child: Transform.translate(
+                        offset: Offset(0, -150 * _animationController.value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Icon(
+                    Icons.stars_rounded,
+                    size: 100,
+                    color: Colors.yellowAccent,
                   ),
                 ),
               ),
-            // Overlay per il feedback del seeking
-            // Overlay per il feedback del seeking
-if (_isDragging)
-  Positioned(
-    top: 20, // Posiziona in alto
-    right: 20, // Posiziona a destra
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5), // Quasi trasparente
-        borderRadius: BorderRadius.circular(10), // Bordi arrotondati
-      ),
-      child: Text(
-        '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-        ),
-      ),
-    ),
-  ),
-          ],
-        );
-      },
-    );
-  }
+            ),
+          // Overlay per il feedback del seeking
+          if (_isDragging)
+            Positioned(
+              top: 20, // Posiziona in alto
+              right: 20, // Posiziona a destra
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5), // Quasi trasparente
+                  borderRadius: BorderRadius.circular(10), // Bordi arrotondati
+                ),
+                child: Text(
+                  '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+}
 }
