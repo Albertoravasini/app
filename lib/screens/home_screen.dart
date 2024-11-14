@@ -230,124 +230,82 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true, // Permette al contenuto di estendersi dietro l'AppBar
       appBar: AppBar(
-  title: Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Expanded(
-        child: GestureDetector(
-          onTap: () => _showTopicSelectionSheet(context),
-          child: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  selectedTopic ?? 'Topic',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+        backgroundColor: Colors.transparent, // AppBar trasparente
+        elevation: 0,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _showTopicSelectionSheet(context),
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        selectedTopic ?? 'Topic',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
-            ],
-          ),
-        ),
-      ),
-      Row(
-        children: [
-          // Sostituisci l'icona del fuoco e i giorni consecutivi con il Container dei coins
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
             ),
-            child: Row(
+            Row(
               children: [
-                const Icon(Icons.stars_rounded, color: Colors.yellowAccent, size: 25),
-                const SizedBox(width: 8),
-                Text(
-                  '${currentUser?.coins ?? 0}', // Mostra il numero di coins
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white12),
                   ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.stars_rounded, color: Colors.yellowAccent, size: 25),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${currentUser?.coins ?? 0}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 5),
+                IconButton(
+                  icon: SvgPicture.asset(
+                    'assets/mingcute_bookmark-fill.svg',
+                    color: showSavedVideos ? Colors.yellow : Colors.white,
+                  ),
+                  onPressed: _toggleSavedVideos,
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 5),
-          IconButton(
-            icon: SvgPicture.asset(
-              'assets/mingcute_bookmark-fill.svg',
-              color: showSavedVideos ? Colors.yellow : Colors.white,
-            ),
-            onPressed: _toggleSavedVideos,
-          ),
-        ],
+          ],
+        ),
       ),
-    ],
-  ),
-),
-      body: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 34,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-               
-                Container(
-  width: double.infinity,  // Larghezza massima
-  height: 34,
-  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),  // Assicurati che il padding sia corretto
-  decoration: ShapeDecoration(
-    color: const Color(0xFF181819),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    ),
-  ),
-  child: Center(
-    child: Text(
-      videoTitle,
-      textAlign: TextAlign.center,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        height: 1.0,
-        letterSpacing: 0.42,
-      ),
-    ),
-  ),
-),
-              ],
-            ),
-          ),
-          Expanded(
-  child: ShortsScreen(
-    key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'), // Forza il ri-rendering
-    selectedTopic: selectedTopic,
-    selectedSubtopic: selectedSubtopic,
-    onVideoTitleChange: _updateVideoTitle,
-    onCoinsUpdate: _updateCoins,  // Passiamo la funzione per aggiornare i coins
-    showSavedVideos: showSavedVideos, // Passa la variabile per mostrare i video salvati
-  ),
-),
-        ],
+      body: ShortsScreen(
+        key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'),
+        selectedTopic: selectedTopic,
+        selectedSubtopic: selectedSubtopic,
+        onVideoTitleChange: _updateVideoTitle,
+        onCoinsUpdate: _updateCoins,
+        showSavedVideos: showSavedVideos,
       ),
     );
   }
