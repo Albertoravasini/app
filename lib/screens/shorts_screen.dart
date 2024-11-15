@@ -238,8 +238,7 @@ Future<void> _handleAsyncOperations(int index) async {
   // Segna il video come visto
   await _shortsController.markVideoAsWatched(currentVideoId, currentVideoTitle, currentVideoTopic);
 
-  // Aggiorna lo stato di like
-  await _updateLikeState(currentVideoId);
+ 
 }
 
 void _preloadNextVideo(int nextIndex) {
@@ -267,38 +266,10 @@ void _preloadNextVideo(int nextIndex) {
 }
 
 // Modifica _updateLikeState per aggiornare l'intero stato di allShortSteps
-Future<void> _updateLikeState(String videoId) async {
-  final likeStatus = await _shortsController.getLikeStatus(videoId);
-  final likeCountValue = await _shortsController.getLikeCount(videoId);
-
-  // Trova l'indice del video corrente in allShortSteps e aggiorna il suo stato
-  final videoIndex = allShortSteps.indexWhere((element) => element['step'].content == videoId);
-  if (videoIndex != -1) {
-    setState(() {
-      allShortSteps[videoIndex]['isLiked'] = likeStatus;
-      allShortSteps[videoIndex]['likeCount'] = likeCountValue;
-    });
-  }
-}
 
 
-  // Metodo per impostare il listener per i like in tempo reale
-  void _setupLikeListener(String videoId) {
-    final videoDoc = FirebaseFirestore.instance.collection('videos').doc(videoId);
 
-    videoDoc.snapshots().listen((snapshot) {
-      if (snapshot.exists) {
-        final videoData = snapshot.data() as Map<String, dynamic>;
-        final likes = videoData['likes'] as int? ?? 0;
-
-        if (mounted) { // Verifica se il widget è ancora montato
-          setState(() {
-            likeCount = likes;
-          });
-        }
-      }
-    });
-  }
+ 
 
   @override
 void dispose() {

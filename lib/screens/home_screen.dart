@@ -230,82 +230,127 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, // Permette al contenuto di estendersi dietro l'AppBar
-      appBar: AppBar(
-        backgroundColor: Colors.transparent, // AppBar trasparente
-        elevation: 0,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _showTopicSelectionSheet(context),
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        selectedTopic ?? 'Topic',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w800,
-                          height: 1.0,
+      body: Stack(
+        children: [
+          ShortsScreen(
+            key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'),
+            selectedTopic: selectedTopic,
+            selectedSubtopic: selectedSubtopic,
+            onVideoTitleChange: _updateVideoTitle,
+            onCoinsUpdate: _updateCoins,
+            showSavedVideos: showSavedVideos,
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: 16.0,
+                right: 16.0,
+                top: 4.0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Container dei coins
+                  Container(
+                    height: 28,
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                    clipBehavior: Clip.antiAlias,
+                    decoration: ShapeDecoration(
+                      color: Color(0x93333333),
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(
+                          width: 1,
+                          color: Colors.white.withOpacity(0.10000000149011612),
                         ),
-                        overflow: TextOverflow.ellipsis,
+                        borderRadius: BorderRadius.circular(22),
                       ),
                     ),
-                    const Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
-                  ],
-                ),
+                    child: IntrinsicWidth(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 15,
+                            height: 15,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(),
+                            child: Icon(
+                              Icons.stars_rounded,
+                              color: Colors.yellowAccent,
+                              size: 15,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Text(
+                            '${currentUser?.coins ?? 0}',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w800,
+                              height: 0.07,
+                              letterSpacing: 0.48,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Indicatore di pagina
+                  Container(
+                    width: 66,
+                    height: 12,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: ShapeDecoration(
+                            color: Color(0x93333333),
+                            shape: OvalBorder(
+                              side: BorderSide(width: 1, color: Color(0x1CB6B6B6)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 30,
+                          height: 12,
+                          decoration: ShapeDecoration(
+                            color: Color(0xFFFFFF28),
+                            shape: RoundedRectangleBorder(
+                              side: BorderSide(width: 1, color: Color(0x1CB6B6B6)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: ShapeDecoration(
+                            color: Color(0x93333333),
+                            shape: OvalBorder(
+                              side: BorderSide(width: 1, color: Color(0x1CB6B6B6)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Spazio vuoto per bilanciare il layout
+                  SizedBox(width: 80),  // Stessa larghezza del container dei coins
+                ],
               ),
             ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.stars_rounded, color: Colors.yellowAccent, size: 25),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${currentUser?.coins ?? 0}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w800,
-                          height: 1.0,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 5),
-                IconButton(
-                  icon: SvgPicture.asset(
-                    'assets/mingcute_bookmark-fill.svg',
-                    color: showSavedVideos ? Colors.yellow : Colors.white,
-                  ),
-                  onPressed: _toggleSavedVideos,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      body: ShortsScreen(
-        key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'),
-        selectedTopic: selectedTopic,
-        selectedSubtopic: selectedSubtopic,
-        onVideoTitleChange: _updateVideoTitle,
-        onCoinsUpdate: _updateCoins,
-        showSavedVideos: showSavedVideos,
+          ),
+        ],
       ),
     );
   }
