@@ -6,7 +6,6 @@ import 'package:audioplayers/audioplayers.dart'; // Importa audioplayers
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -259,58 +258,6 @@ void _onQuestionIconTap() {
   });
 }
 
-  // Funzione per aggiornare lo stato del like
-  Future<void> _toggleLike() async {
-    final videoId = widget.videoId;
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (videoId.isNotEmpty && user != null) {
-      setState(() {
-        isLiked = !isLiked;
-        likeCount += isLiked ? 1 : -1;
-      });
-
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final userDoc = await userDocRef.get();
-
-      if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>;
-        final likedVideos = userData['LikedVideos'] as List<dynamic>? ?? [];
-
-        if (isLiked) {
-          likedVideos.add(videoId);
-        } else {
-          likedVideos.remove(videoId);
-        }
-
-        await userDocRef.update({'LikedVideos': likedVideos});
-
-        final videoDocRef = FirebaseFirestore.instance.collection('videos').doc(videoId);
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          final videoDoc = await transaction.get(videoDocRef);
-          if (videoDoc.exists) {
-            final videoData = videoDoc.data() as Map<String, dynamic>;
-            final likes = videoData['likes'] as int? ?? 0;
-            final newLikes = isLiked ? likes + 1 : likes - 1;
-            transaction.update(videoDocRef, {'likes': newLikes});
-          } else {
-            // Se il documento del video non esiste, crealo con il conteggio iniziale
-            transaction.set(videoDocRef, {'likes': isLiked ? 1 : 0});
-          }
-          FirebaseAnalytics.instance.logEvent(
-            name: isLiked ? 'video_like' : 'video_unlike',
-            parameters: {
-              'video_id': widget.videoId,
-              'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-            },
-          );
-        });
-      }
-    } else {
-      print("Errore: ID video è vuoto o l'utente non è loggato"); // Messaggio di debug
-    }
-  }
-
   // Funzione per aprire i commenti
   void _openComments(BuildContext context) {
     final videoId = widget.videoId;
@@ -522,65 +469,6 @@ Widget build(BuildContext context) {
                               ),
                             ),
                           const SizedBox(height: 20),
-                          // Bottone like
-                          GestureDetector(
-                            onTap: _toggleLike,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              transitionBuilder:
-                                  (Widget child, Animation<double> animation) {
-                                return ScaleTransition(scale: animation, child: child);
-                              },
-                              child: isLiked
-                                  ? Icon(
-                                      Icons.favorite,
-                                      key: ValueKey<int>(1),
-                                      color: Colors.red,
-                                      size: 40,
-                                    )
-                                  : Icon(
-                                      Icons.favorite_border,
-                                      key: ValueKey<int>(2),
-                                      color: Colors.white70,
-                                      size: 40,
-                                    ),
-                            ),
-                          ),
-                          Text(
-                            likeCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          // Bottone commenti
-                          GestureDetector(
-                            onTap: () => _openComments(context),
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/comment_icon.svg',
-                                  color: Colors.white70,
-                                  width: 25,
-                                  height: 30,
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(
-                                    '$commentCount',
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 10),
                           // Bottone per salvare il video
                           GestureDetector(
                             onTap: () {
@@ -594,8 +482,7 @@ Widget build(BuildContext context) {
                               children: [
                                 SvgPicture.asset(
                                   'assets/mingcute_bookmark-fill.svg',
-                                  color:
-                                      isSaved ? Colors.yellow : Colors.white70,
+                                  color: isSaved ? Colors.yellow : Colors.white70,
                                   width: 30,
                                   height: 35,
                                 ),
@@ -603,34 +490,7 @@ Widget build(BuildContext context) {
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          // Bottone per condividere il video
-                          GestureDetector(
-                            onTap: () {
-                              // Implementa la funzione di condivisione
-                              String videoUrl =
-                                  'https://www.youtube.com/watch?v=${widget.videoId}';
-                              String customMessage = '''
-Take a look: $videoUrl
-
-I Found it on JustLearn: https://apps.apple.com/it/app/justlearn/id6508169503
-
-The TikTok for education, but Better ⚡️''';
-
-                              Share.share(customMessage);
-                            },
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/icona_share.svg',
-                                  color: Colors.white70,
-                                  width: 30,
-                                  height: 35,
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ),
-                          ),
+                          
                         ],
                       ),
                     ),
@@ -639,12 +499,33 @@ The TikTok for education, but Better ⚡️''';
               ),
               // Barra di progresso sotto il video
               Container(
-                height: 3, // Altezza della barra di progresso
+                height: 4,
                 width: double.infinity,
-                child: LinearProgressIndicator(
-                  value: _progress,
-                  backgroundColor: Colors.grey[800],
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F1F1F),
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(3),
+                          bottomRight: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(3),
+                        bottomRight: Radius.circular(3),
+                      ),
+                      child: SizedBox(
+                        width: MediaQuery.of(context).size.width * _progress,
+                        child: Container(
+                          color: Colors.yellowAccent,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -692,6 +573,79 @@ The TikTok for education, but Better ⚡️''';
                 ),
               ),
             ),
+          // Aggiungi questo widget dentro lo Stack esistente, dopo il player video
+          Positioned(
+            left: 16,
+            bottom: 20,
+            child: Container(
+              width: 274,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      _controller.metadata.title ?? 'Titolo non disponibile',
+                      textAlign: TextAlign.left,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.72,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                    clipBehavior: Clip.antiAlias,
+                    decoration: ShapeDecoration(
+                      color: const Color(0x93333333),
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(
+                          width: 1,
+                          color: Colors.white.withOpacity(0.1),
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 15,
+                          height: 15,
+                          padding: const EdgeInsets.all(1.25),
+                          child: const Icon(
+                            Icons.school,
+                            color: Colors.white,
+                            size: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 1),
+                        Text(
+                          widget.topic,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.72,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
         ],
       );
     },
