@@ -16,17 +16,18 @@ class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
   final String? selectedSubtopic;
   final Function(String) onVideoTitleChange;
-  final ValueChanged<int> onCoinsUpdate;  // Aggiungi questo parametro per aggiornare i coins
+  final ValueChanged<int> onCoinsUpdate;
   final bool showSavedVideos;
-  
+  final Function(String)? onTopicChanged;
 
   const ShortsScreen({
     super.key,
     this.selectedTopic,
     this.selectedSubtopic,
     required this.onVideoTitleChange,
-    required this.onCoinsUpdate,  // Parametro richiesto per aggiornare i coins
+    required this.onCoinsUpdate,
     this.showSavedVideos = false,
+    this.onTopicChanged,
   });
 
   @override

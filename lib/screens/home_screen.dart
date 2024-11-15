@@ -1,13 +1,9 @@
 import 'package:Just_Learn/screens/access/login_screen.dart';
-import 'package:Just_Learn/screens/subtopic_selection_sheet.dart';
-import 'package:Just_Learn/screens/topic_selection_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'shorts_screen.dart';
 import '../models/user.dart';
-import '../models/level.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -89,17 +85,11 @@ void _toggleSavedVideos() {
       _redirectToLogin();
     }
 
-    await _loadAllTopics();
-
     if (selectedTopic == null) {
       setState(() {
         selectedTopic = 'Just Learn';
         selectedSubtopic = null;
       });
-    }
-
-    if (subtopics.isEmpty) {
-      await _loadSubtopics(selectedTopic!);
     }
   }
 
@@ -132,81 +122,6 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
 
   await FirebaseFirestore.instance.collection('users').doc(user.uid).update(user.toMap());
 }
-
-  Future<void> _loadAllTopics() async {
-    final querySnapshot = await FirebaseFirestore.instance.collection('topics').get();
-    if (mounted) {
-      setState(() {
-        allTopics = querySnapshot.docs.map((doc) => doc.id).toList();
-        isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadSubtopics(String topic) async {
-  final levelsCollection = FirebaseFirestore.instance.collection('levels');
-  final querySnapshot = await levelsCollection
-      .where('topic', isEqualTo: topic)
-      .orderBy('subtopicOrder')  // Ordina per subtopicOrder
-      .orderBy('levelNumber')    // Ordina per levelNumber
-      .get();
-  final levels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
-
-  final newSubtopics = levels
-      .map((level) => level.subtopic ?? '')
-      .where((subtopic) => subtopic.isNotEmpty)
-      .toSet()
-      .toList();
-
-  if (mounted) {
-    setState(() {
-      subtopics = newSubtopics;
-    });
-  }
-}
-
-  void _selectTopic(String newTopic) async {
-    if (selectedTopic != newTopic) {
-      // Cambia il topic solo se diverso da quello attualmente selezionato
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'topics': [newTopic],
-        });
-      }
-
-      await _loadSubtopics(newTopic);
-
-      if (mounted) {
-        setState(() {
-          selectedTopic = newTopic;
-          selectedSubtopic = null; // Deselezioniamo il subtopic quando cambiamo il topic
-        });
-      }
-    }
-  }
-
-  void _selectSubtopic(String? newSubtopic) {
-    setState(() {
-      selectedSubtopic = newSubtopic;
-      videoTitle = ''; // Resettiamo il titolo del video quando cambiamo subtopic
-    });
-  }
-
-  void _openSubtopicSelectionSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) => SubtopicSelectionSheet(
-        subtopics: [ ...subtopics], 
-        selectedSubtopic: selectedSubtopic,
-        onSelectSubtopic: _selectSubtopic,
-      ),
-    );
-  }
 
   void _redirectToLogin() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -351,21 +266,6 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showTopicSelectionSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) => TopicSelectionSheet(
-        allTopics: allTopics,
-        selectedTopic: selectedTopic,
-        onSelectTopic: _selectTopic,
       ),
     );
   }

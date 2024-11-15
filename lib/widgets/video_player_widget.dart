@@ -2,6 +2,7 @@ import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/comments_screen.dart';
+import 'package:Just_Learn/screens/topic_selection_sheet.dart';
 import 'package:audioplayers/audioplayers.dart'; // Importa audioplayers
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,6 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/comment_service.dart';
-import 'progress_border.dart'; // Importa il ProgressBorder
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId; // Ora accetta solo videoId
@@ -22,6 +22,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback? onVideoUnsaved; // Callback per notificare quando un video viene rimosso dai salvati
   final Function(int) onCoinsUpdate; // Callback per aggiornare le monete
   final String topic; // Aggiungi questo campo
+  final Function(String)? onTopicChanged; // Callback per notificare il cambio di topic
 
   const VideoPlayerWidget({
     Key? key,
@@ -34,6 +35,7 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onVideoUnsaved,
     required this.onCoinsUpdate, // Richiesto il callback
     required this.topic, // Richiedi questo parametro
+    this.onTopicChanged, // Richiedi questo parametro
   }) : super(key: key);
 
   @override
@@ -63,6 +65,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   double _dragStartX = 0.0;
   Duration _initialPosition = Duration.zero;
   Duration _seekOffset = Duration.zero;
+
+  List<String> allTopics = [];
 
   @override
   void initState() {
@@ -102,6 +106,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
     // Aggiungi un listener per aggiornare il progresso
     _controller.addListener(_updateProgress);
+
+    _loadTopics();
+  }
+
+  Future<void> _loadTopics() async {
+    final topicsSnapshot = await FirebaseFirestore.instance.collection('topics').get();
+    setState(() {
+      allTopics = topicsSnapshot.docs.map((doc) => doc.id).toList();
+    });
   }
 
   void _updateProgress() {
@@ -380,6 +393,35 @@ void _onQuestionIconTap() {
     });
   }
 
+  void _showTopicSelection(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) => TopicSelectionSheet(
+        allTopics: allTopics,
+        selectedTopic: widget.topic,
+        onSelectTopic: (selectedTopic) async {
+          // Aggiorna Firebase
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+              'topics': [selectedTopic],
+            });
+
+            // Notifica il cambio di topic al parent
+            if (widget.onTopicChanged != null) {
+              widget.onTopicChanged!(selectedTopic);
+              Navigator.pop(context); // Chiudi il bottom sheet
+            }
+          }
+        },
+      ),
+    );
+  }
+
 @override
 Widget build(BuildContext context) {
   return YoutubePlayerBuilder(
@@ -599,47 +641,50 @@ Widget build(BuildContext context) {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                    clipBehavior: Clip.antiAlias,
-                    decoration: ShapeDecoration(
-                      color: const Color(0x93333333),
-                      shape: RoundedRectangleBorder(
-                        side: BorderSide(
-                          width: 1,
-                          color: Colors.white.withOpacity(0.1),
+                  GestureDetector(
+                    onTap: () => _showTopicSelection(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      clipBehavior: Clip.antiAlias,
+                      decoration: ShapeDecoration(
+                        color: const Color(0x93333333),
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(
+                            width: 1,
+                            color: Colors.white.withOpacity(0.1),
+                          ),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        borderRadius: BorderRadius.circular(20),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 15,
-                          height: 15,
-                          padding: const EdgeInsets.all(1.25),
-                          child: const Icon(
-                            Icons.school,
-                            color: Colors.white,
-                            size: 12,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 15,
+                            height: 15,
+                            padding: const EdgeInsets.all(1.25),
+                            child: const Icon(
+                              Icons.school,
+                              color: Colors.white,
+                              size: 12,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 1),
-                        Text(
-                          widget.topic,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.72,
+                          const SizedBox(width: 1),
+                          Text(
+                            widget.topic,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.72,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
