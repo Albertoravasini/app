@@ -1,7 +1,6 @@
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
@@ -16,7 +15,6 @@ class QuizScreen extends StatefulWidget {
 
 class _QuizScreenState extends State<QuizScreen> {
   UserModel? currentUser;
-  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
   @override
   void initState() {
@@ -175,13 +173,7 @@ Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
 }
 
 void _startQuiz(String quizTitle) async {
-  _analytics.logEvent(
-    name: 'quiz_start',
-    parameters: {
-      'quiz_title': quizTitle,
-      'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-    },
-  );
+ 
 
   if (quizTitle == 'Daily Quiz' && currentUser != null) {
     int requiredVideosForNextFreeUnlock = 3 + (currentUser!.dailyQuizFreeUses * 5);

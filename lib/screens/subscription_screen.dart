@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -18,12 +17,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 void initState() {
   super.initState();
   
-  FirebaseAnalytics.instance.logEvent(
-    name: 'subscription_screen_view',
-    parameters: {
-      'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-    },
-  );
+
 }
 
   Future<void> _incrementClickCount() async {
@@ -169,13 +163,7 @@ SizedBox(
       await _incrementClickCount(); // Incrementa il contatore per l'utente
 
       // Registra l'evento su Firebase Analytics
-      FirebaseAnalytics.instance.logEvent(
-        name: 'subscribe_click',
-        parameters: {
-          'selected_plan': selectedPlan,
-          'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-        },
-      );
+    
 
       // Mostra la Snackbar quando l'utente clicca su "Subscribe"
       ScaffoldMessenger.of(context).showSnackBar(

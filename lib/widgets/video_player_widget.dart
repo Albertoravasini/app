@@ -3,10 +3,10 @@ import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/comments_screen.dart';
 import 'package:Just_Learn/screens/topic_selection_sheet.dart';
-import 'package:audioplayers/audioplayers.dart'; // Importa audioplayers
-import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:audioplayers/audioplayers.dart'; // Importa aud
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -111,10 +111,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   }
 
   Future<void> _loadTopics() async {
+    if (!mounted) return; // Verifica se il widget è ancora montato
+    
     final topicsSnapshot = await FirebaseFirestore.instance.collection('topics').get();
-    setState(() {
-      allTopics = topicsSnapshot.docs.map((doc) => doc.id).toList();
-    });
+    if (mounted) { // Verifica nuovamente prima di chiamare setState
+      setState(() {
+        allTopics = topicsSnapshot.docs.map((doc) => doc.id).toList();
+      });
+    }
   }
 
   void _updateProgress() {
@@ -214,7 +218,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _audioPlayer.dispose();
     _controller.removeListener(_videoListener);
     _controller.removeListener(_updateProgress);
-    _controller.dispose(); // Disporre il controller locale
     super.dispose();
   }
 
@@ -234,25 +237,36 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   }
 
   void _logVideoPlayEvent() {
-    FirebaseAnalytics.instance.logEvent(
-      name: 'video_play',
-      parameters: {
-        'video_id': widget.videoId,
-        'video_title': _controller.metadata.title,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-      },
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      Posthog().capture(
+        eventName: 'video_play',
+        properties: {
+          'video_id': widget.videoId,
+          'video_title': _controller.metadata.title,
+          'topic': widget.topic,
+          'user_id': user.uid,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    }
   }
 
   void _logVideoPauseEvent() {
-    FirebaseAnalytics.instance.logEvent(
-      name: 'video_pause',
-      parameters: {
-        'video_id': widget.videoId,
-        'video_title': _controller.metadata.title,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-      },
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      Posthog().capture(
+        eventName: 'video_pause', 
+        properties: {
+          'video_id': widget.videoId,
+          'video_title': _controller.metadata.title,
+          'topic': widget.topic,
+          'user_id': user.uid,
+          'watch_duration': _controller.value.position.inSeconds,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    }
   }
 
 void _onQuestionIconTap() {
@@ -261,13 +275,7 @@ void _onQuestionIconTap() {
     widget.onShowQuestion();
 
     // Registra l'evento di clic sul tasto della domanda
-    FirebaseAnalytics.instance.logEvent(
-      name: 'question_icon_click',
-      parameters: {
-        'video_id': widget.videoId,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-      },
-    );
+   
   });
 }
 
@@ -307,13 +315,7 @@ void _onQuestionIconTap() {
         setState(() {
           isSaved = true;
 
-          FirebaseAnalytics.instance.logEvent(
-            name: 'video_save',
-            parameters: {
-              'video_id': widget.videoId,
-              'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-            },
-          );
+        
         });
       }
     }
@@ -337,13 +339,7 @@ void _onQuestionIconTap() {
         });
         // Notifica al genitore che il video è stato rimosso dai salvati
         widget.onVideoUnsaved?.call();
-        FirebaseAnalytics.instance.logEvent(
-          name: 'video_unsave',
-          parameters: {
-            'video_id': widget.videoId,
-            'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-          },
-        );
+      
       }
     }
   }
@@ -511,7 +507,26 @@ Widget build(BuildContext context) {
                               ),
                             ),
                           const SizedBox(height: 20),
-                          // Bottone per salvare il video
+
+                          // Preview link
+                          GestureDetector(
+                            onTap: () {
+                              // Implementa la funzionalità per preview-link
+                            },
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/fluent_preview-link-24-filled.svg',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+
+                          // Refresh con le proprietà del salvataggio
                           GestureDetector(
                             onTap: () {
                               if (isSaved) {
@@ -523,16 +538,49 @@ Widget build(BuildContext context) {
                             child: Column(
                               children: [
                                 SvgPicture.asset(
-                                  'assets/mingcute_bookmark-fill.svg',
+                                  'assets/heroicons-solid_refresh.svg',
                                   color: isSaved ? Colors.yellow : Colors.white70,
                                   width: 30,
-                                  height: 35,
+                                  height: 30,
                                 ),
-                                const SizedBox(height: 5),
+                                const SizedBox(height: 20),
                               ],
                             ),
                           ),
-                          
+
+                          // Chat AI con le proprietà dei commenti
+                          GestureDetector(
+                            onTap: () => _openComments(context),
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/ri_chat-ai-line.svg',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+
+                          // Pen
+                          GestureDetector(
+                            onTap: () {
+                              // Implementa la funzionalità per pen
+                            },
+                            child: Column(
+                              children: [
+                                Image.asset(
+                                  'assets/solar_pen-bold.png',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),

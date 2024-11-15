@@ -210,7 +210,7 @@ packages:
     source: hosted
     version: "1.0.2"
   cupertino_icons:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: cupertino_icons
       sha256: ba631d1c7f7bef6b729a622b7b752645a2d076dba9976925b8f25725a30e1ee6
@@ -273,30 +273,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.4"
-  firebase_analytics:
-    dependency: "direct main"
-    description:
-      name: firebase_analytics
-      sha256: "2c4e7b548d41b46e8aa08bc3bd1163146be7e6d48f678f2e6dd3114994e42458"
-      url: "https://pub.dev"
-    source: hosted
-    version: "11.3.3"
-  firebase_analytics_platform_interface:
-    dependency: transitive
-    description:
-      name: firebase_analytics_platform_interface
-      sha256: c259ae890c7d4c5d1675d35936be0b1fcd587fce9645948982cd87ad08df6222
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2.5"
-  firebase_analytics_web:
-    dependency: transitive
-    description:
-      name: firebase_analytics_web
-      sha256: "5988d1fd022e55515c2a14811c9b5104c32acde115874a9a69ff7c77c4c05cd9"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.10+2"
   firebase_auth:
     dependency: "direct main"
     description:
@@ -491,14 +467,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_vibrate:
-    dependency: "direct main"
-    description:
-      name: flutter_vibrate
-      sha256: "9cc9b32cf52c90dd34c1cf396ed40010b2c74e69adbb0ff16005afa900971ad8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.3.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
@@ -792,6 +760,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
+  posthog_flutter:
+    dependency: "direct main"
+    description:
+      name: posthog_flutter
+      sha256: fa766d3768e97bfe69faea688ad4a282e8c0a2fd3d877a5376df618a5a13c9e8
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.6.0"
   process:
     dependency: transitive
     description:
@@ -1029,14 +1005,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.2"
-  translator:
-    dependency: "direct main"
-    description:
-      name: translator
-      sha256: "03521d194365e758c66444a3b03005733e1daf0cd3de9c63257bf82b1a4e2ba1"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0"
   typed_data:
     dependency: transitive
     description:
