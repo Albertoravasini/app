@@ -169,8 +169,7 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
                   // Container dei coins
                   Container(
                     height: 28,
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                    clipBehavior: Clip.antiAlias,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: ShapeDecoration(
                       color: Color(0x93333333),
                       shape: RoundedRectangleBorder(
@@ -181,37 +180,27 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
                         borderRadius: BorderRadius.circular(22),
                       ),
                     ),
-                    child: IntrinsicWidth(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 15,
-                            height: 15,
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(),
-                            child: Icon(
-                              Icons.stars_rounded,
-                              color: Colors.yellowAccent,
-                              size: 15,
-                            ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.stars_rounded,
+                          color: Colors.yellowAccent,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          '${currentUser?.coins ?? 0}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.48,
+                            height: 1.2,
                           ),
-                          const SizedBox(width: 14),
-                          Text(
-                            '${currentUser?.coins ?? 0}',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w800,
-                              height: 0.07,
-                              letterSpacing: 0.48,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                   // Indicatore di pagina

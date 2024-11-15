@@ -93,16 +93,14 @@ class _ShortsScreenState extends State<ShortsScreen> {
 Future<void> _loadAllShortSteps() async {
   if (isLoadingMore) return;
   if (!mounted) return;
+  
   setState(() {
     isLoadingMore = true;
   });
 
   final user = FirebaseAuth.instance.currentUser;
 
-  if (user == null) {
-    // Handle unauthenticated user
-    return;
-  }
+  if (user == null) return;
 
   try {
     final shortsService = ShortsService(baseUrl: 'http://167.99.131.91:3000');

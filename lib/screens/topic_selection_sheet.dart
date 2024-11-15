@@ -1,4 +1,4 @@
-import 'package:firebase_analytics/firebase_analytics.dart';
+
 import 'package:flutter/material.dart';
 
 class TopicSelectionSheet extends StatefulWidget {
@@ -38,13 +38,7 @@ void _handleSelectTopic(String topic) {
   
   widget.onSelectTopic(_selectedTopic ?? 'Just Learn');
   
-  // Registra l'evento di selezione del topic su Firebase Analytics
-  FirebaseAnalytics.instance.logEvent(
-    name: 'topic_selected',
-    parameters: {
-      'topic': _selectedTopic ?? 'Just Learn',
-    },
-  );
+ 
   
   Navigator.pop(context); // Chiude il foglio di selezione
 }
