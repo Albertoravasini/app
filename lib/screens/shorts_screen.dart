@@ -11,6 +11,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/models/level.dart';
+import 'package:Just_Learn/widgets/page_view_container.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -352,26 +353,12 @@ void dispose() {
   return Stack(
     children: [
       // Il lettore video
-      VideoPlayerWidget(
-        videoId: videoId, // Aggiungi questo parametro
-  isLiked: isLiked,
-  likeCount: likeCount,
-  questionStep: questionStep,
-  isSaved: isSaved,
-  onShowQuestion: () {
-    setState(() {
-      if (questionStep != null) {
-        allShortSteps[index]['step'] = questionStep;
-        allShortSteps[index]['showQuestion'] = true;
-      }
-    });
-  },
-  onVideoUnsaved: () {
-    // Implementa se necessario
-  },
-  onCoinsUpdate: widget.onCoinsUpdate,
-  topic: allShortSteps[index]['level'].topic,  // Aggiungi il parametro topic qui
-),
+      PageViewContainer(
+        videoId: videoId,
+        onCoinsUpdate: widget.onCoinsUpdate,
+        topic: allShortSteps[index]['level'].topic,
+        questionStep: questionStep,
+      ),
       
       // Aggiungi il pulsante "Go To Course" se il video è parte di un corso
       if (course != null)
