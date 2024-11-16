@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String videoTitle = ""; // Titolo iniziale del video
   bool showSavedVideos = false;
   bool showArticles = false; // Aggiungi questa variabile
-  int _currentPage = 0;  // Aggiungi questa riga
+  int _currentPage = 1;  // Inizia da 1 perché il video è al centro
   
 
   @override
@@ -144,6 +144,14 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
   }
 }
 
+// Aggiungi questo metodo per gestire il cambio pagina
+void _onPageChanged(int page) {
+  print('Page changed to: $page');
+  setState(() {
+    _currentPage = page;
+  });
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -156,7 +164,9 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
             onVideoTitleChange: _updateVideoTitle,
             onCoinsUpdate: _updateCoins,
             showSavedVideos: showSavedVideos,
+            onPageChanged: _onPageChanged,
           ),
+          // Contenitore superiore che include sia l'indicatore che i coins
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.only(
@@ -204,8 +214,32 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
                       ],
                     ),
                   ),
+                  // Indicatore di pagina
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(3, (index) {
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                        height: 12,
+                        width: _currentPage == index ? 32 : 12,
+                        decoration: BoxDecoration(
+                          color: _currentPage == index 
+                            ? Colors.yellowAccent 
+                            : Color(0x93333333),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(  // Aggiunto il bordo bianco
+                            color: Colors.white.withOpacity(0.10000000149011612),
+                            width: 1,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
                   // Spazio vuoto per bilanciare il layout
-                  const Spacer(),
+                  SizedBox(
+                    width: 80, // Larghezza approssimativa del container dei coins
+                  ),
                 ],
               ),
             ),
