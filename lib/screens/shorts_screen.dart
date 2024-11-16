@@ -20,6 +20,7 @@ class ShortsScreen extends StatefulWidget {
   final ValueChanged<int> onCoinsUpdate;
   final bool showSavedVideos;
   final Function(String)? onTopicChanged;
+  final Function(int) onPageChanged;
 
   const ShortsScreen({
     super.key,
@@ -29,6 +30,7 @@ class ShortsScreen extends StatefulWidget {
     required this.onCoinsUpdate,
     this.showSavedVideos = false,
     this.onTopicChanged,
+    required this.onPageChanged,
   });
 
   @override
@@ -358,6 +360,7 @@ void dispose() {
         onCoinsUpdate: widget.onCoinsUpdate,
         topic: allShortSteps[index]['level'].topic,
         questionStep: questionStep,
+        onPageChanged: widget.onPageChanged,
       ),
       
       // Aggiungi il pulsante "Go To Course" se il video è parte di un corso
