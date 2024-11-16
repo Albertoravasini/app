@@ -11,6 +11,8 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/comment_service.dart';
+import '../screens/Articles_screen.dart';
+import '../screens/notes_screen.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId; // Ora accetta solo videoId
@@ -23,6 +25,8 @@ class VideoPlayerWidget extends StatefulWidget {
   final Function(int) onCoinsUpdate; // Callback per aggiornare le monete
   final String topic; // Aggiungi questo campo
   final Function(String)? onTopicChanged; // Callback per notificare il cambio di topic
+  final VoidCallback onShowArticles;
+  final VoidCallback onShowNotes;
 
   const VideoPlayerWidget({
     Key? key,
@@ -36,6 +40,8 @@ class VideoPlayerWidget extends StatefulWidget {
     required this.onCoinsUpdate, // Richiesto il callback
     required this.topic, // Richiedi questo parametro
     this.onTopicChanged, // Richiedi questo parametro
+    required this.onShowArticles,
+    required this.onShowNotes,
   }) : super(key: key);
 
   @override
@@ -67,6 +73,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   Duration _seekOffset = Duration.zero;
 
   List<String> allTopics = [];
+
+  bool _showArticles = false;
+  bool _showNotes = false;
 
   @override
   void initState() {
@@ -438,7 +447,15 @@ Widget build(BuildContext context) {
     builder: (context, player) {
       return Stack(
         children: [
-          Column(
+          _showArticles 
+          ? ArticlesWidget(
+              
+            )
+          : _showNotes 
+          ? NotesScreen(
+            
+            )
+          : Column(
             children: [
               Expanded(
                 child: Stack(
@@ -510,9 +527,7 @@ Widget build(BuildContext context) {
 
                           // Preview link
                           GestureDetector(
-                            onTap: () {
-                              // Implementa la funzionalità per preview-link
-                            },
+                            onTap: widget.onShowArticles,
                             child: Column(
                               children: [
                                 SvgPicture.asset(
@@ -566,9 +581,7 @@ Widget build(BuildContext context) {
 
                           // Pen
                           GestureDetector(
-                            onTap: () {
-                              // Implementa la funzionalità per pen
-                            },
+                            onTap: widget.onShowNotes,
                             child: Column(
                               children: [
                                 Image.asset(

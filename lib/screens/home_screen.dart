@@ -22,6 +22,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> subtopics = [];
   String videoTitle = ""; // Titolo iniziale del video
   bool showSavedVideos = false;
+  bool showArticles = false; // Aggiungi questa variabile
+  int _currentPage = 0;  // Aggiungi questa riga
   
 
   @override
@@ -168,8 +170,7 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
                 children: [
                   // Container dei coins
                   Container(
-                    height: 28,
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    padding: const EdgeInsets.all(5),
                     decoration: ShapeDecoration(
                       color: Color(0x93333333),
                       shape: RoundedRectangleBorder(
@@ -203,53 +204,8 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
                       ],
                     ),
                   ),
-                  // Indicatore di pagina
-                  Container(
-                    width: 66,
-                    height: 12,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: ShapeDecoration(
-                            color: Color(0x93333333),
-                            shape: OvalBorder(
-                              side: BorderSide(width: 1, color: Color(0x1CB6B6B6)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 30,
-                          height: 12,
-                          decoration: ShapeDecoration(
-                            color: Color(0xFFFFFF28),
-                            shape: RoundedRectangleBorder(
-                              side: BorderSide(width: 1, color: Color(0x1CB6B6B6)),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: ShapeDecoration(
-                            color: Color(0x93333333),
-                            shape: OvalBorder(
-                              side: BorderSide(width: 1, color: Color(0x1CB6B6B6)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   // Spazio vuoto per bilanciare il layout
-                  SizedBox(width: 80),  // Stessa larghezza del container dei coins
+                  const Spacer(),
                 ],
               ),
             ),
