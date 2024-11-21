@@ -193,17 +193,17 @@ Future<void> _loadAllShortSteps() async {
 
 @override
 void _onVideoChanged(int index) {
-  // Pausa il video corrente
-  _pauseAllVideos();
-
-  // Riproduci il nuovo video
+  // Pausa il video precedente in modo asincrono
+  Future.microtask(() => _pauseAllVideos());
+  
+  // Avvia il nuovo video
   _youtubeControllers[index].play();
-
-  // Dispose dei controller non necessari
-  _disposeUnusedControllers(index);
-
-  // Precarica il video successivo
+  
+  // Precarica il prossimo video
   _preloadNextVideo(index + 1);
+  
+  // Pulisci i controller non necessari in background
+  Future.microtask(() => _disposeUnusedControllers(index));
 }
 
 void _pauseAllVideos() {
@@ -247,22 +247,21 @@ void _preloadNextVideo(int nextIndex) {
   if (nextIndex < allShortSteps.length) {
     final nextStep = allShortSteps[nextIndex];
     final nextVideoId = (nextStep['step'] as LevelStep).content;
-
-    // Verifica se il controller è già stato inizializzato
+    
+    // Inizializza il controller in anticipo
     if (_youtubeControllers[nextIndex].initialVideoId.isEmpty) {
       final nextController = YoutubePlayerController(
         initialVideoId: nextVideoId,
         flags: const YoutubePlayerFlags(
-          autoPlay: false, // Non avviare automaticamente
+          autoPlay: false,
           mute: false,
+          hideThumbnail: false, // Mostra la thumbnail durante il caricamento
         ),
       );
-
+      
       setState(() {
         _youtubeControllers[nextIndex] = nextController;
       });
-
-      print("Video successivo precaricato con index: $nextIndex, videoId: $nextVideoId");
     }
   }
 }

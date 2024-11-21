@@ -85,12 +85,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       flags: const YoutubePlayerFlags(
         autoPlay: true,
         mute: false,
-        enableCaption: true,
+        enableCaption: false,
         forceHD: true,
         showLiveFullscreenButton: false,
-        hideThumbnail: true
+        hideThumbnail: true,
+        disableDragSeek: true,
+        useHybridComposition: true, // Migliora le performance
       ),
     )..addListener(_videoListener);
+
+    // Precarica il video
+    _controller.load(widget.videoId);
 
     isLiked = widget.isLiked;
     likeCount = widget.likeCount;
