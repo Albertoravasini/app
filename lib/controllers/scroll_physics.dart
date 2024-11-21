@@ -10,9 +10,9 @@ class TikTokScrollPhysics extends PageScrollPhysics {
   }
 
   @override
-  double get minFlingVelocity => 100.0; // Valore leggermente aumentato
+  double get minFlingVelocity => 50.0; // Ridotto per permettere scroll più leggeri
   @override
-  double get maxFlingVelocity => 2500.0; // Valore leggermente aumentato
+  double get maxFlingVelocity => 4000.0; // Aumentato per scroll più veloci
 
   @override
   Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
@@ -23,9 +23,9 @@ class TikTokScrollPhysics extends PageScrollPhysics {
 
     return ScrollSpringSimulation(
       SpringDescription(
-        mass: 10.0, // Ridotto per una simulazione più reattiva
-        stiffness: 500.0, // Ridotto per una transizione più morbida
-        damping: 20.0, // Aumentato per ridurre le oscillazioni
+        mass: 0.5, // Ridotto significativamente per una risposta più immediata
+        stiffness: 200.0, // Ridotto per uno scroll più morbido
+        damping: 1.1, // Ridotto per permettere un movimento più fluido
       ),
       position.pixels,
       velocity > 0 ? position.maxScrollExtent : position.minScrollExtent,
