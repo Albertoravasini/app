@@ -74,6 +74,8 @@ class LevelStep {
   final bool isShort;
   final String? fullText;
   String? topic;
+  final DateTime? createdAt;
+  final int? duration;
 
   LevelStep({
     required this.type,
@@ -86,6 +88,8 @@ class LevelStep {
     this.isShort = false,
     this.fullText,
     this.topic,
+    this.createdAt,
+    this.duration,
   });
 
   factory LevelStep.fromMap(Map<String, dynamic> data) {
@@ -100,6 +104,10 @@ class LevelStep {
       isShort: data['isShort'] ?? false,
       fullText: data['fullText'],
       topic: data['topic'],
+      createdAt: data['createdAt'] != null 
+          ? (data['createdAt'] as Timestamp).toDate() 
+          : null,
+      duration: data['duration'],
     );
   }
 
@@ -115,6 +123,8 @@ class LevelStep {
       'isShort': isShort,
       'fullText': fullText,
       'topic': topic,
+      'createdAt': createdAt?.toIso8601String(),
+      'duration': duration,
     };
   }
 

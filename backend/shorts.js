@@ -2,119 +2,151 @@
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
+const VideoRecommender = require('./recommendation/recommender');
 
 // Endpoint to get processed short steps
 router.post('/get_short_steps', async (req, res) => {
   try {
     const { selectedTopic, selectedSubtopic, uid, showSavedVideos } = req.body;
-
-    let levelsQuery = admin.firestore().collection('levels');
-    let coursesQuery = admin.firestore().collection('courses');
-
-    if (!showSavedVideos) {
-      // Applica i filtri solo se non stai mostrando i video salvati
-      if (selectedTopic && selectedTopic !== 'Just Learn') {
-        levelsQuery = levelsQuery.where('topic', '==', selectedTopic);
-        coursesQuery = coursesQuery.where('topic', '==', selectedTopic);
-      }
-
-      if (selectedSubtopic && selectedSubtopic !== 'tutti') {
-        levelsQuery = levelsQuery.where('subtopic', '==', selectedSubtopic);
-        // Se necessario, applica anche ai corsi
-      }
-    }
-
-    // Fetch Levels and Courses
-    const levelsSnapshot = await levelsQuery.orderBy('subtopicOrder').orderBy('levelNumber').get();
-    const levels = levelsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    const coursesSnapshot = await coursesQuery.get();
-    const courses = coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    // Combina shortSteps
-    let shortSteps = [];
-    levels.forEach(level => {
-      if (Array.isArray(level.steps)) {
-        level.steps.forEach(step => {
-          if (step.type === 'video' && step.isShort) {
-            shortSteps.push({ step, level });
-          }
-        });
-      }
+    console.log('1. Richiesta ricevuta:', { 
+      uid, 
+      selectedTopic,
+      selectedSubtopic 
     });
 
-    courses.forEach(course => {
-      if (Array.isArray(course.sections)) {
-        course.sections.forEach(section => {
-          if (Array.isArray(section.steps)) {
-            section.steps.forEach(step => {
-              if (step.type === 'video' && step.isShort) {
-                shortSteps.push({ step, course });
-              }
-            });
-          }
-        });
-      }
+    const recommender = new VideoRecommender();
+    const recommendedVideos = await recommender.getRecommendedVideos(
+      uid, 
+      20, 
+      selectedTopic  // Passiamo il topic selezionato
+    );
+    
+    console.log('2. Video raccomandati ricevuti:', {
+      count: recommendedVideos.length,
+      topic: selectedTopic || 'tutti i topic'
     });
 
-    // Fetch User Data
-    const userDoc = await admin.firestore().collection('users').doc(uid).get();
-    let watchedVideos = [];
-    let savedVideos = [];
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      if (userData.WatchedVideos) {
-        if (selectedTopic === 'Just Learn') {
-          Object.values(userData.WatchedVideos).forEach(topicVideos => {
-            watchedVideos = watchedVideos.concat(topicVideos);
-          });
-        } else {
-          watchedVideos = userData.WatchedVideos[selectedTopic] || [];
-        }
-      }
-      savedVideos = userData.SavedVideos || [];
+    if (!recommendedVideos || recommendedVideos.length === 0) {
+      console.log('3. Nessun video disponibile');
+      return res.json({ success: true, data: [] });
     }
 
-    const watchedVideoIds = new Set(watchedVideos.map(video => video.videoId));
-    const savedVideoIds = new Set(savedVideos.map(video => video.videoId));
+    // Ottieni i dati dell'utente per verificare i video salvati
+    const userDoc = await admin.firestore()
+      .collection('users')
+      .doc(uid)
+      .get();
 
-    // Filtra i video
-    if (showSavedVideos) {
-      console.log(`Filtraggio video salvati per l'utente ${uid}. SavedVideoIds:`, savedVideoIds);
-      shortSteps = shortSteps.filter(item => {
-        console.log(`Controllando step content: ${item.step.content}`);
-        return savedVideoIds.has(item.step.content); // Assicurati che item.step.content sia l'ID del video
-      });
-    } else {
-      // Nuova logica per mescolare i video
-      let unWatchedSteps = shortSteps.filter(item => !watchedVideoIds.has(item.step.content));
-      let watchedSteps = shortSteps.filter(item => watchedVideoIds.has(item.step.content));
+    const userData = userDoc.exists ? userDoc.data() : {};
+    const savedVideos = new Set((userData.SavedVideos || []).map(v => v.videoId));
 
-      if (unWatchedSteps.length > 0) {
-        // Mescola i video non visti
-        unWatchedSteps.sort(() => Math.random() - 0.5);
-        shortSteps = [...unWatchedSteps, ...watchedSteps];
-      } else {
-        // Tutti i video sono stati visti, quindi mescola tutti i video
-        watchedSteps.sort(() => Math.random() - 0.5);
-        shortSteps = watchedSteps;
-      }
-    }
-
-    // Combine e mappa i passi
-    const allShortSteps = shortSteps.map(item => ({
-      step: item.step,
-      level: item.level || null,
-      course: item.course || null,
+    const allShortSteps = recommendedVideos.map(video => ({
+      step: {
+        type: 'video',
+        content: video.videoId,
+        videoUrl: video.videoUrl,
+        isShort: true,
+        title: video.title || '',
+        topic: video.topic || selectedTopic,
+        thumbnailUrl: video.thumbnailUrl,
+        duration: video.duration
+      },
+      level: video.level,
+      course: video.course,
       showQuestion: false,
-      isSaved: savedVideoIds.has(item.step.content),
-      isWatched: watchedVideoIds.has(item.step.content),
+      isSaved: savedVideos.has(video.videoId),
+      isWatched: false
     }));
 
+    console.log('4. Short steps preparati:', {
+      count: allShortSteps.length,
+      topic: selectedTopic || 'tutti i topic'
+    });
+
     res.json({ success: true, data: allShortSteps });
+    
   } catch (error) {
     console.error('Error fetching short steps:', error);
-    res.status(500).json({ success: false, message: 'Error fetching short steps' });
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Funzione per aggiornare le statistiche del video
+async function updateVideoStats(userId, videoId) {
+  try {
+    const statsRef = admin.firestore().collection('videoStats').doc(videoId);
+    const statsDoc = await statsRef.get();
+
+    if (!statsDoc.exists) {
+      // Crea nuove statistiche se non esistono
+      await statsRef.set({
+        viewCount: 1,
+        totalWatchTime: 0,
+        buttonClicks: 0,
+        seekForward: 0,
+        seekBackward: 0,
+        completions: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Aggiorna le statistiche esistenti
+      await statsRef.update({
+        viewCount: admin.firestore.FieldValue.increment(1),
+      });
+    }
+  } catch (error) {
+    console.error('Error updating video stats:', error);
+  }
+}
+
+// Endpoint per aggiornare le statistiche di engagement
+router.post('/update_video_stats', async (req, res) => {
+  try {
+    const { videoId, userId, action, watchTime } = req.body;
+    const statsRef = admin.firestore().collection('videoStats').doc(videoId);
+    const statsDoc = await statsRef.get();
+
+    if (!statsDoc.exists) {
+      // Crea il documento se non esiste con tutti i campi necessari
+      await statsRef.set({
+        completions: 0,
+        totalWatchTime: 0,
+        viewCount: 0,
+        buttonClicks: 0
+      });
+    }
+
+    const updateData = {};
+
+    switch (action) {
+      case 'watch_time':
+        // Aggiorna solo se il tempo di visualizzazione è significativo (> 1 secondo)
+        if (watchTime > 1) {
+          updateData.totalWatchTime = admin.firestore.FieldValue.increment(watchTime);
+        }
+        break;
+      case 'completion':
+        // Incrementa solo se il video è stato effettivamente completato
+        updateData.completions = admin.firestore.FieldValue.increment(1);
+        break;
+      case 'view':
+        // Incrementa il conteggio visualizzazioni
+        updateData.viewCount = admin.firestore.FieldValue.increment(1);
+        break;
+      case 'button_click':
+        // Incrementa il conteggio dei click sui bottoni
+        updateData.buttonClicks = admin.firestore.FieldValue.increment(1);
+        break;
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await statsRef.update(updateData);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating video stats:', error);
+    res.status(500).json({ success: false, message: 'Error updating video stats' });
   }
 });
 

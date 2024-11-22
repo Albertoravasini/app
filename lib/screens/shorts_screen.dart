@@ -133,38 +133,29 @@ Future<void> _loadAllShortSteps() async {
       setState(() {
         allShortSteps = convertedShortStepsWithMetadata;
         currentLoadedVideos = allShortSteps.length;
-        // Initialize only the first 3 controllers: current, next, and previous (if any)
+        // Inizializza i primi 3 controller per gestire meglio il precaricamento
         _youtubeControllers = List.generate(allShortSteps.length, (index) {
-          if (index == 0 || index == 1) {
-            // Initialize current and next controllers
+          if (index <= 2) { // Inizializza i primi 3 video
             return YoutubePlayerController(
               initialVideoId: (allShortSteps[index]['step'] as LevelStep).content,
               flags: const YoutubePlayerFlags(
-                autoPlay: false, // Non avviare automaticamente
-                mute: false,
-                disableDragSeek: true, // Disabilita il drag seek se non necessario
-        hideControls: true, // Nascondi i controlli per migliorare la performance
-        hideThumbnail: true, // Nascondi la miniatura per velocizzare il caricamento
+                disableDragSeek: true,
+                hideControls: true,
+                hideThumbnail: true,
+                forceHD: false, // Disabilita HD per velocizzare
+                startAt: 0,
               ),
             );
           } else {
-            // Placeholder controllers, to be initialized when needed
             return YoutubePlayerController(
               initialVideoId: '',
               flags: const YoutubePlayerFlags(
                 autoPlay: false,
-                mute: false,
+                mute: true,
               ),
             );
           }
         });
-
-        // Preload the next video
-        if (allShortSteps.length > 1) {
-          _preloadNextVideo(1);
-        }
-
-        isLoadingMore = false;
       });
     }
 
@@ -190,31 +181,54 @@ Future<void> _loadAllShortSteps() async {
   }
 }
 
+void _preloadNextVideo(int nextIndex) {
+  if (nextIndex < allShortSteps.length && nextIndex >= 0) {
+    final nextVideoId = (allShortSteps[nextIndex]['step'] as LevelStep).content;
+    
+    // Verifica se il controller successivo esiste e ha un video diverso
+    if (_youtubeControllers[nextIndex].initialVideoId != nextVideoId) {
+      // Disponi il vecchio controller se necessario
+      if (_youtubeControllers[nextIndex].initialVideoId.isNotEmpty) {
+        _youtubeControllers[nextIndex].dispose();
+      }
+      
+      // Crea un nuovo controller per il prossimo video
+      _youtubeControllers[nextIndex] = YoutubePlayerController(
+        initialVideoId: nextVideoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: true,
+          disableDragSeek: true,
+          hideControls: true,
+          hideThumbnail: true,
+          forceHD: false,
+        ),
+      );
+    }
+    
+    // Avvia il precaricamento
+    _youtubeControllers[nextIndex].load(nextVideoId);
+  }
+}
 
-@override
 void _onVideoChanged(int index) {
-  // Pausa il video precedente in modo asincrono
-  Future.microtask(() => _pauseAllVideos());
-  
-  // Avvia il nuovo video
+  // Gestisci il video corrente
+  _youtubeControllers[index].unMute();
   _youtubeControllers[index].play();
   
   // Precarica il prossimo video
   _preloadNextVideo(index + 1);
   
-  // Pulisci i controller non necessari in background
-  Future.microtask(() => _disposeUnusedControllers(index));
-}
-
-void _pauseAllVideos() {
-  for (var controller in _youtubeControllers) {
-    if (controller.value.isPlaying) {
-      controller.pause();
-    }
+  // Gestisci i video precedenti e successivi
+  if (index > 0) {
+    _youtubeControllers[index - 1].pause();
   }
+  
+  // Pulisci i controller non necessari
+  _cleanupControllers(index);
 }
 
-void _disposeUnusedControllers(int currentIndex) {
+void _cleanupControllers(int currentIndex) {
   for (int i = 0; i < _youtubeControllers.length; i++) {
     if (i < currentIndex - 1 || i > currentIndex + 1) {
       if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
@@ -223,7 +237,7 @@ void _disposeUnusedControllers(int currentIndex) {
           initialVideoId: '',
           flags: const YoutubePlayerFlags(
             autoPlay: false,
-            mute: false,
+            mute: true,
           ),
         );
       }
@@ -243,36 +257,7 @@ Future<void> _handleAsyncOperations(int index) async {
  
 }
 
-void _preloadNextVideo(int nextIndex) {
-  if (nextIndex < allShortSteps.length) {
-    final nextStep = allShortSteps[nextIndex];
-    final nextVideoId = (nextStep['step'] as LevelStep).content;
-    
-    // Inizializza il controller in anticipo
-    if (_youtubeControllers[nextIndex].initialVideoId.isEmpty) {
-      final nextController = YoutubePlayerController(
-        initialVideoId: nextVideoId,
-        flags: const YoutubePlayerFlags(
-          autoPlay: false,
-          mute: false,
-          hideThumbnail: false, // Mostra la thumbnail durante il caricamento
-        ),
-      );
-      
-      setState(() {
-        _youtubeControllers[nextIndex] = nextController;
-      });
-    }
-  }
-}
-
-// Modifica _updateLikeState per aggiornare l'intero stato di allShortSteps
-
-
-
- 
-
-  @override
+@override
 void dispose() {
   for (var controller in _youtubeControllers) {
     if (controller.initialVideoId.isNotEmpty) {
