@@ -130,15 +130,13 @@ Widget build(BuildContext context) {
             padding: const EdgeInsets.all(12.0),
             margin: const EdgeInsets.symmetric(vertical: 8.0),
             decoration: BoxDecoration(
-              color: Color(0xFF1E1E1E), // Card commenti scuro
+              color: Color(0xFF1E1E1E), // Manteniamo il colore scuro
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 6,
-                  offset: Offset(0, 3),
-                ),
-              ],
+              // Rimuoviamo la shadow e aggiungiamo un sottile bordo per definire meglio il commento
+              border: Border.all(
+                color: Colors.white.withOpacity(0.05),
+                width: 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,46 +195,17 @@ Widget build(BuildContext context) {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Azioni: Like, Reply
+                // Azioni: Reply
                 Row(
                   children: [
-                    // Like
-                    GestureDetector(
-                      onTap: () async {
-                        if (isLiked) {
-                          await _commentService.unlikeComment(comment.commentId);
-                        } else {
-                          await _commentService.likeComment(comment.commentId);
-                        }
-                        setState(() {});
-                      },
-                      child: Row(
-                        children: [
-                          Icon(
-                            isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: isLiked ? Colors.redAccent : Colors.white70,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${comment.likeCount}',
-                            style: TextStyle(
-                              color: isLiked ? Colors.redAccent : Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 24),
                     // Reply
                     GestureDetector(
                       onTap: () {
                         setState(() {
-                          _activeReplyCommentId = _activeReplyCommentId == comment.commentId
-                              ? null
-                              : comment.commentId;
-                          _replyController.clear();
+                          _commentController.text = '@$username ';
+                          _commentController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: _commentController.text.length),
+                          );
                         });
                       },
                       child: Row(
@@ -289,12 +258,6 @@ Widget build(BuildContext context) {
                           .toList(),
                     ),
                   ),
-                // Campo di risposta
-                if (_activeReplyCommentId == comment.commentId)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12.0, left: 40.0),
-                    child: _buildReplyInput(comment.commentId, username),
-                  ),
               ],
             ),
           ),
@@ -320,15 +283,8 @@ Widget build(BuildContext context) {
             padding: const EdgeInsets.all(10.0),
             margin: const EdgeInsets.symmetric(vertical: 6.0),
             decoration: BoxDecoration(
-              color: Color(0xFF2C2C2C), // Card risposte leggermente più chiaro
+              color: Color(0xFF2C2C2C),
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black45,
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,63 +375,6 @@ Widget build(BuildContext context) {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildReplyInput(String parentCommentId, String username) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundImage: AssetImage('assets/images/default_avatar.png'), // Utilizza l'immagine di default
-          backgroundColor: Colors.grey[800],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _replyController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Reply To @$username...',
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      border: InputBorder.none,
-                    ),
-                    onTap: () {
-                      if (_replyController.text.isEmpty) {
-                        _replyController.text = '@$username ';
-                        _replyController.selection = TextSelection.fromPosition(
-                          TextPosition(offset: _replyController.text.length),
-                        );
-                      }
-                    },
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send, color: Colors.yellowAccent),
-                  onPressed: () async {
-                    if (_replyController.text.trim().isNotEmpty) {
-                      await _commentService.addReply(parentCommentId, _replyController.text.trim());
-                      setState(() {
-                        _activeReplyCommentId = null;
-                      });
-                      _replyController.clear();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 

@@ -150,14 +150,19 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
           // Considera completato il video se è oltre il 96%
           if (_progress >= 0.96) {
             _progress = 1.0;
+            
+            // Se il video è completato e c'è una domanda disponibile
+            if (!_completionHandled && widget.questionStep != null) {
+              _completionHandled = true;
+              widget.onShowQuestion(); // Notifica che è il momento di mostrare la domanda
+            }
           }
         });
 
-        // Gestisci il completamento della progressione solo quando la barra raggiunge il 100%
+        // Gestisci il completamento della progressione
         if (_progress >= 1.0 && !_completionHandled) {
           _completionHandled = true;
           _handleProgressCompletion();
-          // Registra il completamento nelle statistiche
           _updateVideoStats('completion');
         }
       }
@@ -537,7 +542,7 @@ Widget build(BuildContext context) {
                     // Bottoni e overlay
                     Positioned(
                       bottom: 5,
-                      right: 5,
+                      right: 10,
                       child: Column(
                         children: [
                           // Icona della domanda
