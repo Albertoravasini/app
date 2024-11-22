@@ -69,7 +69,7 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
       children: [
         Container(
           decoration: ShapeDecoration(
-            color: Colors.black,
+            color: const Color(0xFF121212),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(0),
             ),

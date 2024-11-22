@@ -37,11 +37,11 @@ void initState() {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         title: const Text('Pro Plan'),
         centerTitle: true,
-        backgroundColor: Colors.black,
+        backgroundColor: const Color(0xFF121212),
         elevation: 0,
       ),
       body: Padding(
