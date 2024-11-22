@@ -200,14 +200,14 @@ void _startQuiz(String quizTitle) async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF121212),
       body: Stack(
         children: [
           // Background dinamico
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.black87, Colors.black54],
+                colors: [Color(0xFF121212), Color(0xFF121212)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),

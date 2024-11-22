@@ -62,7 +62,7 @@ class _NotesScreenState extends State<NotesScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF181819),
+      color: const Color(0xFF121212),
       child: Column(
         children: [
           Padding(

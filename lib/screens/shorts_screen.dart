@@ -323,6 +323,7 @@ void dispose() {
   final currentStep = allShortSteps[index]['step'] as LevelStep;
   final level = allShortSteps[index]['level'] as Level;
   final videoId = currentStep.content; // Estrai l'ID del video
+  final videoTitle = level.title; // Ottieni il titolo dal level
   
   final steps = level.steps;
   final currentStepIndex = steps.indexOf(currentStep);
@@ -345,6 +346,7 @@ void dispose() {
         topic: allShortSteps[index]['level'].topic,
         questionStep: questionStep,
         onPageChanged: widget.onPageChanged,
+        videoTitle: videoTitle, // Passa il titolo qui
       ),
       
       // Aggiungi il pulsante "Go To Course" se il video è parte di un corso

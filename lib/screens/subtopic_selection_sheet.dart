@@ -50,7 +50,7 @@ class _SubtopicSelectionSheetState extends State<SubtopicSelectionSheet> {
         return Container(
           padding: const EdgeInsets.all(16.0),
           decoration: BoxDecoration(
-            color: Colors.black, // Sfondo semi-trasparente
+            color: const Color(0xFF121212),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(25.0)),
           ),
           child: Column(

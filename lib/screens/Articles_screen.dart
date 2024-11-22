@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
+import '../services/articles_service.dart';
 
 class ArticlesWidget extends StatefulWidget {
-  const ArticlesWidget({Key? key}) : super(key: key);
-
+  final String videoTitle;
+  
+  const ArticlesWidget({
+    Key? key,
+    required this.videoTitle,
+  }) : super(key: key);
+  
   @override
   State<ArticlesWidget> createState() => _ArticlesWidgetState();
 }
 
 class _ArticlesWidgetState extends State<ArticlesWidget> {
-  List<bool> expandedStates = List.generate(10, (index) => false);
+  final ArticlesService _articlesService = ArticlesService();
+  List<Map<String, dynamic>> articles = [];
+  bool isLoading = true;
 
   late PageController _pageController;
   double _currentPage = 0;
@@ -25,6 +33,26 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
         _currentPage = _pageController.page ?? 0;
       });
     });
+    _loadArticles();
+  }
+
+  Future<void> _loadArticles() async {
+    try {
+      final fetchedArticles = await _articlesService.getRelatedArticles(widget.videoTitle);
+      if (mounted) {
+        setState(() {
+          articles = fetchedArticles;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Errore nel caricamento degli articoli: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -36,7 +64,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black,
+      color:  const Color(0xFF121212),
       child: SafeArea(
         child: Column(
           children: [
@@ -89,12 +117,45 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
               child: PageView.builder(
                 scrollDirection: Axis.vertical,
                 controller: _pageController,
-                itemCount: 10,
+                itemCount: articles.isEmpty ? 1 : articles.length,
                 itemBuilder: (context, index) {
+                  if (isLoading) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    );
+                  }
+
+                  if (articles.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.article_outlined,
+                            size: 48,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Nessun articolo disponibile',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final article = articles[index];
                   double difference = index - _currentPage;
                   double scale = 1 - (difference.abs() * 0.1).clamp(0.0, 0.3);
                   double opacity = 1 - (difference.abs() * 0.3).clamp(0.0, 0.7);
-                  
+
                   return Transform.scale(
                     scale: scale,
                     child: Opacity(
@@ -105,10 +166,12 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => ArticleDetailScreen(
-                                title: 'Why the rich will be richer and the poor poorer?',
-                                imageUrl: "https://via.placeholder.com/324x148",
-                                date: 'Aug 16, 2024',
-                                content: 'organize the information...',
+                                title: article['title'] ?? '',
+                                imageUrl: article['imageUrl'] ?? '',
+                                date: article['date'] ?? '',
+                                content: article['content'] ?? '',
+                                sections: article['sections']?.cast<Map<String, String>>(),
+                                source: article['source'] ?? 'Fonte sconosciuta',
                               ),
                             ),
                           );
@@ -137,7 +200,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.2),
                                 blurRadius: 15,
-                                offset: Offset(0, 5),
+                                offset: const Offset(0, 5),
                               ),
                             ],
                           ),
@@ -151,8 +214,14 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                     child: AspectRatio(
                                       aspectRatio: 16 / 9,
                                       child: Image.network(
-                                        "https://via.placeholder.com/324x148",
+                                        article['imageUrl'] ?? "https://via.placeholder.com/324x148",
                                         fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Image.network(
+                                            "https://via.placeholder.com/324x148",
+                                            fit: BoxFit.cover,
+                                          );
+                                        },
                                       ),
                                     ),
                                   ),
@@ -160,14 +229,14 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                     top: 12,
                                     right: 12,
                                     child: Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
                                         color: Colors.black.withOpacity(0.6),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        'Economia',
-                                        style: TextStyle(
+                                        article['source'] ?? 'Fonte sconosciuta',
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
@@ -179,7 +248,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                               ),
                               const SizedBox(height: 20),
                               Text(
-                                'Why the rich will be richer and the poor poorer?',
+                                article['title'] ?? 'Titolo non disponibile',
                                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
@@ -195,24 +264,9 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                     size: 16,
                                     color: Colors.white.withOpacity(0.7),
                                   ),
-                                  SizedBox(width: 6),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    'Aug 16, 2024',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  SizedBox(width: 16),
-                                  Icon(
-                                    Icons.remove_red_eye_outlined,
-                                    size: 16,
-                                    color: Colors.white.withOpacity(0.7),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Text(
-                                    '1.2K views',
+                                    article['date'] ?? 'Data non disponibile',
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.7),
                                       fontSize: 14,
@@ -223,7 +277,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'La disparità economica continua ad aumentare nel mondo moderno. Questo articolo esplora le cause sistemiche e i fattori che contribuiscono all\'ampliamento del divario tra ricchi e poveri...',
+                                article['content'] ?? 'Contenuto non disponibile',
                                 style: TextStyle(
                                   color: Colors.white.withOpacity(0.7),
                                   fontSize: 14,
@@ -255,58 +309,81 @@ class ArticleDetailScreen extends StatelessWidget {
   final String imageUrl;
   final String date;
   final String content;
+  final List<Map<String, String>>? sections;
+  final String source;
 
   const ArticleDetailScreen({
     required this.title,
     required this.imageUrl,
     required this.date,
     required this.content,
+    this.sections,
+    required this.source,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF121212),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 300,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              background: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-              ),
+              background: imageUrl.isNotEmpty
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[900],
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            color: Colors.white54,
+                            size: 50,
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: Colors.grey[900],
+                      child: const Icon(
+                        Icons.article,
+                        color: Colors.white54,
+                        size: 50,
+                      ),
+                    ),
             ),
             backgroundColor: Colors.black,
             leading: IconButton(
               icon: Container(
-                padding: EdgeInsets.all(8),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.arrow_back, color: Colors.white),
+                child: const Icon(Icons.arrow_back, color: Colors.white),
               ),
               onPressed: () => Navigator.pop(context),
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.all(20),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       height: 1.3,
                     ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Icon(
@@ -314,7 +391,7 @@ class ArticleDetailScreen extends StatelessWidget {
                         size: 16,
                         color: Colors.white.withOpacity(0.7),
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
                         date,
                         style: TextStyle(
@@ -322,17 +399,66 @@ class ArticleDetailScreen extends StatelessWidget {
                           fontSize: 14,
                         ),
                       ),
+                      const SizedBox(width: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          source,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  SizedBox(height: 24),
-                  Text(
-                    content,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 16,
-                      height: 1.6,
+                  const SizedBox(height: 24),
+                  if (sections != null && sections!.isNotEmpty)
+                    ...sections!.map((section) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (section['title'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              section['title']!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        if (section['content'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            child: Text(
+                              section['content']!,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 16,
+                                height: 1.6,
+                              ),
+                            ),
+                          ),
+                      ],
+                    )).toList()
+                  else
+                    Text(
+                      content,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                        height: 1.6,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

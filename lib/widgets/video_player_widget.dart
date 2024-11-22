@@ -496,7 +496,7 @@ Widget build(BuildContext context) {
         children: [
           _showArticles 
           ? ArticlesWidget(
-              
+              videoTitle: _controller.metadata.title ?? 'Untitled',
             )
           : _showNotes 
           ? NotesScreen(

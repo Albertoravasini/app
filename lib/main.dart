@@ -81,7 +81,7 @@ class MyApp extends StatelessWidget {
           navigatorKey: navigatorKey,
           theme: ThemeData(
             primaryColor: Colors.white,
-            scaffoldBackgroundColor: Colors.black,
+            scaffoldBackgroundColor: const Color(0xFF121212),
             fontFamily: 'Montserrat',
             iconTheme: const IconThemeData(
               color: Colors.white,

@@ -5,6 +5,7 @@ import '../screens/Articles_screen.dart';
 import '../screens/notes_screen.dart';
 import '../widgets/video_player_widget.dart';
 import '../models/level.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class PageViewContainer extends StatefulWidget {
   final String videoId;
@@ -12,12 +13,14 @@ class PageViewContainer extends StatefulWidget {
   final String topic;
   final LevelStep? questionStep;
   final Function(int)? onPageChanged;
+  final String videoTitle;
 
   const PageViewContainer({
     Key? key,
     required this.videoId,
     required this.onCoinsUpdate,
     required this.topic,
+    required this.videoTitle,
     this.questionStep,
     this.onPageChanged,
   }) : super(key: key);
@@ -28,14 +31,25 @@ class PageViewContainer extends StatefulWidget {
 
 class _PageViewContainerState extends State<PageViewContainer> {
   final PageController _pageController = PageController(initialPage: 1);
-  int _currentPage = 1;
+  late YoutubePlayerController _controller;
+  String videoTitle = '';
 
-  void _navigateToPage(int page) {
-    _pageController.animateToPage(
-      page,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+  @override
+  void initState() {
+    super.initState();
+    _controller = YoutubePlayerController(
+      initialVideoId: widget.videoId,
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+      ),
+    )..addListener(() {
+      if (_controller.metadata.title != null) {
+        setState(() {
+          videoTitle = _controller.metadata.title!;
+        });
+      }
+    });
   }
 
   @override
@@ -43,14 +57,9 @@ class _PageViewContainerState extends State<PageViewContainer> {
     return PageView(
       controller: _pageController,
       physics: const PageScrollPhysics(),
-      onPageChanged: (index) {
-        setState(() {
-          _currentPage = index;
-        });
-        widget.onPageChanged?.call(index);
-      },
+      onPageChanged: widget.onPageChanged,
       children: [
-        ArticlesWidget(),
+        ArticlesWidget(videoTitle: widget.videoTitle),
         VideoPlayerWidget(
           videoId: widget.videoId,
           onCoinsUpdate: widget.onCoinsUpdate,
@@ -61,8 +70,16 @@ class _PageViewContainerState extends State<PageViewContainer> {
           isSaved: false,
           questionStep: widget.questionStep,
           onVideoUnsaved: () {},
-          onShowArticles: () => _navigateToPage(0),
-          onShowNotes: () => _navigateToPage(2),
+          onShowArticles: () => _pageController.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          ),
+          onShowNotes: () => _pageController.animateToPage(
+            2,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          ),
         ),
         NotesScreen(),
       ],
@@ -71,6 +88,7 @@ class _PageViewContainerState extends State<PageViewContainer> {
 
   @override
   void dispose() {
+    _controller.dispose();
     _pageController.dispose();
     super.dispose();
   }
