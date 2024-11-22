@@ -13,6 +13,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/comment_service.dart';
 import '../screens/Articles_screen.dart';
 import '../screens/notes_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId; // Ora accetta solo videoId
@@ -76,6 +78,8 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   bool _showArticles = false;
   bool _showNotes = false;
+
+  DateTime? _startWatchTime;
 
   @override
   void initState() {
@@ -143,16 +147,18 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         setState(() {
           _progress = position.inMilliseconds / duration.inMilliseconds;
 
-          // Considera completato il video se è oltre il 99%
+          // Considera completato il video se è oltre il 96%
           if (_progress >= 0.96) {
             _progress = 1.0;
           }
         });
 
-        // Gestisci il completamento della progressione
+        // Gestisci il completamento della progressione solo quando la barra raggiunge il 100%
         if (_progress >= 1.0 && !_completionHandled) {
           _completionHandled = true;
           _handleProgressCompletion();
+          // Registra il completamento nelle statistiche
+          _updateVideoStats('completion');
         }
       }
     }
@@ -228,6 +234,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   @override
   void dispose() {
+    // Aggiorna il tempo di visualizzazione e il conteggio visualizzazioni quando il widget viene distrutto
+    if (_startWatchTime != null) {
+      final watchTime = DateTime.now().difference(_startWatchTime!).inSeconds;
+      _updateVideoStats('watch_time', watchTime);
+      _updateVideoStats('view');
+    }
+    
     _animationController.dispose();
     _audioPlayer.dispose();
     _controller.removeListener(_videoListener);
@@ -237,17 +250,40 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   void _videoListener() {
     if (mounted) {
-      setState(() {
-        // Controlla se il video è in riproduzione o in pausa
-        if (_controller.value.isPlaying && !isPlaying) {
-          isPlaying = true;
-          _logVideoPlayEvent();
-        } else if (!_controller.value.isPlaying && isPlaying) {
-          isPlaying = false;
-          _logVideoPauseEvent();
+      // Traccia il tempo di visualizzazione solo quando il video viene cambiato
+      if (_controller.value.isPlaying) {
+        if (_startWatchTime == null) {
+          _startWatchTime = DateTime.now();
         }
-      });
+      }
     }
+  }
+
+  Future<void> _updateVideoStats(String action, [int? value]) async {
+    try {
+      await http.post(
+        Uri.parse('http://167.99.131.91:3000/update_video_stats'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'videoId': widget.videoId,
+          'userId': FirebaseAuth.instance.currentUser?.uid,
+          'action': action,
+          'watchTime': value,
+        }),
+      );
+    } catch (e) {
+      print('Errore nell\'aggiornamento delle statistiche: $e');
+    }
+  }
+
+  void _onButtonClick() {
+    _updateVideoStats('button_click');
+    // ... logica esistente ...
+  }
+
+  void _onVideoComplete() {
+    _updateVideoStats('completion');
+    // ... logica esistente ...
   }
 
   void _logVideoPlayEvent() {
@@ -287,9 +323,9 @@ void _onQuestionIconTap() {
   _animationController.reverse().then((_) {
     _animationController.forward();
     widget.onShowQuestion();
-
-    // Registra l'evento di clic sul tasto della domanda
-   
+    
+    // Registra il click del bottone
+    _updateVideoStats('button_click');
   });
 }
 
@@ -297,6 +333,9 @@ void _onQuestionIconTap() {
   void _openComments(BuildContext context) {
     final videoId = widget.videoId;
     if (videoId.isNotEmpty) {
+      // Registra il click del bottone
+      _updateVideoStats('button_click');
+      
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -304,8 +343,6 @@ void _onQuestionIconTap() {
             borderRadius: BorderRadius.vertical(top: Radius.circular(25.0))),
         builder: (context) => CommentsScreen(videoId: videoId),
       );
-    } else {
-      print("Errore: ID video è vuoto"); // Messaggio di debug
     }
   }
 
