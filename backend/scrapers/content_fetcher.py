@@ -96,12 +96,31 @@ class ContentFetcher:
         try:
             search_query = f"{cleaned_query} article"
             
-            # Ricerca testuale
+            # Test di connessione a DuckDuckGo
+            try:
+                logger.info("Test connessione DuckDuckGo...")
+                test_results = list(self.ddg.text(
+                    "test",
+                    region='wt-wt',
+                    safesearch='moderate',
+                    timelimit='y',
+                    max_results=1
+                ))
+                logger.info(f"Test connessione riuscito: {len(test_results)} risultati")
+            except Exception as e:
+                logger.error(f"Test connessione fallito: {str(e)}")
+                if "429" in str(e):
+                    logger.error("LIMITE QUOTE RAGGIUNTO - Errore 429 Too Many Requests")
+                elif "timeout" in str(e).lower():
+                    logger.error("POSSIBILE RATE LIMITING - Timeout della richiesta")
+                raise e
+
+            # Ricerca testuale con parametri aggiuntivi
             text_results = self.ddg.text(
                 search_query,
                 region='wt-wt',
                 safesearch='moderate',
-                timelimit='m',
+                timelimit='y',
                 max_results=4
             )
             
@@ -110,72 +129,40 @@ class ContentFetcher:
                 search_query,
                 region='wt-wt',
                 safesearch='moderate',
-                size=None,
-                color=None,
-                type_image=None,
-                layout=None,
-                license_image=None,
                 max_results=4
             )
             
             articles = []
             for i, result in enumerate(text_results):
                 try:
-                    # Estrai il dominio dall'URL come fonte usando urlparse
+                    # Usa direttamente l'URL come source
                     url = result.get('link', '')
-                    parsed_url = urlparse(url)
-                    domain = parsed_url.netloc
+                    source = urlparse(url).netloc if url else 'Unknown Source'
                     
-                    # Gestisci diversi formati di dominio
-                    if domain:
-                        # Rimuovi www. e altri sottodomini
-                        parts = domain.split('.')
-                        if len(parts) >= 2:
-                            if parts[0] == 'www':
-                                source = parts[1].capitalize()
-                            else:
-                                source = parts[0].capitalize()
-                        else:
-                            source = domain.capitalize()
-                    else:
-                        source = result.get('source', 'Unknown Source')
-
-                    # Mappa di sostituzioni per nomi di fonti comuni
-                    source_mapping = {
-                        'Medium': 'Medium',
-                        'Github': 'GitHub',
-                        'Stackoverflow': 'Stack Overflow',
-                        'Guardian': 'The Guardian',
-                        'Nytimes': 'The New York Times',
-                        'Bbc': 'BBC',
-                        'Cnn': 'CNN',
-                        # Aggiungi altre mappature secondo necessità
-                    }
+                    # Usa la data fornita da DuckDuckGo o la data corrente
+                    date = result.get('published', datetime.now().strftime('%Y-%m-%d'))
                     
-                    # Applica la mappatura se disponibile
-                    source = source_mapping.get(source, source)
-
-                    # Trova un'immagine corrispondente se disponibile
+                    # Trova un'immagine corrispondente
                     image_url = ''
                     if i < len(image_results):
                         image_url = image_results[i].get('image', '')
-
-                    logger.info(f"Fonte estratta per {url}: {source}")  # Log per debug
-
+                    
                     articles.append({
                         'title': result.get('title', ''),
                         'content': result.get('body', ''),
                         'imageUrl': image_url,
-                        'date': datetime.now().strftime('%Y-%m-%d'),
+                        'date': date,
                         'source': source,
                         'url': url,
                         'videoTitle': query
                     })
+                    
+                    logger.info(f"Articolo aggiunto: {source} - {date}")
+                    
                 except Exception as e:
                     logger.error(f"Errore nell'elaborazione del risultato: {str(e)}")
                     continue
-
-            logger.info(f"Trovati {len(articles)} risultati da varie fonti")
+            
             return articles
             
         except Exception as e:

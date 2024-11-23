@@ -41,7 +41,24 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
       final fetchedArticles = await _articlesService.getRelatedArticles(widget.videoTitle);
       if (mounted) {
         setState(() {
-          articles = fetchedArticles;
+          articles = fetchedArticles.map((article) {
+            DateTime date;
+            try {
+              date = DateTime.parse(article['date'] ?? '');
+            } catch (e) {
+              date = DateTime.now();
+            }
+
+            final formattedDate = '${date.day}/${date.month}/${date.year}';
+
+            final source = article['source'] ?? 'Fonte sconosciuta';
+
+            return {
+              ...article,
+              'date': formattedDate,
+              'source': source,
+            };
+          }).toList();
           isLoading = false;
         });
       }
@@ -162,6 +179,9 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                       opacity: opacity,
                       child: GestureDetector(
                         onTap: () {
+                          print('Debug - Content: ${article['content']?.length ?? 0}');
+                          print('Debug - Full Content: ${article['full_content']?.length ?? 0}');
+                          
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -170,7 +190,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                 imageUrl: article['imageUrl'] ?? '',
                                 date: article['date'] ?? '',
                                 content: article['content'] ?? '',
-                                sections: article['sections']?.cast<Map<String, String>>(),
+                                fullContent: article['full_content'] ?? article['content'] ?? '',
                                 source: article['source'] ?? 'Fonte sconosciuta',
                               ),
                             ),
@@ -284,7 +304,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                   height: 1.5,
                                   fontWeight: FontWeight.w400,
                                 ),
-                                maxLines: 3,
+                                maxLines: 4,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -309,89 +329,93 @@ class ArticleDetailScreen extends StatelessWidget {
   final String imageUrl;
   final String date;
   final String content;
-  final List<Map<String, String>>? sections;
+  final String fullContent;
   final String source;
 
   const ArticleDetailScreen({
+    Key? key,
     required this.title,
     required this.imageUrl,
     required this.date,
     required this.content,
-    this.sections,
+    required this.fullContent,
     required this.source,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    print('Debug - DetailScreen Content Length: ${content.length}');
+    print('Debug - DetailScreen Full Content Length: ${fullContent.length}');
+
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: imageUrl.isNotEmpty
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[900],
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            color: Colors.white54,
-                            size: 50,
-                          ),
-                        );
-                      },
-                    )
-                  : Container(
-                      color: Colors.grey[900],
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header con immagine
+            Stack(
+              children: [
+                if (imageUrl.isNotEmpty)
+                  Image.network(
+                    imageUrl,
+                    width: double.infinity,
+                    height: 300,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        height: 300,
+                        color: Colors.grey[900],
+                        child: const Icon(
+                          Icons.image_not_supported,
+                          color: Colors.white54,
+                          size: 50,
+                        ),
+                      );
+                    },
+                  ),
+                // Pulsante indietro
+                Positioned(
+                  top: 40,
+                  left: 16,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
                       child: const Icon(
-                        Icons.article,
-                        color: Colors.white54,
-                        size: 50,
+                        Icons.arrow_back,
+                        color: Colors.white,
                       ),
                     ),
-            ),
-            backgroundColor: Colors.black,
-            leading: IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  shape: BoxShape.circle,
+                  ),
                 ),
-                child: const Icon(Icons.arrow_back, color: Colors.white),
-              ),
-              onPressed: () => Navigator.pop(context),
+              ],
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+            
+            // Contenuto
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Titolo
                   Text(
                     title,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  
+                  // Data e fonte
                   Row(
                     children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: Colors.white.withOpacity(0.7),
-                      ),
-                      const SizedBox(width: 6),
                       Text(
                         date,
                         style: TextStyle(
@@ -419,51 +443,22 @@ class ArticleDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
-                  if (sections != null && sections!.isNotEmpty)
-                    ...sections!.map((section) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (section['title'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Text(
-                              section['title']!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        if (section['content'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 24),
-                            child: Text(
-                              section['content']!,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 16,
-                                height: 1.6,
-                              ),
-                            ),
-                          ),
-                      ],
-                    )).toList()
-                  else
-                    Text(
-                      content,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 16,
-                        height: 1.6,
-                      ),
+                  const SizedBox(height: 16),
+                  
+                  // Contenuto completo
+                  Text(
+                    fullContent.length > content.length ? fullContent : content,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 16,
+                      height: 1.6,
                     ),
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

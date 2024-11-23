@@ -27,7 +27,7 @@ router.post('/get_related_articles', async (req, res) => {
     const existingArticles = await articlesRef.get();
     
     // Controlla la validità della cache (24 ore)
-    const cacheValidityHours = 24;
+    const cacheValidityHours = 0;
     const now = Date.now();
     const cacheExpiry = now - (cacheValidityHours * 60 * 60 * 1000);
     
