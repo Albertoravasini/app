@@ -25,13 +25,15 @@ class ArticlesService {
         if (data['success']) {
           final articles = List<Map<String, dynamic>>.from(data['data']);
           print('Articoli recuperati con successo: ${articles.length}');
+          articles.forEach((article) {
+            print('Content length: ${article['content']?.length ?? 0}');
+            print('Full content length: ${article['full_content']?.length ?? 0}');
+          });
           return articles;
         }
       }
       
-      final errorMessage = jsonDecode(response.body)['message'] ?? 'Errore sconosciuto';
-      print('Errore dal server: $errorMessage');
-      throw Exception(errorMessage);
+      throw Exception('Errore nel recupero degli articoli');
     } catch (e) {
       print('Errore dettagliato nel servizio articoli: $e');
       rethrow;

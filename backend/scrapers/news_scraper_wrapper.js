@@ -27,6 +27,7 @@ class Scraper {
       });
 
       pyshell.on('stderr', function(stderr) {
+        console.log('Debug output:', stderr);
         errorString += stderr;
       });
 
@@ -41,10 +42,10 @@ class Scraper {
         try {
           if (dataString.trim()) {
             const results = JSON.parse(dataString);
-            console.log(`Trovati ${results.length} risultati`);
+            console.log(`Trovati ${results.length} risultati da ContentFetcher`);
             resolve(results);
           } else {
-            console.log('Nessun risultato trovato');
+            console.log('Nessun risultato trovato da ContentFetcher');
             console.log('Output ricevuto:', dataString);
             resolve([]);
           }
