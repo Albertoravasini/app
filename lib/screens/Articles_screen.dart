@@ -42,21 +42,19 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
       if (mounted) {
         setState(() {
           articles = fetchedArticles.map((article) {
-            DateTime date;
-            try {
-              date = DateTime.parse(article['date'] ?? '');
-            } catch (e) {
-              date = DateTime.now();
+            // Gestione della data
+            String formattedDate = article['date'] ?? '';
+            if (formattedDate.isEmpty) {
+              formattedDate = DateTime.now().toString().split(' ')[0];
             }
-
-            final formattedDate = '${date.day}/${date.month}/${date.year}';
-
-            final source = article['source'] ?? 'Fonte sconosciuta';
+            
+            print('Data originale: ${article['date']}'); // Debug
+            print('Data formattata: $formattedDate'); // Debug
 
             return {
               ...article,
               'date': formattedDate,
-              'source': source,
+              'source': article['source'] ?? 'Fonte sconosciuta',
             };
           }).toList();
           isLoading = false;
@@ -179,9 +177,6 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                       opacity: opacity,
                       child: GestureDetector(
                         onTap: () {
-                          print('Debug - Content: ${article['content']?.length ?? 0}');
-                          print('Debug - Full Content: ${article['full_content']?.length ?? 0}');
-                          
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -190,8 +185,8 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                 imageUrl: article['imageUrl'] ?? '',
                                 date: article['date'] ?? '',
                                 content: article['content'] ?? '',
-                                fullContent: article['full_content'] ?? article['content'] ?? '',
-                                source: article['source'] ?? 'Fonte sconosciuta',
+                                fullContent: article['full_content'] ?? '',
+                                source: article['source'] ?? '',
                               ),
                             ),
                           );

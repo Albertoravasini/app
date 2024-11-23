@@ -1,3 +1,4 @@
+// backend/scrapers/news_scraper_wrapper.js
 const { PythonShell } = require('python-shell');
 const path = require('path');
 
@@ -59,4 +60,4 @@ class Scraper {
   }
 }
 
-module.exports = { Scraper }; 
+module.exports = { Scraper };
