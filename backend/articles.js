@@ -1,3 +1,4 @@
+// backend/articles.js
 const express = require('express');
 const router = express.Router();
 const admin = require('firebase-admin');
@@ -27,7 +28,7 @@ router.post('/get_related_articles', async (req, res) => {
     const existingArticles = await articlesRef.get();
     
     // Controlla la validità della cache (24 ore)
-    const cacheValidityHours = 0;
+    const cacheValidityHours = 24; // Puoi impostare 24 ore o altro
     const now = Date.now();
     const cacheExpiry = now - (cacheValidityHours * 60 * 60 * 1000);
     
@@ -89,4 +90,4 @@ router.post('/get_related_articles', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
