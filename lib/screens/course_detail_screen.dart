@@ -1,9 +1,8 @@
 // lib/screens/course_detail_screen.dart
 
-import 'package:Just_Learn/models/level.dart';
+
 import 'package:Just_Learn/screens/course_info_dialog.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/course.dart';
@@ -32,15 +31,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     super.initState();
     _currentUser = widget.user;
     _isCourseUnlocked = _currentUser.unlockedCourses.contains(widget.course.id);
-    // Registra l'evento di visualizzazione del corso
-    FirebaseAnalytics.instance.logEvent(
-      name: 'course_view',
-      parameters: {
-        'course_id': widget.course.id,
-        'course_title': widget.course.title,
-        'user_id': _currentUser.uid,
-      },
-    );
+ 
   }
 /// Verifica se tutte le sezioni precedenti sono completate
 bool _arePreviousSectionsCompleted(int currentIndex) {
@@ -231,14 +222,7 @@ bool _arePreviousSectionsCompleted(int currentIndex) {
       );
     }
     // Registra l'evento di sblocco del corso
-    FirebaseAnalytics.instance.logEvent(
-      name: 'course_unlocked',
-      parameters: {
-        'course_id': widget.course.id,
-        'course_title': widget.course.title,
-        'user_id': _currentUser.uid,
-      },
-    );
+    
   }
 
   /// Funzione per ottenere il currentStep per una sezione
@@ -503,14 +487,7 @@ Widget _buildSections() {
           onTap: isAccessible
               ? () async {
                   // Registra l'evento di visualizzazione della sezione
-                  FirebaseAnalytics.instance.logEvent(
-                    name: 'section_view',
-                    parameters: {
-                      'course_id': widget.course.id,
-                      'section_title': section.title,
-                      'user_id': _currentUser.uid,
-                    },
-                  );
+                 
                   bool? result = await Navigator.push(
                     context,
                     MaterialPageRoute(

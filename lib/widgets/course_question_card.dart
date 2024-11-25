@@ -1,7 +1,6 @@
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:Just_Learn/models/course.dart';
@@ -70,7 +69,7 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
       children: [
         Container(
           decoration: ShapeDecoration(
-            color: Colors.black,
+            color: const Color(0xFF121212),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(0),
             ),
@@ -284,17 +283,6 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
 
     await _addCoinsToUser();
   }
-
-  // Registra l'evento di risposta alla domanda
-  FirebaseAnalytics.instance.logEvent(
-    name: 'question_answered',
-    parameters: {
-      'question_content': widget.step.content,
-      'topic': widget.topic,
-      'is_correct': isCorrect,
-      'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-    },
-  );
 
   await _saveAnsweredQuestion();
 }

@@ -2,16 +2,19 @@ import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/comments_screen.dart';
-import 'package:audioplayers/audioplayers.dart'; // Importa audioplayers
-import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:Just_Learn/screens/topic_selection_sheet.dart';
+import 'package:audioplayers/audioplayers.dart'; // Importa aud
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/comment_service.dart';
-import 'progress_border.dart'; // Importa il ProgressBorder
+import '../screens/Articles_screen.dart';
+import '../screens/notes_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId; // Ora accetta solo videoId
@@ -23,6 +26,9 @@ class VideoPlayerWidget extends StatefulWidget {
   final VoidCallback? onVideoUnsaved; // Callback per notificare quando un video viene rimosso dai salvati
   final Function(int) onCoinsUpdate; // Callback per aggiornare le monete
   final String topic; // Aggiungi questo campo
+  final Function(String)? onTopicChanged; // Callback per notificare il cambio di topic
+  final VoidCallback onShowArticles;
+  final VoidCallback onShowNotes;
 
   const VideoPlayerWidget({
     Key? key,
@@ -35,6 +41,9 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onVideoUnsaved,
     required this.onCoinsUpdate, // Richiesto il callback
     required this.topic, // Richiedi questo parametro
+    this.onTopicChanged, // Richiedi questo parametro
+    required this.onShowArticles,
+    required this.onShowNotes,
   }) : super(key: key);
 
   @override
@@ -65,6 +74,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   Duration _initialPosition = Duration.zero;
   Duration _seekOffset = Duration.zero;
 
+  List<String> allTopics = [];
+
+  bool _showArticles = false;
+  bool _showNotes = false;
+
+  DateTime? _startWatchTime;
+
   @override
   void initState() {
     super.initState();
@@ -73,9 +89,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       flags: const YoutubePlayerFlags(
         autoPlay: true,
         mute: false,
-        enableCaption: true,
+        enableCaption: false,
+        forceHD: true,
+        showLiveFullscreenButton: false,
+        hideThumbnail: true,
+        disableDragSeek: true,
+        useHybridComposition: true, // Migliora le performance
       ),
     )..addListener(_videoListener);
+
+    // Precarica il video
+    _controller.load(widget.videoId);
 
     isLiked = widget.isLiked;
     likeCount = widget.likeCount;
@@ -100,6 +124,19 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
     // Aggiungi un listener per aggiornare il progresso
     _controller.addListener(_updateProgress);
+
+    _loadTopics();
+  }
+
+  Future<void> _loadTopics() async {
+    if (!mounted) return; // Verifica se il widget è ancora montato
+    
+    final topicsSnapshot = await FirebaseFirestore.instance.collection('topics').get();
+    if (mounted) { // Verifica nuovamente prima di chiamare setState
+      setState(() {
+        allTopics = topicsSnapshot.docs.map((doc) => doc.id).toList();
+      });
+    }
   }
 
   void _updateProgress() {
@@ -110,9 +147,15 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         setState(() {
           _progress = position.inMilliseconds / duration.inMilliseconds;
 
-          // Considera completato il video se è oltre il 99%
+          // Considera completato il video se è oltre il 96%
           if (_progress >= 0.96) {
             _progress = 1.0;
+            
+            // Se il video è completato e c'è una domanda disponibile
+            if (!_completionHandled && widget.questionStep != null) {
+              _completionHandled = true;
+              widget.onShowQuestion(); // Notifica che è il momento di mostrare la domanda
+            }
           }
         });
 
@@ -120,6 +163,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         if (_progress >= 1.0 && !_completionHandled) {
           _completionHandled = true;
           _handleProgressCompletion();
+          _updateVideoStats('completion');
         }
       }
     }
@@ -195,123 +239,108 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   @override
   void dispose() {
+    // Aggiorna il tempo di visualizzazione e il conteggio visualizzazioni quando il widget viene distrutto
+    if (_startWatchTime != null) {
+      final watchTime = DateTime.now().difference(_startWatchTime!).inSeconds;
+      _updateVideoStats('watch_time', watchTime);
+      _updateVideoStats('view');
+    }
+    
     _animationController.dispose();
     _audioPlayer.dispose();
     _controller.removeListener(_videoListener);
     _controller.removeListener(_updateProgress);
-    _controller.dispose(); // Disporre il controller locale
     super.dispose();
   }
 
   void _videoListener() {
     if (mounted) {
-      setState(() {
-        // Controlla se il video è in riproduzione o in pausa
-        if (_controller.value.isPlaying && !isPlaying) {
-          isPlaying = true;
-          _logVideoPlayEvent();
-        } else if (!_controller.value.isPlaying && isPlaying) {
-          isPlaying = false;
-          _logVideoPauseEvent();
+      // Traccia il tempo di visualizzazione solo quando il video viene cambiato
+      if (_controller.value.isPlaying) {
+        if (_startWatchTime == null) {
+          _startWatchTime = DateTime.now();
         }
-      });
+      }
     }
   }
 
+  Future<void> _updateVideoStats(String action, [int? value]) async {
+    try {
+      await http.post(
+        Uri.parse('http://167.99.131.91:3000/update_video_stats'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'videoId': widget.videoId,
+          'userId': FirebaseAuth.instance.currentUser?.uid,
+          'action': action,
+          'watchTime': value,
+        }),
+      );
+    } catch (e) {
+      print('Errore nell\'aggiornamento delle statistiche: $e');
+    }
+  }
+
+  void _onButtonClick() {
+    _updateVideoStats('button_click');
+    // ... logica esistente ...
+  }
+
+  void _onVideoComplete() {
+    _updateVideoStats('completion');
+    // ... logica esistente ...
+  }
+
   void _logVideoPlayEvent() {
-    FirebaseAnalytics.instance.logEvent(
-      name: 'video_play',
-      parameters: {
-        'video_id': widget.videoId,
-        'video_title': _controller.metadata.title,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-      },
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      Posthog().capture(
+        eventName: 'video_play',
+        properties: {
+          'video_id': widget.videoId,
+          'video_title': _controller.metadata.title,
+          'topic': widget.topic,
+          'user_id': user.uid,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    }
   }
 
   void _logVideoPauseEvent() {
-    FirebaseAnalytics.instance.logEvent(
-      name: 'video_pause',
-      parameters: {
-        'video_id': widget.videoId,
-        'video_title': _controller.metadata.title,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-      },
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      Posthog().capture(
+        eventName: 'video_pause', 
+        properties: {
+          'video_id': widget.videoId,
+          'video_title': _controller.metadata.title,
+          'topic': widget.topic,
+          'user_id': user.uid,
+          'watch_duration': _controller.value.position.inSeconds,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+    }
   }
 
 void _onQuestionIconTap() {
   _animationController.reverse().then((_) {
     _animationController.forward();
     widget.onShowQuestion();
-
-    // Registra l'evento di clic sul tasto della domanda
-    FirebaseAnalytics.instance.logEvent(
-      name: 'question_icon_click',
-      parameters: {
-        'video_id': widget.videoId,
-        'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
-      },
-    );
+    
+    // Registra il click del bottone
+    _updateVideoStats('button_click');
   });
 }
-
-  // Funzione per aggiornare lo stato del like
-  Future<void> _toggleLike() async {
-    final videoId = widget.videoId;
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (videoId.isNotEmpty && user != null) {
-      setState(() {
-        isLiked = !isLiked;
-        likeCount += isLiked ? 1 : -1;
-      });
-
-      final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final userDoc = await userDocRef.get();
-
-      if (userDoc.exists) {
-        final userData = userDoc.data() as Map<String, dynamic>;
-        final likedVideos = userData['LikedVideos'] as List<dynamic>? ?? [];
-
-        if (isLiked) {
-          likedVideos.add(videoId);
-        } else {
-          likedVideos.remove(videoId);
-        }
-
-        await userDocRef.update({'LikedVideos': likedVideos});
-
-        final videoDocRef = FirebaseFirestore.instance.collection('videos').doc(videoId);
-        await FirebaseFirestore.instance.runTransaction((transaction) async {
-          final videoDoc = await transaction.get(videoDocRef);
-          if (videoDoc.exists) {
-            final videoData = videoDoc.data() as Map<String, dynamic>;
-            final likes = videoData['likes'] as int? ?? 0;
-            final newLikes = isLiked ? likes + 1 : likes - 1;
-            transaction.update(videoDocRef, {'likes': newLikes});
-          } else {
-            // Se il documento del video non esiste, crealo con il conteggio iniziale
-            transaction.set(videoDocRef, {'likes': isLiked ? 1 : 0});
-          }
-          FirebaseAnalytics.instance.logEvent(
-            name: isLiked ? 'video_like' : 'video_unlike',
-            parameters: {
-              'video_id': widget.videoId,
-              'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-            },
-          );
-        });
-      }
-    } else {
-      print("Errore: ID video è vuoto o l'utente non è loggato"); // Messaggio di debug
-    }
-  }
 
   // Funzione per aprire i commenti
   void _openComments(BuildContext context) {
     final videoId = widget.videoId;
     if (videoId.isNotEmpty) {
+      // Registra il click del bottone
+      _updateVideoStats('button_click');
+      
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -319,8 +348,6 @@ void _onQuestionIconTap() {
             borderRadius: BorderRadius.vertical(top: Radius.circular(25.0))),
         builder: (context) => CommentsScreen(videoId: videoId),
       );
-    } else {
-      print("Errore: ID video è vuoto"); // Messaggio di debug
     }
   }
 
@@ -344,13 +371,7 @@ void _onQuestionIconTap() {
         setState(() {
           isSaved = true;
 
-          FirebaseAnalytics.instance.logEvent(
-            name: 'video_save',
-            parameters: {
-              'video_id': widget.videoId,
-              'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-            },
-          );
+        
         });
       }
     }
@@ -374,13 +395,7 @@ void _onQuestionIconTap() {
         });
         // Notifica al genitore che il video è stato rimosso dai salvati
         widget.onVideoUnsaved?.call();
-        FirebaseAnalytics.instance.logEvent(
-          name: 'video_unsave',
-          parameters: {
-            'video_id': widget.videoId,
-            'user_id': FirebaseAuth.instance.currentUser?.uid ?? 'unknown_user',
-          },
-        );
+      
       }
     }
   }
@@ -430,14 +445,43 @@ void _onQuestionIconTap() {
     });
   }
 
+  void _showTopicSelection(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) => TopicSelectionSheet(
+        allTopics: allTopics,
+        selectedTopic: widget.topic,
+        onSelectTopic: (selectedTopic) async {
+          // Aggiorna Firebase
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null) {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+              'topics': [selectedTopic],
+            });
+
+            // Notifica il cambio di topic al parent
+            if (widget.onTopicChanged != null) {
+              widget.onTopicChanged!(selectedTopic);
+              Navigator.pop(context); // Chiudi il bottom sheet
+            }
+          }
+        },
+      ),
+    );
+  }
+
 @override
 Widget build(BuildContext context) {
   return YoutubePlayerBuilder(
     player: YoutubePlayer(
       controller: _controller,
       showVideoProgressIndicator: false,
+      aspectRatio: 9/16,
       onReady: () {
-        // Logica quando il player è pronto
         print("Youtube Player è pronto.");
       },
       onEnded: (metaData) {
@@ -447,256 +491,318 @@ Widget build(BuildContext context) {
         }
       },
     ),
-      builder: (context, player) {
-        return Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(5.0),
-                    child: ProgressBorder(
-                      progress: _progress,
-                      borderWidth: 5.0,
-                      borderColor: Colors.yellowAccent,
-                      borderRadius: BorderRadius.circular(16),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
-                          children: [
-                            // Layer invisibile per tapping e dragging
-                            GestureDetector(
-                              onTap: () {
-                                if (_controller.value.isPlaying) {
-                                  _controller.pause();
-                                } else {
-                                  _controller.play();
-                                }
-                              },
-                              onHorizontalDragStart: _onHorizontalDragStart,
-                              onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                              onHorizontalDragEnd: _onHorizontalDragEnd,
-                              child: Container(
-                                color: Colors.transparent, // Layer invisibile
-                                width: MediaQuery.of(context).size.width,
-                                height: MediaQuery.of(context).size.height,
-                              ),
-                            ),
-                            // YoutubePlayer widget
-                            IgnorePointer(
-                          ignoring: true, // Permette di interagire solo con il GestureDetector
-                          child: SizedBox(
-                            width: MediaQuery.of(context).size.width * 1,
-                            height: MediaQuery.of(context).size.height * 1,
-                            child: FittedBox(
-                              fit: BoxFit.cover,
-                              child: SizedBox(
-                                width: MediaQuery.of(context).size.width,
-                                height: MediaQuery.of(context).size.height,
-                                child: player
-                              ),
-                            ),
+    builder: (context, player) {
+      return Stack(
+        children: [
+          _showArticles 
+          ? ArticlesWidget(
+              videoTitle: _controller.metadata.title ?? 'Untitled',
+              levelId: widget.videoId ?? 'no level id found',
+            )
+          : _showNotes 
+          ? NotesScreen(
+            
+            )
+          : Column(
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    // Contenitore per il player con overflow nascosto
+                    ClipRect(
+                      child: Transform.scale(
+                        scale: 1.21,
+                        child: IgnorePointer(
+                          ignoring: true,
+                          child: Container(
+                            width: double.infinity,
+                            height: double.infinity,
+                            child: player,
                           ),
-                        ),
-                            // Like, comment buttons and other overlays remain unchanged
-                            Positioned(
-                              bottom: 5,
-                              right: 5,
-                              child: Column(
-                                children: [
-                                  // Icona della domanda
-                                  if (showQuestionIcon && widget.questionStep != null)
-                                    GestureDetector(
-                                      onTap: _onQuestionIconTap,
-                                      child: AnimatedBuilder(
-                                        animation: _animationController,
-                                        builder: (context, child) {
-                                          return Transform.scale(
-                                            scale: _scaleAnimation.value,
-                                            child: Container(
-                                              padding: const EdgeInsets.all(5),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white.withOpacity(0.1),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.stars_rounded,
-                                                color: Colors.yellowAccent,
-                                                size: 35,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  const SizedBox(height: 20),
-                                  // Bottone like
-                                  GestureDetector(
-                                    onTap: _toggleLike,
-                                    child: AnimatedSwitcher(
-                                      duration: const Duration(milliseconds: 300),
-                                      transitionBuilder:
-                                          (Widget child, Animation<double> animation) {
-                                        return ScaleTransition(scale: animation, child: child);
-                                      },
-                                      child: isLiked
-                                          ? Icon(
-                                              Icons.favorite,
-                                              key: ValueKey<int>(1),
-                                              color: Colors.red,
-                                              size: 40,
-                                            )
-                                          : Icon(
-                                              Icons.favorite_border,
-                                              key: ValueKey<int>(2),
-                                              color: Colors.white70,
-                                              size: 40,
-                                            ),
-                                    ),
-                                  ),
-                                  Text(
-                                    likeCount.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  // Bottone commenti
-                                  GestureDetector(
-                                    onTap: () => _openComments(context),
-                                    child: Column(
-                                      children: [
-                                        SvgPicture.asset(
-                                          'assets/comment_icon.svg',
-                                          color: Colors.white70,
-                                          width: 25,
-                                          height: 30,
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Text(
-                                            '$commentCount',
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  // Bottone per salvare il video
-                                  GestureDetector(
-                                    onTap: () {
-                                      if (isSaved) {
-                                        _unsaveVideo();
-                                      } else {
-                                        _saveVideo();
-                                      }
-                                    },
-                                    child: Column(
-                                      children: [
-                                        SvgPicture.asset(
-                                          'assets/mingcute_bookmark-fill.svg',
-                                          color:
-                                              isSaved ? Colors.yellow : Colors.white70,
-                                          width: 30,
-                                          height: 35,
-                                        ),
-                                        const SizedBox(height: 5),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  // Bottone per condividere il video
-                                  GestureDetector(
-                                    onTap: () {
-                                      // Implementa la funzione di condivisione
-                                      String videoUrl =
-                                          'https://www.youtube.com/watch?v=${widget.videoId}';
-                                      String customMessage = '''
-Take a look: $videoUrl
-
-I Found it on JustLearn: https://apps.apple.com/it/app/justlearn/id6508169503
-
-The TikTok for education, but Better ⚡️''';
-
-                                      Share.share(customMessage);
-                                    },
-                                    child: Column(
-                                      children: [
-                                        SvgPicture.asset(
-                                          'assets/icona_share.svg',
-                                          color: Colors.white70,
-                                          width: 30,
-                                          height: 35,
-                                        ),
-                                        const SizedBox(height: 10),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
                         ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            ),
-            // Overlay per l'animazione delle monete
-            if (_showCoinsCompletion)
-              Positioned.fill(
-                child: Center(
-                  child: AnimatedBuilder(
-                    animation: _animationController,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: 1.0 - _animationController.value,
-                        child: Transform.translate(
-                          offset: Offset(0, -150 * _animationController.value),
-                          child: child,
-                        ),
-                      );
-                    },
-                    child: Icon(
-                      Icons.stars_rounded,
-                      size: 100,
-                      color: Colors.yellowAccent,
+                    // Layer invisibile per tapping e dragging
+                    GestureDetector(
+                      onTap: () {
+                        if (_controller.value.isPlaying) {
+                          _controller.pause();
+                        } else {
+                          _controller.play();
+                        }
+                      },
+                      onHorizontalDragStart: _onHorizontalDragStart,
+                      onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                      onHorizontalDragEnd: _onHorizontalDragEnd,
+                      child: Container(
+                        color: Colors.transparent,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
                     ),
+                    // Bottoni e overlay
+                    Positioned(
+                      bottom: 5,
+                      right: 10,
+                      child: Column(
+                        children: [
+                          // Icona della domanda
+                          if (showQuestionIcon && widget.questionStep != null)
+                            GestureDetector(
+                              onTap: _onQuestionIconTap,
+                              child: AnimatedBuilder(
+                                animation: _animationController,
+                                builder: (context, child) {
+                                  return Transform.scale(
+                                    scale: _scaleAnimation.value,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.stars_rounded,
+                                        color: Colors.yellowAccent,
+                                        size: 35,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          const SizedBox(height: 20),
+
+                          // Preview link
+                          GestureDetector(
+                            onTap: widget.onShowArticles,
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/fluent_preview-link-24-filled.svg',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+
+                          // Refresh con le proprietà del salvataggio
+                          GestureDetector(
+                            onTap: () {
+                              if (isSaved) {
+                                _unsaveVideo();
+                              } else {
+                                _saveVideo();
+                              }
+                            },
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/heroicons-solid_refresh.svg',
+                                  color: isSaved ? Colors.yellow : Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+
+                          // Chat AI con le proprietà dei commenti
+                          GestureDetector(
+                            onTap: () => _openComments(context),
+                            child: Column(
+                              children: [
+                                SvgPicture.asset(
+                                  'assets/ri_chat-ai-line.svg',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+
+                          // Pen
+                          GestureDetector(
+                            onTap: widget.onShowNotes,
+                            child: Column(
+                              children: [
+                                Image.asset(
+                                  'assets/solar_pen-bold.png',
+                                  color: Colors.white70,
+                                  width: 30,
+                                  height: 30,
+                                ),
+                                const SizedBox(height: 20),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Barra di progresso sotto il video
+              Container(
+                height: 4,
+                width: double.infinity,
+                child: Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F1F1F),
+                        borderRadius: BorderRadius.only(
+                          topRight: Radius.circular(3),
+                          bottomRight: Radius.circular(3),
+                        ),
+                      ),
+                    ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(3),
+                        bottomRight: Radius.circular(3),
+                      ),
+                      child: SizedBox(
+                        width: MediaQuery.of(context).size.width * _progress,
+                        child: Container(
+                          color: Colors.yellowAccent,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          // Overlay per l'animazione delle monete
+          if (_showCoinsCompletion)
+            Positioned.fill(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _animationController,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: 1.0 - _animationController.value,
+                      child: Transform.translate(
+                        offset: Offset(0, -150 * _animationController.value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Icon(
+                    Icons.stars_rounded,
+                    size: 100,
+                    color: Colors.yellowAccent,
                   ),
                 ),
               ),
-            // Overlay per il feedback del seeking
-            // Overlay per il feedback del seeking
-if (_isDragging)
-  Positioned(
-    top: 20, // Posiziona in alto
-    right: 20, // Posiziona a destra
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5), // Quasi trasparente
-        borderRadius: BorderRadius.circular(10), // Bordi arrotondati
-      ),
-      child: Text(
-        '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-        ),
-      ),
-    ),
-  ),
-          ],
-        );
-      },
-    );
-  }
+            ),
+          // Overlay per il feedback del seeking
+          if (_isDragging)
+            Positioned(
+              top: 20, // Posiziona in alto
+              right: 20, // Posiziona a destra
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5), // Quasi trasparente
+                  borderRadius: BorderRadius.circular(10), // Bordi arrotondati
+                ),
+                child: Text(
+                  '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          // Aggiungi questo widget dentro lo Stack esistente, dopo il player video
+          Positioned(
+            left: 16,
+            bottom: 20,
+            child: Container(
+              width: 274,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      _controller.metadata.title ?? 'Titolo non disponibile',
+                      textAlign: TextAlign.left,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.72,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => _showTopicSelection(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      clipBehavior: Clip.antiAlias,
+                      decoration: ShapeDecoration(
+                        color: const Color(0x93333333),
+                        shape: RoundedRectangleBorder(
+                          side: BorderSide(
+                            width: 1,
+                            color: Colors.white.withOpacity(0.1),
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 15,
+                            height: 15,
+                            padding: const EdgeInsets.all(1.25),
+                            child: const Icon(
+                              Icons.school,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 1),
+                          Text(
+                            widget.topic,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.72,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        ],
+      );
+    },
+  );
+}
 }

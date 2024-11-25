@@ -11,22 +11,26 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/models/level.dart';
+import 'package:Just_Learn/widgets/page_view_container.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
   final String? selectedSubtopic;
   final Function(String) onVideoTitleChange;
-  final ValueChanged<int> onCoinsUpdate;  // Aggiungi questo parametro per aggiornare i coins
+  final ValueChanged<int> onCoinsUpdate;
   final bool showSavedVideos;
-  
+  final Function(String)? onTopicChanged;
+  final Function(int) onPageChanged;
 
   const ShortsScreen({
     super.key,
     this.selectedTopic,
     this.selectedSubtopic,
     required this.onVideoTitleChange,
-    required this.onCoinsUpdate,  // Parametro richiesto per aggiornare i coins
+    required this.onCoinsUpdate,
     this.showSavedVideos = false,
+    this.onTopicChanged,
+    required this.onPageChanged,
   });
 
   @override
@@ -92,16 +96,14 @@ class _ShortsScreenState extends State<ShortsScreen> {
 Future<void> _loadAllShortSteps() async {
   if (isLoadingMore) return;
   if (!mounted) return;
+  
   setState(() {
     isLoadingMore = true;
   });
 
   final user = FirebaseAuth.instance.currentUser;
 
-  if (user == null) {
-    // Handle unauthenticated user
-    return;
-  }
+  if (user == null) return;
 
   try {
     final shortsService = ShortsService(baseUrl: 'http://167.99.131.91:3000');
@@ -131,38 +133,29 @@ Future<void> _loadAllShortSteps() async {
       setState(() {
         allShortSteps = convertedShortStepsWithMetadata;
         currentLoadedVideos = allShortSteps.length;
-        // Initialize only the first 3 controllers: current, next, and previous (if any)
+        // Inizializza i primi 3 controller per gestire meglio il precaricamento
         _youtubeControllers = List.generate(allShortSteps.length, (index) {
-          if (index == 0 || index == 1) {
-            // Initialize current and next controllers
+          if (index <= 2) { // Inizializza i primi 3 video
             return YoutubePlayerController(
               initialVideoId: (allShortSteps[index]['step'] as LevelStep).content,
               flags: const YoutubePlayerFlags(
-                autoPlay: false, // Non avviare automaticamente
-                mute: false,
-                disableDragSeek: true, // Disabilita il drag seek se non necessario
-        hideControls: true, // Nascondi i controlli per migliorare la performance
-        hideThumbnail: true, // Nascondi la miniatura per velocizzare il caricamento
+                disableDragSeek: true,
+                hideControls: true,
+                hideThumbnail: true,
+                forceHD: false, // Disabilita HD per velocizzare
+                startAt: 0,
               ),
             );
           } else {
-            // Placeholder controllers, to be initialized when needed
             return YoutubePlayerController(
               initialVideoId: '',
               flags: const YoutubePlayerFlags(
                 autoPlay: false,
-                mute: false,
+                mute: true,
               ),
             );
           }
         });
-
-        // Preload the next video
-        if (allShortSteps.length > 1) {
-          _preloadNextVideo(1);
-        }
-
-        isLoadingMore = false;
       });
     }
 
@@ -188,31 +181,54 @@ Future<void> _loadAllShortSteps() async {
   }
 }
 
-
-@override
-void _onVideoChanged(int index) {
-  // Pausa il video corrente
-  _pauseAllVideos();
-
-  // Riproduci il nuovo video
-  _youtubeControllers[index].play();
-
-  // Dispose dei controller non necessari
-  _disposeUnusedControllers(index);
-
-  // Precarica il video successivo
-  _preloadNextVideo(index + 1);
-}
-
-void _pauseAllVideos() {
-  for (var controller in _youtubeControllers) {
-    if (controller.value.isPlaying) {
-      controller.pause();
+void _preloadNextVideo(int nextIndex) {
+  if (nextIndex < allShortSteps.length && nextIndex >= 0) {
+    final nextVideoId = (allShortSteps[nextIndex]['step'] as LevelStep).content;
+    
+    // Verifica se il controller successivo esiste e ha un video diverso
+    if (_youtubeControllers[nextIndex].initialVideoId != nextVideoId) {
+      // Disponi il vecchio controller se necessario
+      if (_youtubeControllers[nextIndex].initialVideoId.isNotEmpty) {
+        _youtubeControllers[nextIndex].dispose();
+      }
+      
+      // Crea un nuovo controller per il prossimo video
+      _youtubeControllers[nextIndex] = YoutubePlayerController(
+        initialVideoId: nextVideoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: true,
+          disableDragSeek: true,
+          hideControls: true,
+          hideThumbnail: true,
+          forceHD: false,
+        ),
+      );
     }
+    
+    // Avvia il precaricamento
+    _youtubeControllers[nextIndex].load(nextVideoId);
   }
 }
 
-void _disposeUnusedControllers(int currentIndex) {
+void _onVideoChanged(int index) {
+  // Gestisci il video corrente
+  _youtubeControllers[index].unMute();
+  _youtubeControllers[index].play();
+  
+  // Precarica il prossimo video
+  _preloadNextVideo(index + 1);
+  
+  // Gestisci i video precedenti e successivi
+  if (index > 0) {
+    _youtubeControllers[index - 1].pause();
+  }
+  
+  // Pulisci i controller non necessari
+  _cleanupControllers(index);
+}
+
+void _cleanupControllers(int currentIndex) {
   for (int i = 0; i < _youtubeControllers.length; i++) {
     if (i < currentIndex - 1 || i > currentIndex + 1) {
       if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
@@ -221,7 +237,7 @@ void _disposeUnusedControllers(int currentIndex) {
           initialVideoId: '',
           flags: const YoutubePlayerFlags(
             autoPlay: false,
-            mute: false,
+            mute: true,
           ),
         );
       }
@@ -238,69 +254,10 @@ Future<void> _handleAsyncOperations(int index) async {
   // Segna il video come visto
   await _shortsController.markVideoAsWatched(currentVideoId, currentVideoTitle, currentVideoTopic);
 
-  // Aggiorna lo stato di like
-  await _updateLikeState(currentVideoId);
+ 
 }
 
-void _preloadNextVideo(int nextIndex) {
-  if (nextIndex < allShortSteps.length) {
-    final nextStep = allShortSteps[nextIndex];
-    final nextVideoId = (nextStep['step'] as LevelStep).content;
-
-    // Verifica se il controller è già stato inizializzato
-    if (_youtubeControllers[nextIndex].initialVideoId.isEmpty) {
-      final nextController = YoutubePlayerController(
-        initialVideoId: nextVideoId,
-        flags: const YoutubePlayerFlags(
-          autoPlay: false, // Non avviare automaticamente
-          mute: false,
-        ),
-      );
-
-      setState(() {
-        _youtubeControllers[nextIndex] = nextController;
-      });
-
-      print("Video successivo precaricato con index: $nextIndex, videoId: $nextVideoId");
-    }
-  }
-}
-
-// Modifica _updateLikeState per aggiornare l'intero stato di allShortSteps
-Future<void> _updateLikeState(String videoId) async {
-  final likeStatus = await _shortsController.getLikeStatus(videoId);
-  final likeCountValue = await _shortsController.getLikeCount(videoId);
-
-  // Trova l'indice del video corrente in allShortSteps e aggiorna il suo stato
-  final videoIndex = allShortSteps.indexWhere((element) => element['step'].content == videoId);
-  if (videoIndex != -1) {
-    setState(() {
-      allShortSteps[videoIndex]['isLiked'] = likeStatus;
-      allShortSteps[videoIndex]['likeCount'] = likeCountValue;
-    });
-  }
-}
-
-
-  // Metodo per impostare il listener per i like in tempo reale
-  void _setupLikeListener(String videoId) {
-    final videoDoc = FirebaseFirestore.instance.collection('videos').doc(videoId);
-
-    videoDoc.snapshots().listen((snapshot) {
-      if (snapshot.exists) {
-        final videoData = snapshot.data() as Map<String, dynamic>;
-        final likes = videoData['likes'] as int? ?? 0;
-
-        if (mounted) { // Verifica se il widget è ancora montato
-          setState(() {
-            likeCount = likes;
-          });
-        }
-      }
-    });
-  }
-
-  @override
+@override
 void dispose() {
   for (var controller in _youtubeControllers) {
     if (controller.initialVideoId.isNotEmpty) {
@@ -366,6 +323,7 @@ void dispose() {
   final currentStep = allShortSteps[index]['step'] as LevelStep;
   final level = allShortSteps[index]['level'] as Level;
   final videoId = currentStep.content; // Estrai l'ID del video
+  final videoTitle = level.title; // Ottieni il titolo dal level
   
   final steps = level.steps;
   final currentStepIndex = steps.indexOf(currentStep);
@@ -382,26 +340,14 @@ void dispose() {
   return Stack(
     children: [
       // Il lettore video
-      VideoPlayerWidget(
-        videoId: videoId, // Aggiungi questo parametro
-  isLiked: isLiked,
-  likeCount: likeCount,
-  questionStep: questionStep,
-  isSaved: isSaved,
-  onShowQuestion: () {
-    setState(() {
-      if (questionStep != null) {
-        allShortSteps[index]['step'] = questionStep;
-        allShortSteps[index]['showQuestion'] = true;
-      }
-    });
-  },
-  onVideoUnsaved: () {
-    // Implementa se necessario
-  },
-  onCoinsUpdate: widget.onCoinsUpdate,
-  topic: allShortSteps[index]['level'].topic,  // Aggiungi il parametro topic qui
-),
+      PageViewContainer(
+        videoId: videoId,
+        onCoinsUpdate: widget.onCoinsUpdate,
+        topic: allShortSteps[index]['level'].topic,
+        questionStep: questionStep,
+        onPageChanged: widget.onPageChanged,
+        videoTitle: videoTitle, // Passa il titolo qui
+      ),
       
       // Aggiungi il pulsante "Go To Course" se il video è parte di un corso
       if (course != null)

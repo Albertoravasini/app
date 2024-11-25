@@ -18,6 +18,7 @@ class UserModel {
   int coins;
     int dailyVideosCompleted;
   int dailyQuizFreeUses;
+  final bool hasSeenTutorial;
 
   UserModel({
     required this.uid,
@@ -36,6 +37,7 @@ class UserModel {
     required this.coins,
     this.dailyVideosCompleted = 0,
     this.dailyQuizFreeUses = 0,
+    this.hasSeenTutorial = false,
   }) ;
  
 
@@ -72,6 +74,7 @@ class UserModel {
       unlockedCourses: List<String>.from(data['unlockedCourses'] ?? []),
       dailyVideosCompleted: data['dailyVideosCompleted'] ?? 0,
       dailyQuizFreeUses: data['dailyQuizFreeUses'] ?? 0,
+      hasSeenTutorial: data['hasSeenTutorial'] ?? false,
     );
   }
 
@@ -94,6 +97,7 @@ class UserModel {
       'unlockedCourses': unlockedCourses,
       'dailyVideosCompleted': dailyVideosCompleted,
       'dailyQuizFreeUses': dailyQuizFreeUses,
+      'hasSeenTutorial': hasSeenTutorial,
     };
   }
 }
@@ -148,12 +152,16 @@ class VideoWatched {
   final String title;
   final DateTime watchedAt;
   final bool completed;
+  final int watchTime;
+  final int interactions;
 
   VideoWatched({
     required this.videoId,
     required this.title,
     required this.watchedAt,
     this.completed = false,
+    this.watchTime = 0,
+    this.interactions = 0,
   });
 
   factory VideoWatched.fromMap(Map<String, dynamic> data) {
@@ -162,6 +170,8 @@ class VideoWatched {
       title: data['title'] ?? '',
       watchedAt: DateTime.parse(data['watchedAt'] ?? DateTime.now().toIso8601String()),
       completed: data['completed'] ?? false,
+      watchTime: data['watchTime'] ?? 0,
+      interactions: data['interactions'] ?? 0,
     );
   }
 
@@ -171,6 +181,8 @@ class VideoWatched {
       'title': title,
       'watchedAt': watchedAt.toIso8601String(),
       'completed': completed,
+      'watchTime': watchTime,
+      'interactions': interactions,
     };
   }
 }

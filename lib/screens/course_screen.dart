@@ -116,7 +116,7 @@ class _CourseScreenState extends State<CourseScreen> {
   // Funzione per costruire l'AppBar
   AppBar _buildAppBar() {
     return AppBar(
-      backgroundColor: Colors.transparent, // Rende trasparente lo sfondo dell'AppBar
+      backgroundColor: const Color(0xFF121212),
       elevation: 0, // Rimuove l'ombra dell'AppBar
       centerTitle: false, // Non centra il titolo
       title: isSearching
