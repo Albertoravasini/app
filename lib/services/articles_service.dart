@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ArticlesService {
-  final String baseUrl = 'http://localhost:3000';
+  final String baseUrl = 'http://167.99.131.91:3000';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<List<Map<String, dynamic>>> getRelatedArticles(String videoTitle, String levelId) async {
