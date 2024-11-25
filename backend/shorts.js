@@ -14,6 +14,14 @@ router.post('/get_short_steps', async (req, res) => {
       selectedSubtopic 
     });
 
+    console.log('Verifico i video disponibili in Firestore...');
+    
+    const levelsSnapshot = await admin.firestore()
+      .collection('levels')
+      .get();
+    
+    console.log('Livelli trovati:', levelsSnapshot.size);
+    
     const recommender = new VideoRecommender();
     const recommendedVideos = await recommender.getRecommendedVideos(
       uid, 

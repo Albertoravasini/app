@@ -164,11 +164,16 @@ class VideoRecommender {
         .doc(userId)
         .get();
 
+      console.log('Dati utente trovati:', userDoc.exists);
+
       if (!userDoc.exists) {
+        console.log('Utente non trovato');
         return [];
       }
 
+      // Aggiungi questa riga per definire userData
       const userData = userDoc.data();
+      console.log('Dati utente caricati:', userData ? 'sì' : 'no');
 
       // 2. Raccogli video già visti
       const watchedVideos = new Set();
@@ -185,11 +190,14 @@ class VideoRecommender {
         .collection('levels')
         .get();
 
-      // 4. Filtra i video
+      console.log('Video trovati in Firestore:', videosSnapshot.size);
+
+      // Aggiungi log per il filtro topic
       const validVideos = videosSnapshot.docs.flatMap(doc => {
         const level = doc.data();
         
         if (selectedTopic && selectedTopic !== 'Just Learn' && level.topic !== selectedTopic) {
+          console.log('Video saltato per topic non corrispondente:', level.topic, '!=', selectedTopic);
           return [];
         }
 
@@ -219,11 +227,11 @@ class VideoRecommender {
           }));
       });
 
-      // 5. Mescola e seleziona
-      const shuffledVideos = this._shuffleArray(validVideos);
-      return shuffledVideos.slice(0, limit);
+      console.log('Video validi dopo il filtro:', validVideos.length);
+      return validVideos.slice(0, limit);
 
     } catch (error) {
+      console.error('Errore in getRecommendedVideos:', error);
       return [];
     }
   }

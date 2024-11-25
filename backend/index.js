@@ -19,6 +19,15 @@ admin.initializeApp({
   databaseURL: "https://app-just-learn.firebaseio.com"
 });
 
+// Aggiungi questo test di connessione
+admin.firestore().collection('levels').get()
+  .then(snapshot => {
+    console.log('Connessione a Firestore riuscita, documenti trovati:', snapshot.size);
+  })
+  .catch(error => {
+    console.error('Errore di connessione a Firestore:', error);
+  });
+
 app.use(bodyParser.json());
 app.use(compression());
 
