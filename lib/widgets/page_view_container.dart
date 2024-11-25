@@ -59,7 +59,10 @@ class _PageViewContainerState extends State<PageViewContainer> {
       physics: const PageScrollPhysics(),
       onPageChanged: widget.onPageChanged,
       children: [
-        ArticlesWidget(videoTitle: widget.videoTitle),
+        ArticlesWidget(
+          videoTitle: widget.videoTitle,
+          levelId: widget.videoId,
+        ),
         VideoPlayerWidget(
           videoId: widget.videoId,
           onCoinsUpdate: widget.onCoinsUpdate,

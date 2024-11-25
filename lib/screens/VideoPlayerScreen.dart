@@ -50,7 +50,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
-      builder: (context) => CommentsScreen(videoId: widget.videoId),
+      builder: (context) => CommentsScreen(videoId: widget.videoId, ),
     );
   }
 

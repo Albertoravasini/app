@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import '../services/articles_service.dart';
+import '../services/ai_service.dart';
 
 class ArticlesWidget extends StatefulWidget {
   final String videoTitle;
+  final String levelId;
   
   const ArticlesWidget({
     Key? key,
     required this.videoTitle,
+    required this.levelId,
   }) : super(key: key);
   
   @override
@@ -24,6 +27,9 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
   @override
   void initState() {
     super.initState();
+    print('Inizializzazione ArticlesWidget');
+    print('Video Title: ${widget.videoTitle}');
+    print('Level ID: ${widget.levelId}');
     _pageController = PageController(
       viewportFraction: 0.8,
       initialPage: 0,
@@ -38,25 +44,24 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
 
   Future<void> _loadArticles() async {
     try {
-      final fetchedArticles = await _articlesService.getRelatedArticles(widget.videoTitle);
+      if (widget.videoTitle.isEmpty || widget.levelId.isEmpty) {
+        print('ERRORE: videoTitle o levelId mancanti');
+        print('videoTitle: ${widget.videoTitle}');
+        print('levelId: ${widget.levelId}');
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
+      final fetchedArticles = await _articlesService.getRelatedArticles(
+        widget.videoTitle,
+        widget.levelId,
+      );
+      
       if (mounted) {
         setState(() {
-          articles = fetchedArticles.map((article) {
-            // Gestione della data
-            String formattedDate = article['date'] ?? '';
-            if (formattedDate.isEmpty) {
-              formattedDate = DateTime.now().toString().split(' ')[0];
-            }
-            
-            print('Data originale: ${article['date']}'); // Debug
-            print('Data formattata: $formattedDate'); // Debug
-
-            return {
-              ...article,
-              'date': formattedDate,
-              'source': article['source'] ?? 'Fonte sconosciuta',
-            };
-          }).toList();
+          articles = fetchedArticles;
           isLoading = false;
         });
       }
@@ -193,7 +198,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                         },
                         child: Container(
                           margin: EdgeInsets.symmetric(
-                            vertical: 0,
+                            vertical: 8,
                             horizontal: 0 + (difference.abs() * 5),
                           ),
                           padding: const EdgeInsets.all(20),
@@ -229,12 +234,20 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                     child: AspectRatio(
                                       aspectRatio: 16 / 9,
                                       child: Image.network(
-                                        article['imageUrl'] ?? "https://via.placeholder.com/324x148",
+                                        article['imageUrl'] ?? "https://placehold.co/324x148",
                                         fit: BoxFit.cover,
                                         errorBuilder: (context, error, stackTrace) {
                                           return Image.network(
-                                            "https://via.placeholder.com/324x148",
+                                            "https://placehold.co/324x148",
                                             fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Container(
+                                              color: Colors.grey[800],
+                                              child: Icon(
+                                                Icons.image_not_supported,
+                                                size: 48,
+                                                color: Colors.white.withOpacity(0.5),
+                                              ),
+                                            ),
                                           );
                                         },
                                       ),
@@ -291,16 +304,18 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              Text(
-                                article['content'] ?? 'Contenuto non disponibile',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 14,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w400,
+                              Expanded(
+                                child: Text(
+                                  article['content'] ?? 'Contenuto non disponibile',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 14,
+                                    height: 1.5,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  maxLines: 4,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 4,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -319,7 +334,7 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
 }
 
 // Nuovo screen per il dettaglio dell'articolo
-class ArticleDetailScreen extends StatelessWidget {
+class ArticleDetailScreen extends StatefulWidget {
   final String title;
   final String imageUrl;
   final String date;
@@ -338,121 +353,370 @@ class ArticleDetailScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    print('Debug - DetailScreen Content Length: ${content.length}');
-    print('Debug - DetailScreen Full Content Length: ${fullContent.length}');
+  State<ArticleDetailScreen> createState() => _ArticleDetailScreenState();
+}
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header con immagine
-            Stack(
-              children: [
-                if (imageUrl.isNotEmpty)
-                  Image.network(
-                    imageUrl,
-                    width: double.infinity,
-                    height: 300,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 300,
-                        color: Colors.grey[900],
-                        child: const Icon(
-                          Icons.image_not_supported,
-                          color: Colors.white54,
-                          size: 50,
-                        ),
-                      );
-                    },
-                  ),
-                // Pulsante indietro
-                Positioned(
-                  top: 40,
-                  left: 16,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
+  final AiService _aiService = AiService();
+  Map<String, String>? summary;
+  bool isLoadingSummary = false;
+
+  Future<void> _generateSummary() async {
+    setState(() {
+      isLoadingSummary = true;
+    });
+
+    try {
+      final result = await _aiService.getSummary(widget.fullContent);
+      setState(() {
+        summary = result;
+        isLoadingSummary = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoadingSummary = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore nella generazione del riassunto')),
+      );
+    }
+  }
+
+  String _formatContent(String content) {
+    // Dividi il contenuto in paragrafi
+    final paragraphs = content.split('. ');
+    
+    // Crea sezioni logiche basate sulla lunghezza del testo
+    List<String> formattedParagraphs = [];
+    String currentParagraph = '';
+    
+    for (var sentence in paragraphs) {
+      if (currentParagraph.length > 300) {
+        formattedParagraphs.add(currentParagraph.trim());
+        currentParagraph = '';
+      }
+      currentParagraph += sentence + '. ';
+    }
+    
+    if (currentParagraph.isNotEmpty) {
+      formattedParagraphs.add(currentParagraph.trim());
+    }
+    
+    return formattedParagraphs.join('\n\n');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        appBarTheme: Theme.of(context).appBarTheme.copyWith(
+          scrolledUnderElevation: 0, // Rimuove l'effetto di elevazione durante lo scroll
+          shadowColor: Colors.transparent, // Rimuove l'ombra
+          surfaceTintColor: Colors.transparent, // Rimuove la tinta di superficie di Material 3
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF121212),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          forceMaterialTransparency: true, // Forza la trasparenza completa
+          leading: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_back,
+                color: Colors.white,
+              ),
             ),
-            
-            // Contenuto
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ),
+        extendBodyBehindAppBar: true,
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
                 children: [
-                  // Titolo
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  if (widget.imageUrl.isNotEmpty)
+                    Image.network(
+                      widget.imageUrl,
+                      width: double.infinity,
+                      height: 300,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          height: 300,
+                          color: Colors.grey[900],
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            color: Colors.white54,
+                            size: 50,
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Data e fonte
-                  Row(
-                    children: [
-                      Text(
-                        date,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14,
-                        ),
+                ],
+              ),
+              
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Titolo
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(width: 16),
-                      Container(
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Data e fonte
+                    Row(
+                      children: [
+                        Text(
+                          widget.date,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            widget.source,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Pulsante AI separato
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: isLoadingSummary ? null : _generateSummary,
+                      child: Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 16,
+                          vertical: 16,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withOpacity(0.15),
+                              Colors.white.withOpacity(0.05),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                            width: 1,
+                          ),
                         ),
-                        child: Text(
-                          source,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'AI Summary',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    if (isLoadingSummary)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white.withOpacity(0.7),
+                            ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Contenuto completo
-                  Text(
-                    fullContent.length > content.length ? fullContent : content,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 16,
-                      height: 1.6,
+                    
+                    if (summary != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    color: Colors.white.withOpacity(0.7),
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'AI Summary',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.7),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                summary?['summary'] ?? '',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                              ),
+                              if (summary?['key_learning'] != null) ...[
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.lightbulb_outline,
+                                      color: Colors.white.withOpacity(0.7),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Key Learning',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.7),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: (summary?['key_learning'] ?? '')
+                                      .split('\n')
+                                      .map((point) => point.trim())
+                                      .where((point) => point.isNotEmpty)
+                                      .map((point) => Padding(
+                                            padding: const EdgeInsets.only(bottom: 8.0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '• ',
+                                                  style: TextStyle(
+                                                    color: Colors.white.withOpacity(0.9),
+                                                    fontSize: 14,
+                                                    height: 1.5,
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: Text(
+                                                    point,
+                                                    style: TextStyle(
+                                                      color: Colors.white.withOpacity(0.9),
+                                                      fontSize: 14,
+                                                      height: 1.5,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ))
+                                      .toList(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Contenuto principale
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _formatContent(widget.fullContent.length > widget.content.length ? widget.fullContent : widget.content)
+                            .split('\n\n')
+                            .map((paragraph) => Column(
+                                  children: [
+                                    Text(
+                                      paragraph,
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.9),
+                                        fontSize: 16,
+                                        height: 1.6,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    if (paragraph != _formatContent(widget.fullContent.length > widget.content.length ? widget.fullContent : widget.content)
+                                        .split('\n\n')
+                                        .last)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                        child: Container(
+                                          height: 1,
+                                          color: Colors.white.withOpacity(0.1),
+                                        ),
+                                      ),
+                                  ],
+                                ))
+                            .toList(),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
