@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AiService {
-  final String baseUrl = 'http://localhost:3000';
+  final String baseUrl = 'http://167.99.131.91:3000';
 
   Future<Map<String, String>> getSummary(String content) async {
     try {

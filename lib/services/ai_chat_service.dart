@@ -10,7 +10,7 @@ class AIChatService {
   factory AIChatService() => _instance;
   AIChatService._internal();
 
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://167.99.131.91:3000';
   final List<AIChatMessage> _chatHistory = [];
 
   List<AIChatMessage> get chatHistory => List.unmodifiable(_chatHistory);

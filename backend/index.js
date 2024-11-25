@@ -4,6 +4,8 @@ const redis = require('redis');
 const admin = require('firebase-admin');
 const compression = require('compression');
 const cors = require('cors');
+require('dotenv').config();
+const path = require('path');
 
 // Prima importa tutti i router
 const generateQuestionsRouter = require('./questions/generate_questions');
@@ -42,7 +44,7 @@ app.listen(port, '0.0.0.0', () => {
 });
 
 // Inizializza Firebase Admin SDK
-const serviceAccount = require('./Firebase_AdminSDK.json');
+const serviceAccount = require(path.join(__dirname, process.env.GOOGLE_APPLICATION_CREDENTIALS));
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://app-just-learn.firebaseio.com"
