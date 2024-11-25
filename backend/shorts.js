@@ -7,7 +7,7 @@ const VideoRecommender = require('./recommendation/recommender');
 // Endpoint to get processed short steps
 router.post('/get_short_steps', async (req, res) => {
   try {
-    const { selectedTopic, selectedSubtopic, uid } = req.body;
+    const { selectedTopic, selectedSubtopic, uid, showSavedVideos } = req.body;
     console.log('1. Richiesta ricevuta:', { 
       uid, 
       selectedTopic,
@@ -18,7 +18,7 @@ router.post('/get_short_steps', async (req, res) => {
     const recommendedVideos = await recommender.getRecommendedVideos(
       uid, 
       20, 
-      selectedTopic
+      selectedTopic  // Passiamo il topic selezionato
     );
     
     console.log('2. Video raccomandati ricevuti:', {
@@ -40,47 +40,27 @@ router.post('/get_short_steps', async (req, res) => {
     const userData = userDoc.exists ? userDoc.data() : {};
     const savedVideos = new Set((userData.SavedVideos || []).map(v => v.videoId));
 
-    // Aggiungi log per debugging
-    console.log('Video raccomandati struttura:', recommendedVideos[0]);
-
-    const allShortSteps = recommendedVideos.map(video => {
-      // Verifica che tutti i campi necessari siano presenti
-      console.log('Preparazione video:', {
-        videoId: video.content || video.videoId,
+    const allShortSteps = recommendedVideos.map(video => ({
+      step: {
+        type: 'video',
+        content: video.videoId,
+        videoUrl: video.videoUrl,
+        isShort: true,
+        title: video.title || '',
         topic: video.topic || selectedTopic,
-        level: video.level
-      });
-
-      return {
-        step: {
-          type: 'video',
-          content: video.content || video.videoId, // Assicurati che ci sia un ID video
-          videoUrl: video.videoUrl,
-          isShort: true,
-          title: video.title || '',
-          topic: video.topic || selectedTopic,
-          thumbnailUrl: video.thumbnailUrl,
-          duration: video.duration
-        },
-        level: {
-          id: video.levelId || 'default',
-          topic: video.topic || selectedTopic,
-          title: video.title || '',
-          steps: video.steps || [],
-          levelNumber: video.levelNumber || 1,
-          subtopic: video.subtopic || '',
-          subtopicOrder: video.subtopicOrder || 0
-        },
-        showQuestion: false,
-        isSaved: savedVideos.has(video.content || video.videoId),
-        isWatched: false
-      };
-    });
+        thumbnailUrl: video.thumbnailUrl,
+        duration: video.duration
+      },
+      level: video.level,
+      course: video.course,
+      showQuestion: false,
+      isSaved: savedVideos.has(video.videoId),
+      isWatched: false
+    }));
 
     console.log('4. Short steps preparati:', {
       count: allShortSteps.length,
-      topic: selectedTopic || 'tutti i topic',
-      primoVideo: allShortSteps[0]?.step?.content // Log del primo video ID
+      topic: selectedTopic || 'tutti i topic'
     });
 
     res.json({ success: true, data: allShortSteps });

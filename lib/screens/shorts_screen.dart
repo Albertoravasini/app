@@ -106,7 +106,7 @@ Future<void> _loadAllShortSteps() async {
   if (user == null) return;
 
   try {
-    final shortsService = ShortsService(baseUrl: 'http://localhost:3000');
+    final shortsService = ShortsService(baseUrl: 'http://167.99.131.91:3000');
     final shortStepsWithMetadata = await shortsService.getShortSteps(
       selectedTopic: widget.selectedTopic,
       selectedSubtopic: widget.selectedSubtopic,
@@ -320,23 +320,12 @@ void dispose() {
   int likeCount = allShortSteps[index]['likeCount'] ?? 0;
   bool isSaved = allShortSteps[index]['isSaved'] ?? false;
 
-  // Verifica se level è null prima del cast
-  final level = allShortSteps[index]['level'];
-  if (level == null) {
-    // Gestisci il caso in cui level è null
-    return const Center(
-      child: Text(
-        'Video non disponibile',
-        style: TextStyle(color: Colors.white),
-      ),
-    );
-  }
-
   final currentStep = allShortSteps[index]['step'] as LevelStep;
-  final videoId = currentStep.content;
-  final videoTitle = (level as Level).title; // Cast sicuro dopo la verifica
+  final level = allShortSteps[index]['level'] as Level;
+  final videoId = currentStep.content; // Estrai l'ID del video
+  final videoTitle = level.title; // Ottieni il titolo dal level
   
-  final steps = (level as Level).steps;
+  final steps = level.steps;
   final currentStepIndex = steps.indexOf(currentStep);
 
   LevelStep? questionStep;
@@ -354,10 +343,10 @@ void dispose() {
       PageViewContainer(
         videoId: videoId,
         onCoinsUpdate: widget.onCoinsUpdate,
-        topic: (level as Level).topic, // Cast sicuro dopo la verifica
+        topic: allShortSteps[index]['level'].topic,
         questionStep: questionStep,
         onPageChanged: widget.onPageChanged,
-        videoTitle: videoTitle, // Passa il titolo qui
+        videoTitle: videoTitle, // Assicurati che questo sia definito
       ),
       
       // Aggiungi il pulsante "Go To Course" se il video è parte di un corso

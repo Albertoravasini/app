@@ -158,26 +158,17 @@ class VideoRecommender {
   // Metodo principale per ottenere i video raccomandati
   async getRecommendedVideos(userId, limit = 10, selectedTopic = null) {
     try {
-      console.log('Inizializzazione ricerca video...');
-      
-      // Verifica che admin sia inizializzato
-      if (!admin.apps.length) {
-        throw new Error('Firebase Admin non è inizializzato');
-      }
-
-      const db = admin.firestore();
-      console.log('Firestore connesso');
-
       // 1. Ottieni dati utente
-      const userDoc = await db.collection('users').doc(userId).get();
+      const userDoc = await admin.firestore()
+        .collection('users')
+        .doc(userId)
+        .get();
 
       if (!userDoc.exists) {
-        console.log('Utente non trovato');
         return [];
       }
 
       const userData = userDoc.data();
-      console.log('Dati utente trovati');
 
       // 2. Raccogli video già visti
       const watchedVideos = new Set();
@@ -188,12 +179,11 @@ class VideoRecommender {
           }
         });
       }
-      console.log(`Video già visti: ${watchedVideos.size}`);
 
       // 3. Ottieni tutti i video
-      const videosSnapshot = await db.collection('levels').get();
-
-      console.log(`Trovati ${videosSnapshot.size} livelli nel database`);
+      const videosSnapshot = await admin.firestore()
+        .collection('levels')
+        .get();
 
       // 4. Filtra i video
       const validVideos = videosSnapshot.docs.flatMap(doc => {
@@ -212,35 +202,28 @@ class VideoRecommender {
               hasUrl: !!(step?.videoUrl || step?.content),
               notWatched: !watchedVideos.has(videoId)
             };
-            console.log('Controllo video:', {
-              videoId,
-              checks,
-              passed: Object.values(checks).every(check => check)
-            });
             return Object.values(checks).every(check => check);
           })
           .map(step => ({
             ...step,
-            levelId: doc.id,
+            videoId: step.content || this._extractVideoId(step.videoUrl),
+            videoUrl: step.videoUrl || `https://youtube.com/watch?v=${step.content}`,
             topic: level.topic,
             subtopic: level.subtopic,
-            levelNumber: level.levelNumber,
-            subtopicOrder: level.subtopicOrder
+            level: {
+              id: doc.id,
+              title: level.title,
+              topic: level.topic,
+              subtopic: level.subtopic
+            }
           }));
       });
-
-      console.log(`Video validi trovati: ${validVideos.length}`);
 
       // 5. Mescola e seleziona
       const shuffledVideos = this._shuffleArray(validVideos);
       return shuffledVideos.slice(0, limit);
 
     } catch (error) {
-      console.error('Errore dettagliato:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
       return [];
     }
   }
