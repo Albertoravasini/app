@@ -55,3 +55,6 @@ node_modules/
 backend/Firebase_AdminSDK.json
 backend/Firebase_AdminSDK.json
 backend/firebase-credentials.json
+backend/.env
+backend/.env
+backend/.env
