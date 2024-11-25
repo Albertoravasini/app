@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AIChat:
-    def __init__(self, model_path: str = "Meta-Llama-3-8B-Instruct.Q4_0.gguf"):
+    def __init__(self, model_path: str = "ai/models/mistral-7b-instruct.gguf"):
         self.model = GPT4All(model_path)
         
     def generate_response(self, message: str, chat_history: List[Dict], video_title: str = "") -> Dict:
