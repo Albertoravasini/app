@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class AIChat:
     def __init__(self, model_path: str = "/root/app/backend/ai/models/Meta-Llama-3-8B-Instruct.Q4_0.gguf"):
-        self.model = GPT4All(model_path)
+        self.model = GPT4All(model_path, device='cpu')
         
     def generate_response(self, message: str, chat_history: List[Dict], video_title: str = "") -> Dict:
         try:

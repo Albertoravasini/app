@@ -8,11 +8,10 @@ def download_model():
     MODEL_NAME = "Meta-Llama-3-8B-Instruct.Q4_0.gguf"
     
     try:
-        # Crea la directory se non esiste
         os.makedirs(MODEL_PATH, exist_ok=True)
         
         print(f"Inizializzazione download del modello in {MODEL_PATH}...")
-        model = GPT4All(MODEL_NAME, model_path=MODEL_PATH)
+        model = GPT4All(MODEL_NAME, model_path=MODEL_PATH, device='cpu')
         print("Download completato con successo!")
         return True
     except Exception as e:
