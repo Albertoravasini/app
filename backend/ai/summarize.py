@@ -1,32 +1,39 @@
 # type: ignore
-from gpt4all import GPT4All
+from openai import OpenAI
 import sys
 import json
+import os
+from dotenv import load_dotenv
+
+# Carica le variabili d'ambiente dal file .env nella root del backend
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(backend_dir, '.env'))
 
 def summarize_text(text):
     try:
-        model = GPT4All("/root/app/backend/ai/models/Meta-Llama-3-8B-Instruct.Q4_0.gguf", device='cpu')
+        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         
-        prompt = f"""
-        Please provide:
-        1. A concise summary of the following text in English (2-3 sentences)
-        2. Three key learnings from this text, formatted as bullet points
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{
+                "role": "system",
+                "content": "Sei un assistente che crea riassunti concisi e punti chiave."
+            }, {
+                "role": "user",
+                "content": f"""Please provide:
+                1. A concise summary of the following text in English (2-3 sentences)
+                2. Three key learnings from this text, formatted as bullet points
 
-        Text:
-        {text[:2000]}
+                Text:
+                {text[:2000]}"""
+            }],
+            temperature=0.7,
+            max_tokens=500
+        )
         
-        Format your response as:
-        Summary: [your summary here]
-        Key Learning:
-        • [first key learning]
-        • [second key learning]
-        • [third key learning]
-        """
-        
-        response = model.generate(prompt, max_tokens=500)
-        
-        # Parsing della risposta per separare il riassunto e l'apprendimento chiave
-        parts = response.strip().split('Key Learning:')
+        result = response.choices[0].message.content.strip()
+        parts = result.split('Key Learning')
         summary = parts[0].replace('Summary:', '').strip()
         key_learning = parts[1].strip() if len(parts) > 1 else "No key learning extracted"
         

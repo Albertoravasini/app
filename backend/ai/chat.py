@@ -1,33 +1,37 @@
 # type: ignore
-from gpt4all import GPT4All
+from openai import OpenAI
 import sys
 import json
-from typing import Dict, List, Optional
+import os
+from typing import Dict, List
 import logging
+from dotenv import load_dotenv
 
-# Configura logging
+# Carica le variabili d'ambiente dal file .env nella root del backend
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(backend_dir, '.env'))
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AIChat:
-    def __init__(self, model_path: str = "/root/app/backend/ai/models/Meta-Llama-3-8B-Instruct.Q4_0.gguf"):
-        self.model = GPT4All(model_path, device='cpu')
+    def __init__(self):
+        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         
     def generate_response(self, message: str, chat_history: List[Dict], video_title: str = "") -> Dict:
         try:
-            context = self._build_context(message, chat_history, video_title)
-            response = self.model.generate(
-                context,
-                max_tokens=200,
-                temp=0.7,
-                top_k=40,
-                top_p=0.4,
-                repeat_penalty=1.18
+            messages = self._build_messages(message, chat_history, video_title)
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=200
             )
             
             return {
                 "success": True,
-                "response": response.strip()
+                "response": response.choices[0].message.content.strip()
             }
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
@@ -36,34 +40,35 @@ class AIChat:
                 "error": str(e)
             }
 
-    def _build_context(self, message: str, chat_history: List[Dict], video_title: str) -> str:
-        return f"""
-        Sei un tutor che aiuta gli studenti a comprendere meglio i video educativi.
-        Stai rispondendo a domande sul video: "{video_title}"
-        Rispondi in modo BREVE e CONCISO (massimo 2-3 frasi).
+    def _build_messages(self, message: str, chat_history: List[Dict], video_title: str) -> List[Dict]:
+        messages = [{
+            "role": "system",
+            "content": f"""Sei un tutor che aiuta gli studenti a comprendere meglio i video educativi.
+            Stai rispondendo a domande sul video: "{video_title}"
+            Rispondi in modo BREVE e CONCISO (massimo 2-3 frasi).
+            
+            Regole:
+            1. Usa le informazioni dalle chat precedenti
+            2. Rispondi SOLO alla domanda specifica
+            3. Non ripetere informazioni già date
+            4. Mantieni un tono amichevole ma professionale"""
+        }]
         
-        Regole:
-        1. Usa le informazioni dalle chat precedenti
-        2. Rispondi SOLO alla domanda specifica
-        3. Non ripetere informazioni già date
-        4. Mantieni un tono amichevole ma professionale
+        # Aggiungi la cronologia della chat
+        for msg in chat_history:
+            role = "assistant" if msg.get('isAi') else "user"
+            messages.append({
+                "role": role,
+                "content": msg.get('content', '')
+            })
         
-        Cronologia della chat:
-        {self._format_chat_history(chat_history)}
+        # Aggiungi il messaggio corrente
+        messages.append({
+            "role": "user",
+            "content": message
+        })
         
-        Domanda dello studente:
-        {message}
-        """
-
-    @staticmethod
-    def _format_chat_history(chat_history: List[Dict]) -> str:
-        if not chat_history:
-            return "Nessuna cronologia precedente."
-        
-        return "\n".join(
-            f"{'Studente' if not msg.get('isAi') else 'Insegnante'}: {msg.get('content', '')}"
-            for msg in chat_history
-        )
+        return messages
 
 def main():
     try:
