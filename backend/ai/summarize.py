@@ -14,6 +14,9 @@ def summarize_text(text):
     try:
         client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         
+        # Aggiungi log per debug
+        print(f"OpenAI Key: {os.getenv('OPENAI_API_KEY')[:5]}...")
+        
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{
@@ -38,21 +41,27 @@ def summarize_text(text):
         key_learning = parts[1].strip() if len(parts) > 1 else "No key learning extracted"
         
         return {
-            "summary": summary,
-            "key_learning": key_learning
+            "success": True,
+            "summary": {
+                "summary": summary,
+                "key_learning": key_learning
+            }
         }
         
     except Exception as e:
         print(f"Errore durante la generazione del riassunto: {str(e)}", file=sys.stderr)
-        return None
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     try:
         input_text = sys.stdin.read()
-        summary = summarize_text(input_text)
-        if summary:
-            print(json.dumps({"success": True, "summary": summary}))
-        else:
-            print(json.dumps({"success": False, "error": "Errore nella generazione del riassunto"}))
+        result = summarize_text(input_text)
+        print(json.dumps(result))
     except Exception as e:
-        print(json.dumps({"success": False, "error": str(e)})) 
+        print(json.dumps({
+            "success": False,
+            "error": str(e)
+        })) 
