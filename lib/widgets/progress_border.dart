@@ -9,6 +9,7 @@ class ProgressBorder extends StatelessWidget {
   final double borderWidth;
   final Color borderColor;
   final BorderRadius borderRadius;
+  final VoidCallback? onProgressComplete;
 
   const ProgressBorder({
     required this.child,
@@ -16,31 +17,37 @@ class ProgressBorder extends StatelessWidget {
     this.borderWidth = 5.0,
     this.borderColor = Colors.yellowAccent,
     this.borderRadius = BorderRadius.zero,
+    this.onProgressComplete,
   });
 
   @override
-Widget build(BuildContext context) {
-  return TweenAnimationBuilder<double>(
-    tween: Tween<double>(begin: 0.0, end: progress),
-    duration: const Duration(milliseconds: 100), // Durata breve per un aggiornamento fluido
-    builder: (context, animatedProgress, child) {
-      // Cambia il colore e lo spessore del bordo al completamento del progresso
-      final currentBorderColor = animatedProgress >= 1.0 ? Colors.yellowAccent : borderColor;
-      final currentBorderWidth = animatedProgress >= 1.0 ? borderWidth + 2.0 : borderWidth;
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: progress),
+      duration: const Duration(milliseconds: 100),
+      onEnd: () {
+        if (progress >= 1.0 && onProgressComplete != null) {
+          onProgressComplete!();
+        }
+      },
+      builder: (context, animatedProgress, child) {
+        final currentBorderColor = animatedProgress >= 1.0 ? Colors.yellowAccent : borderColor;
+        final currentBorderWidth = animatedProgress >= 1.0 ? borderWidth + 2.0 : borderWidth;
 
-      return CustomPaint(
-        painter: _BorderPainter(
-          progress: animatedProgress,
-          borderWidth: currentBorderWidth,
-          borderColor: currentBorderColor,
-          borderRadius: borderRadius,
-        ),
-        child: child,
-      );
-    },
-    child: child,
-  );
-}}
+        return CustomPaint(
+          painter: _BorderPainter(
+            progress: animatedProgress,
+            borderWidth: currentBorderWidth,
+            borderColor: currentBorderColor,
+            borderRadius: borderRadius,
+          ),
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
+}
 
 class _BorderPainter extends CustomPainter {
   final double progress;

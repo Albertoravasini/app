@@ -265,6 +265,8 @@ Padding(
       return VideoPlayerWidget(
         videoId: videoId,
         onShowQuestion: () {},
+        onShowArticles: () {},
+        onShowNotes: () {},
         isLiked: false,
         likeCount: 0,
         isSaved: false,

@@ -45,4 +45,10 @@ app.*.map.json
 /android/app/release
 backend/serviceAccountKey.json
 backend/serviceAccountKey.json
+<<<<<<< HEAD
 backend/node_modules/
+=======
+node_modules/
+node_modules/
+*.dylib
+>>>>>>> app/Justlearn2

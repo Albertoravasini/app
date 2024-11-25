@@ -43,7 +43,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return ScaffoldMessenger(
       key: scaffoldMessengerKey,
       child: Scaffold(
-        backgroundColor: const Color(0xFF121212), // Sfondo scuro
+        backgroundColor: const Color(0xFF121212),
         appBar: AppBar(
           title: const Text(
             'Notifications',

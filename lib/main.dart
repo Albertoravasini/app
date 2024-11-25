@@ -8,7 +8,6 @@ import 'package:Just_Learn/screens/quiz_screen.dart';
 import 'package:Just_Learn/services/notification_service.dart';
 import 'package:Just_Learn/services/auth_service.dart';
 import 'package:Just_Learn/models/user.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -26,8 +25,7 @@ import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navig
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Dichiara un'istanza globale di FirebaseAnalytics
-FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+
 
 // Funzione di gestione dei messaggi in background
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -83,7 +81,7 @@ class MyApp extends StatelessWidget {
           navigatorKey: navigatorKey,
           theme: ThemeData(
             primaryColor: Colors.white,
-            scaffoldBackgroundColor: Colors.black,
+            scaffoldBackgroundColor: const Color(0xFF121212),
             fontFamily: 'Montserrat',
             iconTheme: const IconThemeData(
               color: Colors.white,

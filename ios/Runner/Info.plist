@@ -2,6 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- Configurazione esistente -->
+
+    <!-- Configurazione PostHog -->
+    <key>com.posthog.posthog.API_KEY</key>
+    <string>phc_yVg99hIIWok5ohl5mEtkTmCL3CNL4NxDnTwNzffnBQ</string>
+    <key>com.posthog.posthog.POSTHOG_HOST</key>
+    <string>https://eu.i.posthog.com</string>
+    <key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
+    <true/>
+
+    <!-- Resto delle tue configurazioni esistenti -->
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

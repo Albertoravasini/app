@@ -176,10 +176,10 @@ Widget build(BuildContext context) {
   print("Costruzione della schermata delle domande...");
 
   return Scaffold(
-    backgroundColor: Colors.black,
+    backgroundColor: const Color(0xFF121212),
     appBar: AppBar(
       title: Text(widget.topic, style: const TextStyle(color: Colors.white)),
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF121212),
       elevation: 0,
     ),
     body: selectedQuestionsWithLevels.isEmpty

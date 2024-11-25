@@ -8,7 +8,19 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/app_icon" /> <!-- Imposta l'icona della notifica -->
-
+<!-- Configurazione PostHog -->
+    <meta-data
+        android:name="com.posthog.posthog.API_KEY"
+        android:value="phc_yVg99hIIWok5ohl5mEtkTmCL3CNL4NxDnTwNzffnBQ" />
+    <meta-data
+        android:name="com.posthog.posthog.POSTHOG_HOST"
+        android:value="https://eu.i.posthog.com" />
+    <meta-data
+        android:name="com.posthog.posthog.TRACK_APPLICATION_LIFECYCLE_EVENTS"
+        android:value="true" />
+    <meta-data
+        android:name="com.posthog.posthog.DEBUG"
+        android:value="true" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

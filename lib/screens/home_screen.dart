@@ -1,13 +1,10 @@
 import 'package:Just_Learn/screens/access/login_screen.dart';
-import 'package:Just_Learn/screens/subtopic_selection_sheet.dart';
-import 'package:Just_Learn/screens/topic_selection_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'shorts_screen.dart';
 import '../models/user.dart';
-import '../models/level.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import '../widgets/tutorial_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,22 +23,52 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> subtopics = [];
   String videoTitle = ""; // Titolo iniziale del video
   bool showSavedVideos = false;
-  
+  bool showArticles = false; // Aggiungi questa variabile
+  int _currentPage = 1;  // Inizia da 1 perché il video è al centro
+  bool _showTutorial = false;
 
   @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  if (allTopics.isEmpty) {
-    _loadTopicsAndUser();
+  void initState() {
+    super.initState();
+    _checkTutorial();
   }
-}
 
-void _toggleSavedVideos() {
-  setState(() {
-    showSavedVideos = !showSavedVideos; // Alterna la variabile
-  });
-  // Non serve ricaricare tutto qui perché la chiave cambierà e forzerà il ri-rendering
-}
+  Future<void> _checkTutorial() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        final userModel = UserModel.fromMap(userData);
+        
+        setState(() {
+          _showTutorial = !userModel.hasSeenTutorial;
+        });
+
+        if (_showTutorial) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({'hasSeenTutorial': true});
+        }
+      }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (allTopics.isEmpty) {
+      _loadTopicsAndUser();
+    }
+  }
+
+  void _toggleSavedVideos() {
+    setState(() {
+      showSavedVideos = !showSavedVideos; // Alterna la variabile
+    });
+    // Non serve ricaricare tutto qui perché la chiave cambierà e forzerà il ri-rendering
+  }
 
   Future<void> _loadTopicsAndUser() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -89,123 +116,42 @@ void _toggleSavedVideos() {
       _redirectToLogin();
     }
 
-    await _loadAllTopics();
-
     if (selectedTopic == null) {
       setState(() {
         selectedTopic = 'Just Learn';
         selectedSubtopic = null;
       });
     }
-
-    if (subtopics.isEmpty) {
-      await _loadSubtopics(selectedTopic!);
-    }
   }
 
   // Metodo per aggiornare i coins dell'utente
-void _updateCoins(int newCoins) {
-  if (mounted) {
-    setState(() {
-      currentUser?.coins = newCoins;
-    });
-  }
-}
-
-Future<void> _updateConsecutiveDays(UserModel user) async {
-  final now = DateTime.now();
-  final lastAccess = user.lastAccess;
-  final difference = DateTime(now.year, now.month, now.day)
-      .difference(DateTime(lastAccess.year, lastAccess.month, lastAccess.day))
-      .inDays;
-
-  if (difference == 1) {
-    // Incrementa se l'accesso è avvenuto il giorno successivo
-    user.consecutiveDays += 1;
-  } else if (difference > 1) {
-    // Resetta a 0 se sono passati più di un giorno
-    user.consecutiveDays = 0;
-  }
-  // Se difference == 0, nessuna modifica
-
-  user.lastAccess = now;
-
-  await FirebaseFirestore.instance.collection('users').doc(user.uid).update(user.toMap());
-}
-
-  Future<void> _loadAllTopics() async {
-    final querySnapshot = await FirebaseFirestore.instance.collection('topics').get();
+  void _updateCoins(int newCoins) {
     if (mounted) {
       setState(() {
-        allTopics = querySnapshot.docs.map((doc) => doc.id).toList();
-        isLoading = false;
+        currentUser?.coins = newCoins;
       });
     }
   }
 
-  Future<void> _loadSubtopics(String topic) async {
-  final levelsCollection = FirebaseFirestore.instance.collection('levels');
-  final querySnapshot = await levelsCollection
-      .where('topic', isEqualTo: topic)
-      .orderBy('subtopicOrder')  // Ordina per subtopicOrder
-      .orderBy('levelNumber')    // Ordina per levelNumber
-      .get();
-  final levels = querySnapshot.docs.map((doc) => Level.fromFirestore(doc)).toList();
+  Future<void> _updateConsecutiveDays(UserModel user) async {
+    final now = DateTime.now();
+    final lastAccess = user.lastAccess;
+    final difference = DateTime(now.year, now.month, now.day)
+        .difference(DateTime(lastAccess.year, lastAccess.month, lastAccess.day))
+        .inDays;
 
-  final newSubtopics = levels
-      .map((level) => level.subtopic ?? '')
-      .where((subtopic) => subtopic.isNotEmpty)
-      .toSet()
-      .toList();
-
-  if (mounted) {
-    setState(() {
-      subtopics = newSubtopics;
-    });
-  }
-}
-
-  void _selectTopic(String newTopic) async {
-    if (selectedTopic != newTopic) {
-      // Cambia il topic solo se diverso da quello attualmente selezionato
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'topics': [newTopic],
-        });
-      }
-
-      await _loadSubtopics(newTopic);
-
-      if (mounted) {
-        setState(() {
-          selectedTopic = newTopic;
-          selectedSubtopic = null; // Deselezioniamo il subtopic quando cambiamo il topic
-        });
-      }
+    if (difference == 1) {
+      // Incrementa se l'accesso è avvenuto il giorno successivo
+      user.consecutiveDays += 1;
+    } else if (difference > 1) {
+      // Resetta a 0 se sono passati più di un giorno
+      user.consecutiveDays = 0;
     }
-  }
+    // Se difference == 0, nessuna modifica
 
-  void _selectSubtopic(String? newSubtopic) {
-    setState(() {
-      selectedSubtopic = newSubtopic;
-      videoTitle = ''; // Resettiamo il titolo del video quando cambiamo subtopic
-    });
-  }
+    user.lastAccess = now;
 
-  void _openSubtopicSelectionSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) => SubtopicSelectionSheet(
-        subtopics: [ ...subtopics], 
-        selectedSubtopic: selectedSubtopic,
-        onSelectSubtopic: _selectSubtopic,
-      ),
-    );
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).update(user.toMap());
   }
 
   void _redirectToLogin() {
@@ -219,150 +165,133 @@ Future<void> _updateConsecutiveDays(UserModel user) async {
     });
   }
 
- void _updateVideoTitle(String newTitle) {
-  if (mounted) { // Controlla se il widget è ancora montato
+  void _updateVideoTitle(String newTitle) {
+    if (mounted) { // Controlla se il widget è ancora montato
+      setState(() {
+        videoTitle = newTitle;
+      });
+    }
+  }
+
+  // Aggiungi questo metodo per gestire il cambio pagina
+  void _onPageChanged(int page) {
+    print('Page changed to: $page');
     setState(() {
-      videoTitle = newTitle;
+      _currentPage = page;
     });
   }
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-  title: Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Expanded(
-        child: GestureDetector(
-          onTap: () => _showTopicSelectionSheet(context),
-          child: Row(
+      body: Stack(
+        children: [
+          Stack(
             children: [
-              Flexible(
-                child: Text(
-                  selectedTopic ?? 'Topic',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
+              ShortsScreen(
+                key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'),
+                selectedTopic: selectedTopic,
+                selectedSubtopic: selectedSubtopic,
+                onVideoTitleChange: _updateVideoTitle,
+                onCoinsUpdate: _updateCoins,
+                showSavedVideos: showSavedVideos,
+                onPageChanged: _onPageChanged,
+              ),
+              // Contenitore superiore che include sia l'indicatore che i coins
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 0.0),
+                  child: Stack(
+                    alignment: Alignment.topCenter,  // Allinea tutto in alto al centro
+                    children: [
+                      // Container dei coins (a sinistra)
+                      Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 16.0),
+                          child: Container(
+                            height: 32,  // Altezza fissa per allineare con l'indicatore
+                            padding: const EdgeInsets.all(5),
+                            decoration: ShapeDecoration(
+                              color: Color(0x93333333),
+                              shape: RoundedRectangleBorder(
+                                side: BorderSide(
+                                  width: 1,
+                                  color: Colors.white.withOpacity(0.10000000149011612),
+                                ),
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.stars_rounded,
+                                  color: Colors.yellowAccent,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 14),
+                                Text(
+                                  '${currentUser?.coins ?? 0}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontFamily: 'Montserrat',
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.48,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      
+                      // Indicatore di pagina (al centro)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          return Container(
+                            height: 32,  // Stessa altezza del container dei coins
+                            alignment: Alignment.center,  // Centra verticalmente i dot
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                              height: 12,
+                              width: _currentPage == index ? 32 : 12,
+                              decoration: BoxDecoration(
+                                color: _currentPage == index 
+                                  ? Colors.yellowAccent 
+                                  : Color(0x93333333),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.10000000149011612),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(Icons.arrow_drop_down, color: Colors.white, size: 28),
             ],
           ),
-        ),
-      ),
-      Row(
-        children: [
-          // Sostituisci l'icona del fuoco e i giorni consecutivi con il Container dei coins
-          Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.stars_rounded, color: Colors.yellowAccent, size: 25),
-                const SizedBox(width: 8),
-                Text(
-                  '${currentUser?.coins ?? 0}', // Mostra il numero di coins
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 5),
-          IconButton(
-            icon: SvgPicture.asset(
-              'assets/mingcute_bookmark-fill.svg',
-              color: showSavedVideos ? Colors.yellow : Colors.white,
-            ),
-            onPressed: _toggleSavedVideos,
-          ),
-        ],
-      ),
-    ],
-  ),
-),
-      body: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 34,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-               
-                Container(
-  width: double.infinity,  // Larghezza massima
-  height: 34,
-  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),  // Assicurati che il padding sia corretto
-  decoration: ShapeDecoration(
-    color: const Color(0xFF181819),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    ),
-  ),
-  child: Center(
-    child: Text(
-      videoTitle,
-      textAlign: TextAlign.center,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        height: 1.0,
-        letterSpacing: 0.42,
-      ),
-    ),
-  ),
-),
-              ],
-            ),
-          ),
-          Expanded(
-  child: ShortsScreen(
-    key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'), // Forza il ri-rendering
-    selectedTopic: selectedTopic,
-    selectedSubtopic: selectedSubtopic,
-    onVideoTitleChange: _updateVideoTitle,
-    onCoinsUpdate: _updateCoins,  // Passiamo la funzione per aggiornare i coins
-    showSavedVideos: showSavedVideos, // Passa la variabile per mostrare i video salvati
-  ),
-),
-        ],
-      ),
-    );
-  }
 
-  void _showTopicSelectionSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) => TopicSelectionSheet(
-        allTopics: allTopics,
-        selectedTopic: selectedTopic,
-        onSelectTopic: _selectTopic,
+          // Tutorial overlay
+          if (_showTutorial)
+            TutorialOverlay(
+              onComplete: () {
+                setState(() {
+                  _showTutorial = false;
+                });
+              },
+            ),
+        ],
       ),
     );
   }
