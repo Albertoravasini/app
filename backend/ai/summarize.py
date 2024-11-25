@@ -5,7 +5,7 @@ import json
 
 def summarize_text(text):
     try:
-        model = GPT4All("ai/models/mistral-7b-instruct.gguf")
+        model = GPT4All("Meta-Llama-3-8B-Instruct.Q4_0.gguf")
         
         prompt = f"""
         Please provide:

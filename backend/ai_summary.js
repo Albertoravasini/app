@@ -3,8 +3,12 @@ const router = express.Router();
 const { spawn } = require('child_process');
 const path = require('path');
 
+// Aumenta il timeout
+const PYTHON_TIMEOUT = 300000; // 5 minuti
+
 router.post('/summarize', async (req, res) => {
   const { content } = req.body;
+  let hasResponded = false;
   
   if (!content) {
     return res.status(400).json({ 
