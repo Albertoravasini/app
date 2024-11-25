@@ -27,7 +27,7 @@ router.post('/chat', async (req, res) => {
   const { message, videoId, levelId, chatHistory, videoTitle } = req.body;
   
   try {
-    const pythonProcess = spawn('python3', [
+    const pythonProcess = spawn('/root/app/backend/venv/bin/python3', [
       path.join(__dirname, 'ai', 'chat.py')
     ]);
 

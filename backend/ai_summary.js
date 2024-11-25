@@ -14,7 +14,7 @@ router.post('/summarize', async (req, res) => {
   }
 
   try {
-    const pythonProcess = spawn('python3', [
+    const pythonProcess = spawn('/root/app/backend/venv/bin/python3', [
       path.join(__dirname, 'ai', 'summarize.py')
     ]);
 
