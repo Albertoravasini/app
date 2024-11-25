@@ -53,3 +53,5 @@ node_modules/
 *.dylib
 >>>>>>> app/Justlearn2
 backend/Firebase_AdminSDK.json
+backend/Firebase_AdminSDK.json
+backend/firebase-credentials.json
