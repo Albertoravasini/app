@@ -3,8 +3,9 @@ const router = express.Router();
 const { spawn } = require('child_process');
 const path = require('path');
 
-// Aumenta il timeout
-const PYTHON_TIMEOUT = 300000; // 5 minuti
+// Determina il percorso Python in base all'ambiente
+const isProd = process.env.NODE_ENV === 'production';
+const PYTHON_PATH = isProd ? '/root/app/backend/venv/bin/python3' : 'python3';
 
 router.post('/summarize', async (req, res) => {
   const { content } = req.body;
@@ -18,7 +19,7 @@ router.post('/summarize', async (req, res) => {
   }
 
   try {
-    const pythonProcess = spawn('/root/app/backend/venv/bin/python3', [
+    const pythonProcess = spawn(PYTHON_PATH, [
       path.join(__dirname, 'ai', 'summarize.py')
     ]);
 

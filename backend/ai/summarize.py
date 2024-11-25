@@ -3,20 +3,32 @@ from openai import OpenAI
 import sys
 import json
 import os
+import logging
 from dotenv import load_dotenv
 
-# Carica le variabili d'ambiente dal file .env nella root del backend
+# Configura logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Carica le variabili d'ambiente
 current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(backend_dir, '.env'))
 
 def summarize_text(text):
     try:
-        client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            logger.error("API key non trovata nel file .env")
+            return {
+                "success": False,
+                "error": "API key non configurata"
+            }
+            
+        logger.info("Inizializzazione client OpenAI...")
+        client = OpenAI(api_key=api_key)
         
-        # Aggiungi log per debug
-        print(f"OpenAI Key: {os.getenv('OPENAI_API_KEY')[:5]}...")
-        
+        logger.info("Invio richiesta a OpenAI...")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{
@@ -35,6 +47,7 @@ def summarize_text(text):
             max_tokens=500
         )
         
+        logger.info("Elaborazione risposta...")
         result = response.choices[0].message.content.strip()
         parts = result.split('Key Learning')
         summary = parts[0].replace('Summary:', '').strip()
@@ -49,7 +62,7 @@ def summarize_text(text):
         }
         
     except Exception as e:
-        print(f"Errore durante la generazione del riassunto: {str(e)}", file=sys.stderr)
+        logger.error(f"Errore dettagliato: {str(e)}")
         return {
             "success": False,
             "error": str(e)
@@ -57,10 +70,20 @@ def summarize_text(text):
 
 if __name__ == "__main__":
     try:
+        logger.info("Lettura input...")
         input_text = sys.stdin.read()
-        result = summarize_text(input_text)
-        print(json.dumps(result))
+        if not input_text:
+            logger.error("Nessun testo ricevuto in input")
+            print(json.dumps({
+                "success": False,
+                "error": "Nessun testo fornito"
+            }))
+        else:
+            logger.info("Generazione riassunto...")
+            result = summarize_text(input_text)
+            print(json.dumps(result))
     except Exception as e:
+        logger.error(f"Errore principale: {str(e)}")
         print(json.dumps({
             "success": False,
             "error": str(e)
