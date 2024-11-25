@@ -106,7 +106,7 @@ Future<void> _loadAllShortSteps() async {
   if (user == null) return;
 
   try {
-    final shortsService = ShortsService(baseUrl: 'http://localhost:3000');
+    final shortsService = ShortsService(baseUrl: 'http://167.99.131.91:3000');
     final shortStepsWithMetadata = await shortsService.getShortSteps(
       selectedTopic: widget.selectedTopic,
       selectedSubtopic: widget.selectedSubtopic,

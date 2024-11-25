@@ -7,7 +7,7 @@ class Scraper {
     return new Promise((resolve, reject) => {
       const options = {
         mode: 'text',
-        pythonPath: 'python3',
+        pythonPath: '/root/app/backend/venv/bin/python3',
         pythonOptions: ['-u'],
         scriptPath: path.join(__dirname),
         args: [query]
