@@ -3,14 +3,20 @@ const bodyParser = require('body-parser');
 const redis = require('redis');
 const admin = require('firebase-admin');
 const compression = require('compression');
-const cors = require('cors');
-require('dotenv').config();
-const path = require('path');
-
-// Prima importa tutti i router
 const generateQuestionsRouter = require('./questions/generate_questions');
+const path = require('path');
 const aiSummaryRouter = require('./ai_summary');
 const aiChatRouter = require('./ai_chat');
+const cors = require('cors');
+
+// Inizializza Firebase Admin SDK PRIMA di importare i router
+const serviceAccount = require('./Firebase_AdminSDK.json');
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://app-just-learn.firebaseio.com"
+});
+
+// Importa i router DOPO l'inizializzazione di Firebase
 const shortsRouter = require('./shorts');
 const articlesRouter = require('./articles');
 
@@ -22,7 +28,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(compression());
 
-// Poi definisci le route
+// Routes
 app.use('/ai', aiSummaryRouter);
 app.use('/ai', aiChatRouter);
 app.use('/', shortsRouter);
@@ -41,13 +47,6 @@ app.use((req, res) => {
 // INFINE avvia il server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server running on port ${port}`);
-});
-
-// Inizializza Firebase Admin SDK
-const serviceAccount = require(path.join(__dirname, process.env.GOOGLE_APPLICATION_CREDENTIALS));
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://app-just-learn.firebaseio.com"
 });
 
 const redisClient = redis.createClient();
