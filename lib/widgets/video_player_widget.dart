@@ -497,6 +497,7 @@ Widget build(BuildContext context) {
           _showArticles 
           ? ArticlesWidget(
               videoTitle: _controller.metadata.title ?? 'Untitled',
+              levelId: widget.videoId ?? 'no level id found',
             )
           : _showNotes 
           ? NotesScreen(

@@ -3,11 +3,43 @@ const bodyParser = require('body-parser');
 const redis = require('redis');
 const admin = require('firebase-admin');
 const compression = require('compression');
-const generateQuestionsRouter = require('./questions/generate_questions'); // Importa il router
-const path = require('path');
+const cors = require('cors');
+
+// Prima importa tutti i router
+const generateQuestionsRouter = require('./questions/generate_questions');
+const aiSummaryRouter = require('./ai_summary');
+const aiChatRouter = require('./ai_chat');
+const shortsRouter = require('./shorts');
+const articlesRouter = require('./articles');
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+app.use(compression());
+
+// Poi definisci le route
+app.use('/ai', aiSummaryRouter);
+app.use('/ai', aiChatRouter);
+app.use('/', shortsRouter);
+app.use('/', generateQuestionsRouter);
+app.use('/', articlesRouter);
+
+// Aggiungi gestione errori 404
+app.use((req, res) => {
+  console.log(`404 - Route non trovata: ${req.method} ${req.url}`);
+  res.status(404).json({
+    success: false,
+    message: 'Endpoint non trovato'
+  });
+});
+
+// INFINE avvia il server
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
+});
 
 // Inizializza Firebase Admin SDK
 const serviceAccount = require('./Firebase_AdminSDK.json');
@@ -16,9 +48,6 @@ admin.initializeApp({
   databaseURL: "https://app-just-learn.firebaseio.com"
 });
 
-app.use(bodyParser.json());
-app.use(compression());
-
 const redisClient = redis.createClient();
 redisClient.on('error', (err) => console.error('Redis error:', err));
 redisClient.on('connect', () => console.log('Connected to Redis'));
@@ -26,19 +55,6 @@ redisClient.on('connect', () => console.log('Connected to Redis'));
 (async () => {
   await redisClient.connect();
 })();
-
-// backend/server.js
-const shortsRouter = require('./shorts');
-app.use('/', shortsRouter);
-
-// Usa il router per l'endpoint /generate_questions
-app.use('/generate_questions', generateQuestionsRouter);
-
-// Importa il router degli articoli
-const articlesRouter = require('./articles');
-
-// Aggiungi questa riga dopo app.use('/', shortsRouter);
-app.use('/', articlesRouter);
 
 // Funzione per inviare notifiche push
 async function sendPushNotification(token, title, body) {
@@ -140,8 +156,3 @@ async function schedulePushNotification(uid, token) {
     nextNotificationDelay
   );
 }
-
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-});
