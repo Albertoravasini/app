@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../models/course.dart';
 import '../services/course_service.dart';
 
@@ -30,6 +31,11 @@ class _CourseScreenState extends State<CourseScreen> {
     _loadTopics();
     _loadCourses();
     _loadCurrentUser(); // Carica l'utente corrente
+    
+    // Traccia la visualizzazione della schermata
+    Posthog().screen(
+      screenName: 'Course Screen',
+    );
   }
  // Funzione per caricare l'utente corrente
   Future<void> _loadCurrentUser() async {
@@ -248,6 +254,16 @@ class _CourseScreenState extends State<CourseScreen> {
     return GestureDetector(
       onTap: () {
         if (_currentUser != null) {
+          // Traccia il click sul corso
+          Posthog().capture(
+            eventName: 'course_clicked',
+            properties: {
+              'course_id': course.id,
+              'course_title': course.title,
+              'course_topic': course.topic,
+            },
+          );
+          
           Navigator.push(
             context,
             MaterialPageRoute(

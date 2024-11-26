@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:Just_Learn/screens/question_screen.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({Key? key}) : super(key: key);
@@ -20,6 +21,12 @@ class _QuizScreenState extends State<QuizScreen> {
   void initState() {
     super.initState();
     _loadCurrentUser();
+    Posthog().screen(
+      screenName: 'Quiz Screen',
+      properties: {
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
   final List<Map<String, dynamic>> quizzes = [
@@ -173,7 +180,13 @@ Future<void> _handleLastViewedVideosQuiz(bool isFree) async {
 }
 
 void _startQuiz(String quizTitle) async {
- 
+  Posthog().capture(
+    eventName: 'quiz_card_clicked',
+    properties: {
+      'quiz_title': quizTitle,
+      'timestamp': DateTime.now().toIso8601String(),
+    },
+  );
 
   if (quizTitle == 'Daily Quiz' && currentUser != null) {
     int requiredVideosForNextFreeUnlock = 3 + (currentUser!.dailyQuizFreeUses * 5);
@@ -448,87 +461,104 @@ Widget _buildMysteryCard(double width, String title, String description, int cos
 // Costruisce la card per l'upgrade
 // Costruisce la card per l'upgrade
 Widget _buildUpgradeProCard() {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), // Padding contenuto
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.05),
-      borderRadius: BorderRadius.circular(12), // Bordi arrotondati
-      border: Border.all(color: Colors.white12),
-    ),
-    child: Row(
-      children: [
-        // Icona stilizzata
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.stars_rounded,
-            color: Colors.yellowAccent,
-            size: 28, // Dimensioni dell'icona leggermente ridotte
-          ),
+  return GestureDetector(
+    onTap: () {
+      Posthog().capture(
+        eventName: 'upgrade_button_clicked',
+        properties: {
+          'source': 'quiz_screen',
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const SubscriptionScreen(),
         ),
-        const SizedBox(width: 12), // Spazio tra icona e testo
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              // Titolo principale
-              Text(
-                'Upgrade to Pro',
+      );
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), // Padding contenuto
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12), // Bordi arrotondati
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        children: [
+          // Icona stilizzata
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.stars_rounded,
+              color: Colors.yellowAccent,
+              size: 28, // Dimensioni dell'icona leggermente ridotte
+            ),
+          ),
+          const SizedBox(width: 12), // Spazio tra icona e testo
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                // Titolo principale
+                Text(
+                  'Upgrade to Pro',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18, // Font leggermente ridotto
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                // Testo descrittivo
+                Text(
+                  'Unlock unlimited quizzes and access all courses.',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12, // Font ridotto per il testo descrittivo
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Pulsante "Upgrade" con dimensioni compatte
+          SizedBox(
+            width: 100, // Larghezza coerente ma più compatta
+            child: ElevatedButton(
+              onPressed: () {
+                // Naviga alla schermata di abbonamento
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SubscriptionScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellowAccent,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 12), // Altezza ridotta
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8), // Bordi leggermente arrotondati
+                ),
+              ),
+              child: const Text(
+                'Upgrade',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18, // Font leggermente ridotto
+                  fontSize: 14, // Font leggermente ridotto
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 4),
-              // Testo descrittivo
-              Text(
-                'Unlock unlimited quizzes and access all courses.',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12, // Font ridotto per il testo descrittivo
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Pulsante "Upgrade" con dimensioni compatte
-        SizedBox(
-          width: 100, // Larghezza coerente ma più compatta
-          child: ElevatedButton(
-            onPressed: () {
-              // Naviga alla schermata di abbonamento
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubscriptionScreen(),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.yellowAccent,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 12), // Altezza ridotta
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8), // Bordi leggermente arrotondati
-              ),
-            ),
-            child: const Text(
-              'Upgrade',
-              style: TextStyle(
-                fontSize: 14, // Font leggermente ridotto
-                fontWeight: FontWeight.bold,
-              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }

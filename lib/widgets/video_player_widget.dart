@@ -291,38 +291,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     // ... logica esistente ...
   }
 
-  void _logVideoPlayEvent() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      Posthog().capture(
-        eventName: 'video_play',
-        properties: {
-          'video_id': widget.videoId,
-          'video_title': _controller.metadata.title,
-          'topic': widget.topic,
-          'user_id': user.uid,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
-      );
-    }
-  }
-
-  void _logVideoPauseEvent() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      Posthog().capture(
-        eventName: 'video_pause', 
-        properties: {
-          'video_id': widget.videoId,
-          'video_title': _controller.metadata.title,
-          'topic': widget.topic,
-          'user_id': user.uid,
-          'watch_duration': _controller.value.position.inSeconds,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
-      );
-    }
-  }
 
 void _onQuestionIconTap() {
   _animationController.reverse().then((_) {
@@ -543,7 +511,7 @@ Widget build(BuildContext context) {
                     // Bottoni e overlay
                     Positioned(
                       bottom: 5,
-                      right: 10,
+                      right: 15,
                       child: Column(
                         children: [
                           // Icona della domanda

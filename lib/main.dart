@@ -10,6 +10,7 @@ import 'package:Just_Learn/services/auth_service.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:provider/provider.dart';
@@ -36,20 +37,25 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    if (kIsWeb) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.web,
+      );
+    } else {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+    
+    // Inizializza il servizio notifiche solo su piattaforme mobili
+    if (!kIsWeb) {
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      final NotificationService notificationService = NotificationService();
+      await notificationService.initialize();
+    }
   } catch (e) {
-    // Se Firebase è già inizializzato, continua con l'esecuzione
-    print('Firebase già inizializzato: $e');
+    print('Errore inizializzazione Firebase: $e');
   }
-
-  // Imposta il gestore dei messaggi in background
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // Inizializza il servizio notifiche
-  final NotificationService notificationService = NotificationService();
-  await notificationService.initialize();
 
   // Ottenere l'utente corrente (se autenticato)
   User? currentUser = FirebaseAuth.instance.currentUser;

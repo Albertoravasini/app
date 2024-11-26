@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'note_editor_screen.dart';
 
 class NotesScreen extends StatefulWidget {
@@ -63,6 +64,14 @@ class _NotesScreenState extends State<NotesScreen> {
   Future<void> _createNewFolder(String folderName) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      // Traccia la creazione di una nuova cartella
+      Posthog().capture(
+        eventName: 'folder_created',
+        properties: {
+          'folder_name': folderName,
+        },
+      );
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)

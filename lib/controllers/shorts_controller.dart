@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:overlay_support/overlay_support.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../models/level.dart';
 
 
@@ -54,63 +55,79 @@ class ShortsController {
                     child: SafeArea(
                       child: Center(
                         child: Container(
-                          margin: EdgeInsets.symmetric(horizontal: 20), // Margine per centrare la notifica
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10), // Padding contenuto
-                          decoration: BoxDecoration(
-                            color: Colors.black87, // Sfondo nero con opacità ridotta
-                            borderRadius: BorderRadius.circular(12), // Bordi arrotondati
-                            border: Border.all(color: Colors.white12), // Bordo leggero
+                          margin: EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          decoration: ShapeDecoration(
+                            color: Color(0x93333333),
+                            shape: RoundedRectangleBorder(
+                              side: BorderSide(
+                                width: 1,
+                                color: Colors.white.withOpacity(0.10000000149011612),
+                              ),
+                              borderRadius: BorderRadius.circular(22),
+                            ),
                           ),
                           child: Row(
                             children: [
-                              // Icona personalizzata
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.1), // Sfondo circolare per l'icona
+                                  color: Colors.white.withOpacity(0.1),
                                   shape: BoxShape.circle,
                                 ),
-                                child: Image.asset(
-                                  'assets/free_icon.png', // Icona personalizzata
-                                  width: 28,
-                                  height: 28,
+                                child: Icon(
+                                  Icons.stars_rounded,
+                                  color: Colors.yellowAccent,
+                                  size: 28,
                                 ),
                               ),
-                              const SizedBox(width: 12), // Spazio tra icona e testo
+                              const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    // Titolo della notifica
+                                  children: [
                                     Text(
                                       '''You've unlocked the Daily Quiz!''',
                                       style: TextStyle(
                                         color: Colors.white,
-                                        fontSize: 18, // Font leggermente ridotto
-                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
                                         fontFamily: 'Montserrat',
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.48,
+                                        height: 1.2,
                                       ),
                                     ),
                                     SizedBox(height: 4),
-                                    // Testo descrittivo
                                     Text(
                                       'Click to start now.',
                                       style: TextStyle(
                                         color: Colors.white70,
                                         fontSize: 12,
-                                        height: 1.4,
                                         fontFamily: 'Montserrat',
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.4,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              // Pulsante per avviare il quiz
                               SizedBox(
-                                width: 60, // Dimensione compatta del pulsante
+                                height: 32,
                                 child: ElevatedButton(
                                   onPressed: () {
+                                    // Traccia l'evento con Posthog
+                                    Posthog().capture(
+                                      eventName: 'daily_quiz_notification_clicked',
+                                      properties: {
+                                        'user_id': userModel.uid,
+                                        'daily_videos_completed': userModel.dailyVideosCompleted,
+                                        'daily_quiz_free_uses': userModel.dailyQuizFreeUses,
+                                        'timestamp': DateTime.now().toIso8601String(),
+                                      },
+                                    );
+
                                     // Chiudi la notifica
                                     OverlaySupportEntry.of(context)?.dismiss();
 
@@ -127,17 +144,19 @@ class ShortsController {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.yellowAccent,
                                     foregroundColor: Colors.black,
-                                    padding: const EdgeInsets.symmetric(vertical: 8), // Padding verticale ridotto
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8), // Bordi leggermente arrotondati
+                                      borderRadius: BorderRadius.circular(22),
                                     ),
                                   ),
-                                  child: const Text(
+                                  child: Text(
                                     'Start',
                                     style: TextStyle(
                                       color: Colors.black,
-                                      fontSize: 14, // Font leggermente ridotto
-                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.48,
                                     ),
                                   ),
                                 ),

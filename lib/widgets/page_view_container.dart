@@ -1,6 +1,7 @@
 // Crea un nuovo file lib/widgets/page_view_container.dart
 
 import 'package:flutter/material.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../screens/Articles_screen.dart';
 import '../screens/notes_screen.dart';
 import '../widgets/video_player_widget.dart';
@@ -52,12 +53,16 @@ class _PageViewContainerState extends State<PageViewContainer> {
     });
   }
 
+  void _onPageChanged(int page) {
+    widget.onPageChanged?.call(page);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageView(
       controller: _pageController,
       physics: const PageScrollPhysics(),
-      onPageChanged: widget.onPageChanged,
+      onPageChanged: _onPageChanged,
       children: [
         ArticlesWidget(
           videoTitle: widget.videoTitle,

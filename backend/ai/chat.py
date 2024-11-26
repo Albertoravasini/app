@@ -43,15 +43,15 @@ class AIChat:
     def _build_messages(self, message: str, chat_history: List[Dict], video_title: str) -> List[Dict]:
         messages = [{
             "role": "system",
-            "content": f"""Sei un tutor che aiuta gli studenti a comprendere meglio i video educativi.
-            Stai rispondendo a domande sul video: "{video_title}"
-            Rispondi in modo BREVE e CONCISO (massimo 2-3 frasi).
+            "content": f"""You are a tutor helping students better understand educational videos.
+            You are answering questions about the video: "{video_title}"
+            Answer BRIEFLY and CONCISELY (maximum 2-3 sentences).
             
-            Regole:
-            1. Usa le informazioni dalle chat precedenti
-            2. Rispondi SOLO alla domanda specifica
-            3. Non ripetere informazioni già date
-            4. Mantieni un tono amichevole ma professionale"""
+            Rules:
+            1. Use information from previous chats
+            2. Answer ONLY the specific question
+            3. Don't repeat information already given
+            4. Maintain a friendly but professional tone"""
         }]
         
         # Aggiungi la cronologia della chat

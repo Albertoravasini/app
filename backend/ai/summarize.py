@@ -33,7 +33,7 @@ def summarize_text(text):
             model="gpt-3.5-turbo",
             messages=[{
                 "role": "system",
-                "content": "Sei un assistente che crea riassunti concisi e punti chiave."
+                "content": "You are an assistant that creates concise summaries and key points."
             }, {
                 "role": "user",
                 "content": f"""Please provide:

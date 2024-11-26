@@ -2,6 +2,7 @@ import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'shorts_screen.dart';
 import '../models/user.dart';
 import '../widgets/tutorial_overlay.dart';
@@ -30,6 +31,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Manteniamo questo tracciamento per la visualizzazione iniziale
+    Posthog().screen(
+      screenName: 'Video Screen',  // Cambiato da 'Home Screen' a 'Video Screen'
+      properties: {
+        'timestamp': DateTime.now().toIso8601String(),
+        'showSavedVideos': showSavedVideos,
+        'initial_view': true  // Aggiungiamo questa proprietà per distinguere
+      },
+    );
     _checkTutorial();
   }
 
@@ -175,10 +185,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Aggiungi questo metodo per gestire il cambio pagina
   void _onPageChanged(int page) {
-    print('Page changed to: $page');
     setState(() {
       _currentPage = page;
     });
+
+    // Questo traccia solo i cambi di pagina successivi
+    String screenName;
+    switch (page) {
+      case 0:
+        screenName = 'Articles Screen';
+        break;
+      case 1:
+        screenName = 'Video Screen';
+        break;
+      case 2:
+        screenName = 'Notes Screen';
+        break;
+      default:
+        return;
+    }
+
+    Posthog().screen(
+      screenName: screenName,
+      properties: {
+        'timestamp': DateTime.now().toIso8601String(),
+        'showSavedVideos': showSavedVideos,
+        'initial_view': false
+      },
+    );
   }
 
   @override

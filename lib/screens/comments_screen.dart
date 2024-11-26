@@ -2,6 +2,7 @@ import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../services/comment_service.dart';
 import '../services/ai_chat_service.dart';
 import '../widgets/ai_chat_widget.dart';
@@ -29,6 +30,31 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
   // Aggiungi una chiave globale per accedere allo stato del widget AI chat
   final GlobalKey<AIChatWidgetState> _aiChatKey = GlobalKey<AIChatWidgetState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Usa screen() per la visualizzazione della schermata
+    Posthog().screen(
+      screenName: 'Comments Screen',
+      properties: {
+        'videoId': widget.videoId,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  Future<void> _addComment(String content) async {
+    await _commentService.addComment(widget.videoId, content);
+    // Usa capture() per l'azione di aggiungere un commento
+    Posthog().capture(
+      eventName: 'Comment Added',
+      properties: {
+        'videoId': widget.videoId,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +109,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 0),
               
               // Contenuto principale
               Expanded(
@@ -431,7 +457,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
               controller: _commentController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: _showAiChat ? 'Chiedi all\'AI...' : 'Aggiungi un commento...',
+                hintText: _showAiChat ? 'Ask the AI...' : 'Add a comment...',
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -454,10 +480,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
               if (_showAiChat && _aiChatKey.currentState != null) {
                 _aiChatKey.currentState!.handleMessage(messageToSend);
               } else if (!_showAiChat) {
-                _commentService.addComment(
-                  widget.videoId,
-                  messageToSend,
-                );
+                _addComment(messageToSend);
               }
             },
           ),

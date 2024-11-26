@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:video_player/video_player.dart'; // Importa il video player
-import 'dart:math';
 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart'; // Per la selezione casuale
 
@@ -35,6 +35,14 @@ class _QuestionScreenState extends State<QuestionScreen> {
   void initState() {
     super.initState();
     _loadQuestions();
+    // Traccia l'ingresso nella schermata Question
+    Posthog().screen(
+      screenName: 'Questions Screen',
+      properties: {
+        'topic': widget.topic,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
   @override

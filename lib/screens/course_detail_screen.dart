@@ -5,6 +5,7 @@ import 'package:Just_Learn/screens/course_info_dialog.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../models/course.dart';
 import 'level_screen.dart';
 import 'package:Just_Learn/models/user.dart';
@@ -31,20 +32,31 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
     super.initState();
     _currentUser = widget.user;
     _isCourseUnlocked = _currentUser.unlockedCourses.contains(widget.course.id);
- 
+    
+    // Traccia la visualizzazione della schermata dettaglio corso
+    Posthog().screen(
+      screenName: 'Course Detail Screen',
+      properties: {
+        'course_id': widget.course.id,
+        'course_title': widget.course.title,
+        'course_topic': widget.course.topic,
+        'is_unlocked': _isCourseUnlocked,
+      },
+    );
   }
-/// Verifica se tutte le sezioni precedenti sono completate
-bool _arePreviousSectionsCompleted(int currentIndex) {
-  for (int i = 0; i < currentIndex; i++) {
-    String previousSectionTitle = widget.course.sections[i].title;
-    int currentStep = _getCurrentStepForSection(previousSectionTitle);
-    int totalSteps = widget.course.sections[i].steps.length;
-    if (currentStep < totalSteps) {
-      return false;
+
+  /// Verifica se tutte le sezioni precedenti sono completate
+  bool _arePreviousSectionsCompleted(int currentIndex) {
+    for (int i = 0; i < currentIndex; i++) {
+      String previousSectionTitle = widget.course.sections[i].title;
+      int currentStep = _getCurrentStepForSection(previousSectionTitle);
+      int totalSteps = widget.course.sections[i].steps.length;
+      if (currentStep < totalSteps) {
+        return false;
+      }
     }
+    return true;
   }
-  return true;
-}
 
   // Funzione per ricaricare i dati utente da Firestore
   Future<void> _reloadUserData() async {
@@ -132,6 +144,15 @@ bool _arePreviousSectionsCompleted(int currentIndex) {
       height: 60,
       child: ElevatedButton(
         onPressed: () {
+          // Traccia il click sul pulsante subscribe
+          Posthog().capture(
+            eventName: 'subscription_button_clicked',
+            properties: {
+              'from_course_id': widget.course.id,
+              'from_course_title': widget.course.title,
+            },
+          );
+          
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
@@ -199,6 +220,17 @@ bool _arePreviousSectionsCompleted(int currentIndex) {
   /// Funzione per sbloccare il corso
   void _unlockCourse() async {
     if (_currentUser.coins >= widget.course.cost) {
+      // Traccia lo sblocco del corso con coins
+      Posthog().capture(
+        eventName: 'course_unlocked_with_coins',
+        properties: {
+          'course_id': widget.course.id,
+          'course_title': widget.course.title,
+          'cost': widget.course.cost,
+          'user_remaining_coins': _currentUser.coins - widget.course.cost,
+        },
+      );
+      
       int newCoins = _currentUser.coins - widget.course.cost;
       List<String> newUnlockedCourses = List.from(_currentUser.unlockedCourses)..add(widget.course.id);
 
@@ -357,6 +389,14 @@ Widget _buildProgressBar(int currentStep, int totalSteps) {
       left: 16,
       child: GestureDetector(
         onTap: () {
+          // Traccia il click sul pulsante back
+          Posthog().capture(
+            eventName: 'course_detail_back_clicked',
+            properties: {
+              'course_id': widget.course.id,
+              'course_title': widget.course.title,
+            },
+          );
           Navigator.pop(context);
         },
         child: Container(
@@ -418,6 +458,15 @@ Widget _buildProgressBar(int currentStep, int totalSteps) {
 
   /// Mostra la descrizione del corso in una finestra di dialogo
   void _showCourseDescription() {
+    // Traccia il click sul pulsante info
+    Posthog().capture(
+      eventName: 'course_info_clicked',
+      properties: {
+        'course_id': widget.course.id,
+        'course_title': widget.course.title,
+      },
+    );
+    
     showDialog(
       context: context,
       builder: (context) => CourseInfoDialog(course: widget.course),
@@ -486,8 +535,18 @@ Widget _buildSections() {
         child: GestureDetector(
           onTap: isAccessible
               ? () async {
-                  // Registra l'evento di visualizzazione della sezione
-                 
+                  // Traccia il click sulla sezione
+                  Posthog().capture(
+                    eventName: 'section_clicked',
+                    properties: {
+                      'course_id': widget.course.id,
+                      'course_title': widget.course.title,
+                      'section_title': section.title,
+                      'section_index': index,
+                      'is_completed': isCompleted,
+                    },
+                  );
+                  
                   bool? result = await Navigator.push(
                     context,
                     MaterialPageRoute(

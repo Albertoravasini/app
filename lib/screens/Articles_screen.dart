@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../services/articles_service.dart';
 import '../services/ai_service.dart';
 
@@ -182,6 +183,16 @@ class _ArticlesWidgetState extends State<ArticlesWidget> {
                       opacity: opacity,
                       child: GestureDetector(
                         onTap: () {
+                          Posthog().capture(
+                            eventName: 'article_clicked',
+                            properties: {
+                              'article_title': article['title'],
+                              'article_source': article['source'],
+                              'video_title': widget.videoTitle,
+                              'level_id': widget.levelId,
+                            },
+                          );
+                          
                           Navigator.push(
                             context,
                             MaterialPageRoute(

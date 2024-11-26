@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({Key? key}) : super(key: key);
@@ -16,8 +17,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   @override
 void initState() {
   super.initState();
-  
-
+  // Traccia l'ingresso nella schermata Subscription
+  Posthog().screen(
+    screenName: 'Subscription Screen',
+    properties: {
+      'timestamp': DateTime.now().toIso8601String(),
+    },
+  );
 }
 
   Future<void> _incrementClickCount() async {
@@ -133,9 +139,7 @@ void initState() {
                     discountLabel: '-53%',
                     isSelected: selectedPlan == 'annual',
                     onTap: () {
-                      setState(() {
-                        selectedPlan = 'annual';
-                      });
+                      _handlePlanSelection('annual');
                     },
                   ),
                 ),
@@ -146,9 +150,7 @@ void initState() {
                     discountedPrice: '\$9.99 / month',
                     isSelected: selectedPlan == 'monthly',
                     onTap: () {
-                      setState(() {
-                        selectedPlan = 'monthly';
-                      });
+                      _handlePlanSelection('monthly');
                     },
                   ),
                 ),
@@ -160,6 +162,14 @@ SizedBox(
   width: double.infinity, // Larghezza piena
   child: ElevatedButton(
     onPressed: () async {
+      // Traccia il tentativo di acquisto
+      Posthog().capture(
+        eventName: 'subscription_purchase_attempted',
+        properties: {
+          'plan_type': selectedPlan,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
       await _incrementClickCount(); // Incrementa il contatore per l'utente
 
       // Registra l'evento su Firebase Analytics
@@ -290,6 +300,21 @@ SizedBox(
           ],
         ),
       ),
+    );
+  }
+
+  // Nel metodo che gestisce il cambio piano
+  void _handlePlanSelection(String plan) {
+    setState(() {
+      selectedPlan = plan;
+    });
+    // Traccia la selezione del piano
+    Posthog().capture(
+      eventName: 'subscription_plan_selected',
+      properties: {
+        'plan_type': plan,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
     );
   }
 }

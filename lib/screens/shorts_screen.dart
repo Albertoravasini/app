@@ -7,6 +7,7 @@ import 'package:Just_Learn/widgets/video_player_widget.dart';
 import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:Just_Learn/models/user.dart';
@@ -215,6 +216,23 @@ void _onVideoChanged(int index) {
   // Gestisci il video corrente
   _youtubeControllers[index].unMute();
   _youtubeControllers[index].play();
+  
+  // Registra l'evento video_play su Posthog
+  final videoId = (allShortSteps[index]['step'] as LevelStep).content;
+  final videoTitle = (allShortSteps[index]['level'] as Level).title;
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    Posthog().capture(
+      eventName: 'video_play',
+      properties: {
+        'video_id': videoId,
+        'video_title': videoTitle,
+        'topic': widget.selectedTopic ?? 'General',
+        'user_id': user.uid,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
   
   // Precarica il prossimo video
   _preloadNextVideo(index + 1);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:Just_Learn/models/ai_chat_message.dart';
 import 'package:Just_Learn/services/ai_chat_service.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 
 class AIChatWidget extends StatefulWidget {
   final String videoId;
@@ -25,6 +26,20 @@ class AIChatWidgetState extends State<AIChatWidget> {
   bool _isProcessing = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Usa screen() per la visualizzazione della chat
+    Posthog().screen(
+      screenName: 'AI Chat Screen',
+      properties: {
+        'videoId': widget.videoId,
+        'levelId': widget.levelId,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       children: [
@@ -37,7 +52,7 @@ class AIChatWidgetState extends State<AIChatWidget> {
                 return _buildMessageBubble(AIChatMessage(
                   id: 'welcome',
                   isAi: true,
-                  content: "Ciao! Sono il tuo assistente AI. Come posso aiutarti con questo video?",
+                  content: "Hi. I'm your AI assistant. How can I help you with this video?",
                   timestamp: DateTime.now(),
                 ));
               }
@@ -229,5 +244,18 @@ class AIChatWidgetState extends State<AIChatWidget> {
 
   String _formatTimestamp(DateTime timestamp) {
     return '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> sendMessage(String message) async {
+    // Usa capture() per l'invio del messaggio
+    Posthog().capture(
+      eventName: 'AI Message Sent',
+      properties: {
+        'videoId': widget.videoId,
+        'levelId': widget.levelId,
+        'timestamp': DateTime.now().toIso8601String(),
+        'messageLength': message.length,
+      },
+    );
   }
 } 

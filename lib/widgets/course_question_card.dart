@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:Just_Learn/models/course.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:vibration/vibration.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -270,6 +271,18 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
     hasAnswered = true;
     widget.onAnswered(isCorrect);
   });
+
+  // Traccia la risposta dell'utente
+  Posthog().capture(
+    eventName: 'question_answered',
+    properties: {
+      'topic': widget.topic,
+      'question': widget.step.content,
+      'selected_answer': choice,
+      'is_correct': isCorrect,
+      'timestamp': DateTime.now().toIso8601String(),
+    },
+  );
 
   if (isCorrect) {
     if (await Vibration.hasVibrator() ?? false) {

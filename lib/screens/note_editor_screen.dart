@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
+import 'package:posthog_flutter/posthog_flutter.dart';
+
 class NoteEditorScreen extends StatefulWidget {
   final String? initialTitle;
   final String? initialContent;
@@ -127,6 +129,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       await _saveNote();
     }
 
+    Posthog().capture(
+      eventName: 'note_closed',
+      properties: {
+        'folder_name': widget.folderName,
+        'note_title': currentTitle,
+        'was_edited': currentTitle != _lastSavedTitle || currentContent != _lastSavedContent,
+      },
+    );
+
     if (!_isDisposed && mounted) {
       Navigator.of(context).pop();
     }
@@ -244,6 +255,13 @@ class NewNoteButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
+        Posthog().capture(
+          eventName: 'new_note_created',
+          properties: {
+            'folder_name': folderName,
+          },
+        );
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -366,6 +384,15 @@ class NoteCard extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (!isLongPressed) {
+          Posthog().capture(
+            eventName: 'note_opened',
+            properties: {
+              'note_id': noteId,
+              'folder_name': folderName,
+              'note_title': title,
+            },
+          );
+
           Navigator.push(
             context,
             MaterialPageRoute(
