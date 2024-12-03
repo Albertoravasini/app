@@ -22,11 +22,19 @@ import 'admin_panel/admin_panel_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navigazione personalizzata
+import 'screens/support_screen.dart'; // Importa la schermata di supporto
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-
+// Aggiungi questa funzione helper
+bool get isWeb {
+  try {
+    return kIsWeb;
+  } catch (e) {
+    return false;
+  }
+}
 
 // Funzione di gestione dei messaggi in background
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -37,18 +45,30 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    if (kIsWeb) {
+    if (isWeb) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.web,
       );
+      
+      // Modifica questa parte per gestire entrambi gli URL
+      final path = Uri.base.path;
+      if (path == '/privacy-policy') {
+        runApp(const MaterialApp(
+          home: PrivacyPolicyScreen(),
+        ));
+        return;
+      } else if (path == '/support') {
+        runApp(const MaterialApp(
+          home: SupportScreen(),
+        ));
+        return;
+      }
     } else {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-    }
-    
-    // Inizializza il servizio notifiche solo su piattaforme mobili
-    if (!kIsWeb) {
+      
+      // Inizializza il servizio notifiche solo su piattaforme mobili
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
       final NotificationService notificationService = NotificationService();
       await notificationService.initialize();
@@ -57,9 +77,8 @@ void main() async {
     print('Errore inizializzazione Firebase: $e');
   }
 
-  // Ottenere l'utente corrente (se autenticato)
+  // Se non è un URL speciale, continua con il normale flusso dell'app
   User? currentUser = FirebaseAuth.instance.currentUser;
-
   runApp(MyApp(user: currentUser));
 }
 
@@ -150,14 +169,16 @@ class MyApp extends StatelessWidget {
               behavior: SnackBarBehavior.floating,
             ),
           ),
-          home: const SplashScreen(),
+          initialRoute: '/',
           routes: {
+            '/': (context) => const SplashScreen(),
             '/home': (context) => const HomeScreen(),
             '/login': (context) => const LoginScreen(),
             '/register': (context) => const RegisterScreen(),
             '/topics': (context) => TopicSelectionScreen(user: FirebaseAuth.instance.currentUser!),
             '/admin': (context) => const AdminPanelScreen(),
             '/privacy-policy': (context) => const PrivacyPolicyScreen(),
+            '/support': (context) => const SupportScreen(),
           },
         ),
       ),

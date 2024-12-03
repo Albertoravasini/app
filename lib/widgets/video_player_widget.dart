@@ -267,7 +267,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   Future<void> _updateVideoStats(String action, [int? value]) async {
     try {
       await http.post(
-        Uri.parse('http://167.99.131.91:3000/update_video_stats'),
+        Uri.parse('http://localhost:3000/update_video_stats'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'videoId': widget.videoId,

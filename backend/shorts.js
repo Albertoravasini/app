@@ -25,7 +25,7 @@ router.post('/get_short_steps', async (req, res) => {
     const recommender = new VideoRecommender();
     const recommendedVideos = await recommender.getRecommendedVideos(
       uid, 
-      20, 
+      30, 
       selectedTopic  // Passiamo il topic selezionato
     );
     

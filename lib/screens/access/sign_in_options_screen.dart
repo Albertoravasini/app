@@ -22,6 +22,13 @@ class SignInOptionsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false); // Use AuthService for Google and Apple Sign-In
 
+    void handlePrivacyPolicy() {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+      );
+    }
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -306,12 +313,7 @@ class SignInOptionsScreen extends StatelessWidget {
                     const Spacer(),
                     // Privacy Policy
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()), // Navigate to Privacy Policy screen
-                        );
-                      },
+                      onTap: handlePrivacyPolicy,
                       child: RichText(
                         textAlign: TextAlign.center,
                         text: const TextSpan(
