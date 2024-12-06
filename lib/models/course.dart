@@ -21,6 +21,8 @@ class Course {
   List<String> recommendedBooks;
   List<String> recommendedPodcasts;
   List<String> recommendedWebsites;
+  double rating;
+  int totalRatings;
 
   Course({
     required this.id,
@@ -38,6 +40,8 @@ class Course {
     this.recommendedBooks = const [],
     this.recommendedPodcasts = const [],
     this.recommendedWebsites = const [],
+    this.rating = 0.0,
+    this.totalRatings = 0,
   });
 
   factory Course.fromFirestore(DocumentSnapshot doc) {
@@ -65,6 +69,8 @@ class Course {
       recommendedBooks: List<String>.from(data['recommendedBooks'] ?? []),
       recommendedPodcasts: List<String>.from(data['recommendedPodcasts'] ?? []),
       recommendedWebsites: List<String>.from(data['recommendedWebsites'] ?? []),
+      rating: (data['rating'] ?? 0.0).toDouble(),
+      totalRatings: data['totalRatings'] ?? 0,
     );
   }
 
@@ -84,6 +90,8 @@ class Course {
       'recommendedBooks': recommendedBooks,
       'recommendedPodcasts': recommendedPodcasts,
       'recommendedWebsites': recommendedWebsites,
+      'rating': rating,
+      'totalRatings': totalRatings,
     };
   }
 }

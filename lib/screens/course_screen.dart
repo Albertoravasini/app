@@ -192,34 +192,43 @@ class _CourseScreenState extends State<CourseScreen> {
   }
 
   // Funzione per costruire un singolo pulsante dei topic
-  Widget _buildSubtopicButton(String topic) {
+Widget _buildSubtopicButton(String topic) {
     final bool isSelected = selectedTopic == topic;
     return GestureDetector(
-      onTap: () => _filterCoursesByTopic(topic),
-      child: Container(
-        height: 53,
-        padding: const EdgeInsets.symmetric(horizontal: 27, vertical: 17),
-        decoration: ShapeDecoration(
-          color: Color(0xFF181819), // Colore di sfondo
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        _filterCoursesByTopic(topic);
+      },
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? Color(0xFF242426) : Color(0xFF181819),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
+            width: 1,
           ),
+          boxShadow: isSelected ? [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            )
+          ] : [],
         ),
-        child: Center(
-          child: Text(
-            topic,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Color(0xFF434348), // Cambia il colore del testo se selezionato
-              fontSize: 16,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.48,
-            ),
+        child: Text(
+          topic,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Color(0xFF434348),
+            fontSize: 15,
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
           ),
         ),
       ),
     );
-  }
+}
 
     Widget _buildCourseGrid() {
     final filteredCourses = _filterCoursesBySearchText();

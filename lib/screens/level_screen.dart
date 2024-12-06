@@ -134,180 +134,190 @@ Future<void> _loadUserProgress() async {
     final steps = widget.section.steps;
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: _pageController == null
-          ? Center(child: CircularProgressIndicator())
-          : Column(
+      backgroundColor: const Color(0xFF121212),
+      body: SafeArea(
+        child: _pageController == null
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
               children: [
-                const SizedBox(height: 30),
+                // Main content (Video/Questions)
+                PageView.builder(
+                  scrollDirection: Axis.vertical,
+                  itemCount: steps.length,
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentStep = index;
+                      currentStepData = steps[index];
+                      currentTitle = currentStepData?.type == 'video' 
+                        ? currentStepData!.content 
+                        : widget.section.title;
+                      
+                      if (_currentStep == steps.length - 1) {
+                        sectionCompleted = true;
+                      }
+                      _saveUserProgress();
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final step = steps[index];
 
-                // Barra di progresso personalizzata con pulsante "indietro"
-                // Barra di progresso personalizzata con pulsante "indietro"
-Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 0),
-  child: Row(
-    crossAxisAlignment: CrossAxisAlignment.center,
-    children: [
-      // Pulsante indietro
-      GestureDetector(
-        onTap: () async {
-          await _saveUserProgress();
-          Navigator.pop(context, true);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-            size: 30,
-          ),
-        ),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Container(
-          height: 15,
-          decoration: ShapeDecoration(
-            color: const Color(0xFF181819),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          child: FractionallySizedBox(
-            widthFactor: (_currentStep + 1) / steps.length,
-            alignment: Alignment.centerLeft,
-            child: Container(
-              height: 15,
-              decoration: ShapeDecoration(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ],
-  ),
-),
-
-                // Titolo della sezione
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                  decoration: ShapeDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      widget.section.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                        letterSpacing: 0.66,
+                    if (step.type == 'video') {
+                      final videoId = YoutubePlayer.convertUrlToId(step.content) ?? '';
+                      if (videoId.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'URL video non valido',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        );
+                      }
+                      return VideoPlayerWidget(
+                        videoId: videoId,
+                        onShowQuestion: () {},
+                        onShowArticles: () {},
+                        onShowNotes: () {},
+                        isLiked: false,
+                        likeCount: 0,
+                        isSaved: false,
+                        onCoinsUpdate: (newCoins) {
+                          print("Coins aggiornati: $newCoins");
+                        },
+                        topic: widget.section.title,
+                      );
+                    } else if (step.type == 'question') {
+                      return CourseQuestionCard(
+                        step: step,
+                        onAnswered: (isCorrect) {
+                          if (isCorrect) {
+                            _onCompleteStep();
+                          }
+                        },
+                        onCompleteStep: _onCompleteStep,
+                        topic: widget.section.title,
+                      );
+                    }
+                    
+                    return const Center(
+                      child: Text(
+                        'Unknown step type',
+                        style: TextStyle(color: Colors.white),
                       ),
-                      textAlign: TextAlign.center,
+                    );
+                  },
+                ),
+
+                // Overlay controls
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      child: Column(
+                        children: [
+                          // Top row with back button and progress
+                          Row(
+                            children: [
+                              // Back button
+                              GestureDetector(
+                                onTap: () async {
+                                  await _saveUserProgress();
+                                  Navigator.pop(context, true);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              
+                              // Progress indicator
+                              Expanded(
+                                child: Container(
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      AnimatedFractionallySizedBox(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: (_currentStep + 1) / steps.length,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color:  Colors.yellowAccent,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              
+                              // Step counter
+                              Container(
+                                margin: const EdgeInsets.only(left: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  '${_currentStep + 1}/${steps.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontFamily: 'Montserrat',
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Corpo principale con PageView verticale
-                Expanded(
-                  child: PageView.builder(
-  scrollDirection: Axis.vertical,
-  itemCount: steps.length,
-  controller: _pageController,
-  onPageChanged: (index) {
-    setState(() {
-      _currentStep = index;
-      currentStepData = steps[index];
-      
-      // Aggiorna il titolo corrente
-      currentTitle = currentStepData?.type == 'video' ? currentStepData!.content : widget.section.title;
-
-      // Controlla se l'ultimo step è stato raggiunto
-      if (_currentStep == steps.length - 1) {
-        sectionCompleted = true;
-      } else {
-        sectionCompleted = false;
-      }
-
-      _saveUserProgress();
-      print('Page changed to $_currentStep');
-    });
-  },
-  itemBuilder: (context, index) {
-    final step = steps[index];
-
-    if (step.type == 'video') {
-      final videoId = YoutubePlayer.convertUrlToId(step.content) ?? '';
-      if (videoId.isEmpty) {
-        return Center(
-          child: Text(
-            'URL video non valido',
-            style: TextStyle(color: Colors.white),
-          ),
-        );
-      }
-      return VideoPlayerWidget(
-        videoId: videoId,
-        onShowQuestion: () {},
-        onShowArticles: () {},
-        onShowNotes: () {},
-        isLiked: false,
-        likeCount: 0,
-        isSaved: false,
-        onCoinsUpdate: (int newCoins) {
-          // Gestisci l'aggiornamento dei coins
-          print("Coins aggiornati: $newCoins");
-        },
-        topic: widget.section.title,
-      );
-    } else if (step.type == 'question') {
-      // Restituisce CourseQuestionCard
-      return CourseQuestionCard(
-        step: step,
-        onAnswered: (isCorrect) {
-          if (isCorrect) {
-            _onCompleteStep();
-          }
-        },
-        onCompleteStep: _onCompleteStep,
-        topic: widget.section.title,
-      );
-    } else {
-      // Gestisce altri tipi di step se presenti
-      return Center(
-        child: Text(
-          'Unknown step type',
-          style: TextStyle(color: Colors.white),
-        ),
-      );
-    }
-  },
-),
-                ),
-
-                // Pulsante "Next" (opzionale, può essere rimosso se non necessario)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 15.0),
-                  child: SizedBox(),
                 ),
               ],
             ),
+      ),
     );
   }
 }

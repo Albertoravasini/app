@@ -1,5 +1,6 @@
 // lib/widgets/course_info_dialog.dart
 
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/course.dart';
 
@@ -33,35 +34,16 @@ class _CourseInfoDialogState extends State<CourseInfoDialog> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(3, (index) {
-        return AnimatedContainer(
-          duration: Duration(milliseconds: 300),
+        return Container(
           margin: EdgeInsets.symmetric(horizontal: 4),
-          width: _currentPage == index ? 12 : 8,
-          height: _currentPage == index ? 12 : 8,
+          height: 8,
+          width: _currentPage == index ? 24 : 8,
           decoration: BoxDecoration(
-            color: _currentPage == index ? Colors.yellowAccent : Colors.white54,
-            shape: BoxShape.circle,
+            color: _currentPage == index ? Colors.yellowAccent : Colors.white24,
+            borderRadius: BorderRadius.circular(4),
           ),
         );
       }),
-    );
-  }
-
-  /// Builds an icon with text for the sections
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white, size: 24),
-        SizedBox(width: 8),
-        Text(
-          title,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
     );
   }
 
@@ -260,58 +242,94 @@ class _CourseInfoDialogState extends State<CourseInfoDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: Colors.grey[900],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Color(0xFF181819),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
         width: double.infinity,
-        height: MediaQuery.of(context).size.height * 0.6, // Dynamic height
+        height: MediaQuery.of(context).size.height * 0.7,
         child: Column(
           children: [
-            // Header with close button
-            Stack(
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+            // Header
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Colors.white12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
                     child: Text(
                       widget.course.title,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
-                ),
-                // You can add a close button here if needed
-              ],
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close, color: Colors.white70),
+                  ),
+                ],
+              ),
             ),
 
-            // Divider
-            Divider(color: Colors.white54),
-
-            // Page content
+            // Content
             Expanded(
               child: _buildPageContent(),
             ),
 
-            // Page indicators
-            _buildPageIndicator(),
-
-            // Page navigation
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+            // Navigation
+            Container(
+              padding: EdgeInsets.all(16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Add navigation buttons if needed
+                  _buildPageIndicator(),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildNavigationButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Icon(icon, color: Colors.white70, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70),
+        SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }
