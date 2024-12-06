@@ -23,6 +23,7 @@ import 'screens/privacy_policy_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navigazione personalizzata
 import 'screens/support_screen.dart'; // Importa la schermata di supporto
+import 'screens/profile_screen.dart'; // Importa la schermata del profilo insegnante
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -179,6 +180,9 @@ class MyApp extends StatelessWidget {
             '/admin': (context) => const AdminPanelScreen(),
             '/privacy-policy': (context) => const PrivacyPolicyScreen(),
             '/support': (context) => const SupportScreen(),
+            '/profile': (context) => ProfileScreen(
+              currentUser: ModalRoute.of(context)!.settings.arguments as UserModel
+            ),
           },
         ),
       ),

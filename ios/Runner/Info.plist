@@ -12,6 +12,14 @@
     <key>com.posthog.posthog.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
     <true/>
 
+ <!-- Permessi per Image Picker -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>This app needs access to your photo library to let you select a profile picture.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>This app needs access to camera to let you take a profile picture.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app needs access to microphone when you record videos for your profile.</string>
+
     <!-- Resto delle tue configurazioni esistenti -->
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>

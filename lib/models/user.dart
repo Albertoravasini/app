@@ -19,6 +19,7 @@ class UserModel {
     int dailyVideosCompleted;
   int dailyQuizFreeUses;
   final bool hasSeenTutorial;
+  final String? profileImageUrl;
 
   UserModel({
     required this.uid,
@@ -38,6 +39,7 @@ class UserModel {
     this.dailyVideosCompleted = 0,
     this.dailyQuizFreeUses = 0,
     this.hasSeenTutorial = false,
+    this.profileImageUrl,
   }) ;
  
 
@@ -75,6 +77,7 @@ class UserModel {
       dailyVideosCompleted: data['dailyVideosCompleted'] ?? 0,
       dailyQuizFreeUses: data['dailyQuizFreeUses'] ?? 0,
       hasSeenTutorial: data['hasSeenTutorial'] ?? false,
+      profileImageUrl: data['profileImageUrl'],
     );
   }
 
@@ -98,6 +101,7 @@ class UserModel {
       'dailyVideosCompleted': dailyVideosCompleted,
       'dailyQuizFreeUses': dailyQuizFreeUses,
       'hasSeenTutorial': hasSeenTutorial,
+      'profileImageUrl': profileImageUrl,
     };
   }
 }
