@@ -2,6 +2,7 @@ import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/comments_screen.dart';
+import 'package:Just_Learn/screens/section_selection_sheet.dart';
 import 'package:Just_Learn/screens/topic_selection_sheet.dart';
 import 'package:audioplayers/audioplayers.dart'; // Importa aud
 import 'package:flutter/material.dart';
@@ -18,39 +19,41 @@ import 'package:http/http.dart' as http;
 import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
 
 class VideoPlayerWidget extends StatefulWidget {
-  final String videoId; // Ora accetta solo videoId
+  final String videoId;
   final bool isLiked;
   final int likeCount;
-  final LevelStep? questionStep; // La domanda associata al video
-  final Function() onShowQuestion; // Callback per mostrare la domanda
+  final LevelStep? questionStep;
+  final Function() onShowQuestion;
   final bool isSaved;
-  final VoidCallback? onVideoUnsaved; // Callback per notificare quando un video viene rimosso dai salvati
-  final Function(int) onCoinsUpdate; // Callback per aggiornare le monete
-  final String topic; // Aggiungi questo campo
-  final Function(String)? onTopicChanged; // Callback per notificare il cambio di topic
+  final VoidCallback? onVideoUnsaved;
+  final Function(int) onCoinsUpdate;
+  final String topic;
+  final Function(String)? onTopicChanged;
   final VoidCallback onShowArticles;
   final VoidCallback onShowNotes;
-  final Course course; // Aggiungi questa proprietà
-  final Function(Course?) onStartCourse; // Aggiungi questa callback
-  final bool isInCourse; // Aggiungi questo parametro
+  final bool isInCourse;
+  final Course? course;
+  final Section? currentSection;
+  final Function(Course?) onStartCourse;
 
   const VideoPlayerWidget({
     Key? key,
-    required this.videoId, // Aggiornato
+    required this.videoId,
     this.isLiked = false,
     this.likeCount = 0,
     this.questionStep,
     required this.onShowQuestion,
     this.isSaved = false,
     this.onVideoUnsaved,
-    required this.onCoinsUpdate, // Richiesto il callback
-    required this.topic, // Richiedi questo parametro
-    this.onTopicChanged, // Richiedi questo parametro
+    required this.onCoinsUpdate,
+    required this.topic,
+    this.onTopicChanged,
     required this.onShowArticles,
     required this.onShowNotes,
-    required this.course, // Aggiungi questo parametro
-    required this.onStartCourse, // Aggiungi questo parametro
-    this.isInCourse = false, // Aggiungi questo parametro con default false
+    this.isInCourse = false,
+    this.course,
+    this.currentSection,
+    required this.onStartCourse,
   }) : super(key: key);
 
   @override
@@ -59,38 +62,43 @@ class VideoPlayerWidget extends StatefulWidget {
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     with SingleTickerProviderStateMixin {
-  late YoutubePlayerController _controller; // Controller locale
-  bool isLiked = false;
-  int likeCount = 0;
-  int commentCount = 0;
-  bool showQuestionIcon = false;
+  late YoutubePlayerController _controller;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   final CommentService _commentService = CommentService();
-  late bool isSaved;
-  bool isPlaying = false; // Traccia lo stato di riproduzione
+  late AudioPlayer _audioPlayer;
 
-  double _progress = 0.0; // Progresso del video (0.0 - 1.0)
-  bool _completionHandled = false; // Evita trigger multipli
-  bool _showCoinsCompletion = false; // Mostra l'animazione delle monete
-  late AudioPlayer _audioPlayer; // Player per l'audio
-
-  // Variabili per il drag
+  bool isLiked = false;
+  bool isSaved = false;
+  bool isPlaying = false;
+  bool showQuestionIcon = false;
+  bool _completionHandled = false;
+  bool _showCoinsCompletion = false;
   bool _isDragging = false;
-  double _dragStartX = 0.0;
-  Duration _initialPosition = Duration.zero;
-  Duration _seekOffset = Duration.zero;
-
-  List<String> allTopics = [];
-
   bool _showArticles = false;
   bool _showNotes = false;
 
+  int likeCount = 0;
+  int commentCount = 0;
+  double _progress = 0.0;
+  double _dragStartX = 0.0;
+  
+  Duration _initialPosition = Duration.zero;
+  Duration _seekOffset = Duration.zero;
   DateTime? _startWatchTime;
+
+  List<String> allTopics = [];
 
   @override
   void initState() {
     super.initState();
+    _initializeController();
+    _initializeAnimations();
+    _initializeState();
+    _loadTopics();
+  }
+
+  void _initializeController() {
     _controller = YoutubePlayerController(
       initialVideoId: widget.videoId,
       flags: const YoutubePlayerFlags(
@@ -101,18 +109,14 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         showLiveFullscreenButton: false,
         hideThumbnail: true,
         disableDragSeek: true,
-        useHybridComposition: true, // Migliora le performance
+        useHybridComposition: true,
       ),
     )..addListener(_videoListener);
-
-    // Precarica il video
     _controller.load(widget.videoId);
+    _controller.addListener(_updateProgress);
+  }
 
-    isLiked = widget.isLiked;
-    likeCount = widget.likeCount;
-    isSaved = widget.isSaved; // Inizializziamo lo stato isSaved
-
-    // Inizializza l'AnimationController per l'icona della domanda
+  void _initializeAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -125,14 +129,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
       showQuestionIcon = true;
       _animationController.forward();
     }
+  }
 
-    // Inizializza l'AudioPlayer
+  void _initializeState() {
+    isLiked = widget.isLiked;
+    likeCount = widget.likeCount;
+    isSaved = widget.isSaved;
     _audioPlayer = AudioPlayer();
-
-    // Aggiungi un listener per aggiornare il progresso
-    _controller.addListener(_updateProgress);
-
-    _loadTopics();
   }
 
   Future<void> _loadTopics() async {
@@ -246,18 +249,18 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   @override
   void dispose() {
-    // Aggiorna il tempo di visualizzazione e il conteggio visualizzazioni quando il widget viene distrutto
-    if (_startWatchTime != null) {
-      final watchTime = DateTime.now().difference(_startWatchTime!).inSeconds;
-      _updateVideoStats('watch_time', watchTime);
-      _updateVideoStats('view');
-    }
-    
+    _updateVideoStats('watch_time', _startWatchTime?.difference(DateTime.now()).inSeconds);
+    _updateVideoStats('view');
+    _cleanupControllers();
+    super.dispose();
+  }
+
+  void _cleanupControllers() {
     _animationController.dispose();
     _audioPlayer.dispose();
     _controller.removeListener(_videoListener);
     _controller.removeListener(_updateProgress);
-    super.dispose();
+    _controller.dispose();
   }
 
   void _videoListener() {
@@ -737,50 +740,76 @@ Widget build(BuildContext context) {
                 // Row per topic e quit button
                 Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => _showTopicSelection(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                        clipBehavior: Clip.antiAlias,
-                        decoration: ShapeDecoration(
-                          color: const Color(0x93333333),
-                          shape: RoundedRectangleBorder(
-                            side: BorderSide(
-                              width: 1,
-                              color: Colors.white.withOpacity(0.1),
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 15,
-                              height: 15,
-                              padding: const EdgeInsets.all(1.25),
-                              child: const Icon(
-                                Icons.school,
-                                color: Colors.white,
-                                size: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 1),
-                            Text(
-                              widget.topic,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.72,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+GestureDetector(
+  onTap: () {
+    if (widget.isInCourse) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => SectionSelectionSheet(
+          course: widget.course!,
+          currentSection: widget.currentSection,
+          onSelectSection: (selectedSection) {
+            widget.onStartCourse(widget.course);
+            Navigator.pop(context);
+          },
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => TopicSelectionSheet(
+          allTopics: allTopics,
+          selectedTopic: widget.topic,
+          onSelectTopic: widget.onTopicChanged!,
+        ),
+      );
+    }
+  },
+  child: FittedBox(
+    fit: BoxFit.none,
+    child: Container(
+      height: 23,
+      decoration: ShapeDecoration(
+        color: Color(0x93333333),
+        shape: RoundedRectangleBorder(
+          side: BorderSide(
+            width: 1,
+            color: Colors.white.withOpacity(0.10000000149011612),
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 7),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.school,
+            color: Colors.white,
+            size: 15,
+          ),
+          SizedBox(width: 4),
+          Text(
+            widget.isInCourse 
+                ? "Section ${widget.currentSection?.sectionNumber ?? 1}" 
+                : widget.topic,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.72,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
                     if (widget.isInCourse)
                       Padding(
                         padding: const EdgeInsets.only(left: 8),

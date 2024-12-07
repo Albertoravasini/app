@@ -78,14 +78,14 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 10.0),
+                padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 20.0),
                 child: SizedBox(
                   width: double.infinity,
                   child: Text(
                     widget.step.content,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 30,
+                      fontSize: 26,
                       fontFamily: 'Montserrat',
                       fontWeight: FontWeight.w800,
                     ),
@@ -132,34 +132,89 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
       padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 15),
       child: SingleChildScrollView(
         child: Column(
-          children: widget.step.choices?.map((choice) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 24),
-              child: GestureDetector(
-                onTap: () => _onAnswered(choice),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 28),
-                  decoration: ShapeDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+          children: widget.step.choices?.asMap().entries.map((entry) {
+            final int index = entry.key;
+            final String choice = entry.value;
+            
+            return TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 200 + (index * 100)),
+              tween: Tween(begin: 0.0, end: 1.0),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, 20 * (1 - value)),
+                  child: Opacity(
+                    opacity: value,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: GestureDetector(
+                        onTap: () => _onAnswered(choice),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E1E),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white.withOpacity(0.1),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      String.fromCharCode(65 + index), // A, B, C, D...
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontFamily: 'Montserrat',
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    choice,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.4,
+                                      letterSpacing: 0.3,
+                                    ),
+                                    textAlign: TextAlign.left,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    choice,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                      letterSpacing: 0.48,
-                    ),
-                    textAlign: TextAlign.left,
-                  ),
-                ),
-              ),
+                );
+              },
             );
           }).toList() ?? [],
         ),
@@ -173,132 +228,249 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
       child: SingleChildScrollView(
         child: Column(
           children: [
-            if (!isCorrect) ...[
-              _buildSelectedAnswer(),
-              const SizedBox(height: 24),
+            // Top feedback banner
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              decoration: BoxDecoration(
+                color: isCorrect 
+                  ? Colors.yellowAccent.withOpacity(0.1)
+                  : Colors.red.withOpacity(0.1),
+                border: Border(
+                  left: BorderSide(
+                    color: isCorrect ? Colors.yellowAccent : Colors.red,
+                    width: 4,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isCorrect ? Icons.check_circle : Icons.cancel,
+                    color: isCorrect ? Colors.yellowAccent : Colors.red,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    isCorrect ? 'Correct!' : 'Wrong',
+                    style: TextStyle(
+                      color: isCorrect ? Colors.yellowAccent : Colors.red,
+                      fontSize: 18,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Given answer (if wrong)
+            if (!isCorrect)
+              GestureDetector(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(
+                      color: Colors.red.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.red.withOpacity(0.1),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.close,
+                            color: Colors.red,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          selectedAnswer ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w700,
+                            height: 1.4,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            if (!isCorrect) const SizedBox(height: 20),
+            
+            // Correct answer
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.yellowAccent.withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.yellowAccent.withOpacity(0.1),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.check,
+                        color: Colors.yellowAccent,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      widget.step.correctAnswer ?? '',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w700,
+                        height: 1.4,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Explanation
+            if (widget.step.explanation != null) ...[
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          color: Colors.yellowAccent.withOpacity(0.8),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Explanation',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.step.explanation!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w400,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
-            _buildCorrectAnswer(),
-            const SizedBox(height: 24),
-            _buildExplanation(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSelectedAnswer() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 24),
-      decoration: ShapeDecoration(
-        color: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              selectedAnswer ?? '',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontFamily: 'Montserrat',
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          if (!isCorrect)
-            const Icon(Icons.close, color: Colors.red, size: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCorrectAnswer() {
-    final correctAnswer = widget.step.correctAnswer ?? 'Risposta corretta non disponibile';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 24),
-      decoration: ShapeDecoration(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              correctAnswer,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 16,
-                fontFamily: 'Montserrat',
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Icon(Icons.check, color: Colors.green, size: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildExplanation() {
-    return SizedBox(
-      width: double.infinity,
-      child: Text(
-        widget.step.explanation ?? 'Nessuna spiegazione disponibile.',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontFamily: 'Montserrat',
-          fontWeight: FontWeight.w500,
-          height: 1.5,
-        ),
-      ),
-    );
-  }
-
- Future<void> _onAnswered(String choice) async {
-  setState(() {
-    selectedAnswer = choice;
-    isCorrect = _checkAnswer(choice);
-    hasAnswered = true;
-    widget.onAnswered(isCorrect);
-  });
-
-  // Traccia la risposta dell'utente
-  Posthog().capture(
-    eventName: 'question_answered',
-    properties: {
-      'topic': widget.topic,
-      'question': widget.step.content,
-      'selected_answer': choice,
-      'is_correct': isCorrect,
-      'timestamp': DateTime.now().toIso8601String(),
-    },
-  );
-
-  if (isCorrect) {
-    if (await Vibration.hasVibrator() ?? false) {
-      Vibration.vibrate(duration: 100);
-    }
-    _audioPlayer?.play(AssetSource('success_sound.mp3'));
+  Future<void> _onAnswered(String choice) async {
     setState(() {
-      _showCoins = true;
+      selectedAnswer = choice;
+      isCorrect = _checkAnswer(choice);
+      hasAnswered = true;
+      widget.onAnswered(isCorrect);
     });
-    _animationController?.forward(from: 0);
 
-    await _addCoinsToUser();
+    // Traccia la risposta dell'utente
+    Posthog().capture(
+      eventName: 'question_answered',
+      properties: {
+        'topic': widget.topic,
+        'question': widget.step.content,
+        'selected_answer': choice,
+        'is_correct': isCorrect,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+
+    if (isCorrect) {
+      if (await Vibration.hasVibrator() ?? false) {
+        Vibration.vibrate(duration: 100);
+      }
+      _audioPlayer?.play(AssetSource('success_sound.mp3'));
+      setState(() {
+        _showCoins = true;
+      });
+      _animationController?.forward(from: 0);
+
+      await _addCoinsToUser();
+    }
+
+    await _saveAnsweredQuestion();
   }
-
-  await _saveAnsweredQuestion();
-}
 
   Future<void> _addCoinsToUser() async {
     final user = FirebaseAuth.instance.currentUser;

@@ -423,44 +423,50 @@ void dispose() {
   }
 
   Widget _buildQuestionCard(LevelStep step, Level level) {
-  if (step.choices == null || step.choices!.isEmpty) {
-    return const Center(
-      child: Text(
-        'Errore: Domanda non disponibile.',
-        style: TextStyle(color: Colors.red, fontSize: 24),
+    if (step.choices == null || step.choices!.isEmpty) {
+      return const Center(
+        child: Text(
+          'Errore: Domanda non disponibile.',
+          style: TextStyle(color: Colors.red, fontSize: 24),
+        ),
+      );
+    }
+
+    // Aggiungi un Container con Center per centrare il CourseQuestionCard
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.only(top: 80, right: 16, left: 16),
+        child: CourseQuestionCard(
+          step: step,
+          topic: level.topic,
+          onAnswered: (bool isCorrect) async {
+            if (isCorrect) {
+              _onContinuePressed(_pageController.page!.toInt());
+
+              // Recupera i coins attuali e aggiungi 10
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+                final doc = await docRef.get();
+                if (doc.exists) {
+                  final userData = doc.data() as Map<String, dynamic>;
+                  final currentCoins = userData['coins'] ?? 0;
+
+                  // Aggiorna i coins con l'incremento di 10
+                  widget.onCoinsUpdate(currentCoins + 0);  // Incrementa i coins di 10
+                }
+              }
+            } else {
+              // Gestisci la risposta errata
+            }
+          },
+          onCompleteStep: () {
+            // Azioni da fare quando lo step è completato
+          },
+        ),
       ),
     );
   }
-
-  return CourseQuestionCard(
-    step: step,
-    topic: level.topic, // Usa il `topic` del livello associato allo step
-    onAnswered: (bool isCorrect) async {
-      if (isCorrect) {
-        _onContinuePressed(_pageController.page!.toInt());
-
-        // Recupera i coins attuali e aggiungi 10
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-          final doc = await docRef.get();
-          if (doc.exists) {
-            final userData = doc.data() as Map<String, dynamic>;
-            final currentCoins = userData['coins'] ?? 0;
-
-            // Aggiorna i coins con l'incremento di 10
-            widget.onCoinsUpdate(currentCoins + 0);  // Incrementa i coins di 10
-          }
-        }
-      } else {
-        // Gestisci la risposta errata
-      }
-    },
-    onCompleteStep: () {
-      // Azioni da fare quando lo step è completato
-    },
-  );
-}
 
   Future<void> _markSectionAsCompleted(String sectionTitle) async {
     final user = FirebaseAuth.instance.currentUser;
