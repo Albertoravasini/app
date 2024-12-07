@@ -100,11 +100,13 @@ class Section {
   String title;
   final List<LevelStep> steps;
   String? imageUrl;
+  int sectionNumber;
 
   Section({
     required this.title,
     required this.steps,
     this.imageUrl,
+    required this.sectionNumber,
   });
 
   factory Section.fromMap(Map<String, dynamic> data) {
@@ -112,6 +114,7 @@ class Section {
       title: data['title'] ?? '',
       steps: List<LevelStep>.from(data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []),
       imageUrl: data['imageUrl'],
+      sectionNumber: data['sectionNumber'] ?? 1,
     );
   }
 
@@ -120,6 +123,7 @@ class Section {
       'title': title,
       'steps': steps.map((step) => step.toMap()).toList(),
       'imageUrl': imageUrl,
+      'sectionNumber': sectionNumber,
     };
   }
 }

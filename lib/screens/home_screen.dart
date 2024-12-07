@@ -27,6 +27,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool showArticles = false; // Aggiungi questa variabile
   int _currentPage = 1;  // Inizia da 1 perché il video è al centro
   bool _showTutorial = false;
+  bool isInCourse = false;
+  int currentSectionStep = 0;
+  int totalSectionSteps = 0;
 
   @override
   void initState() {
@@ -215,6 +218,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void updateSectionProgress(int current, int total, bool inCourse) {
+    setState(() {
+      currentSectionStep = current;
+      totalSectionSteps = total;
+      isInCourse = inCourse;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -230,13 +241,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 onCoinsUpdate: _updateCoins,
                 showSavedVideos: showSavedVideos,
                 onPageChanged: _onPageChanged,
+                onSectionProgressUpdate: updateSectionProgress,
               ),
-              // Contenitore superiore che include sia l'indicatore che i coins
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 0.0),
                   child: Stack(
-                    alignment: Alignment.topCenter,  // Allinea tutto in alto al centro
+                    alignment: Alignment.topCenter,
                     children: [
                       // Container dei coins (a sinistra)
                       Align(
@@ -244,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Padding(
                           padding: const EdgeInsets.only(left: 16.0),
                           child: Container(
-                            height: 32,  // Altezza fissa per allineare con l'indicatore
+                            height: 32,
                             padding: const EdgeInsets.all(5),
                             decoration: ShapeDecoration(
                               color: Color(0x93333333),
@@ -281,6 +292,45 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
+
+                      // Indicatore di progresso del corso (a destra)
+                      if (isInCourse)
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 16.0),
+                            child: Container(
+                              height: 32,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              decoration: ShapeDecoration(
+                                color: Color(0x93333333),
+                                shape: RoundedRectangleBorder(
+                                  side: BorderSide(
+                                    width: 1,
+                                    color: Colors.white.withOpacity(0.10000000149011612),
+                                  ),
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${currentSectionStep + 1}/$totalSectionSteps',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.48,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       
                       // Indicatore di pagina (al centro)
                       Row(
@@ -288,8 +338,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(3, (index) {
                           return Container(
-                            height: 32,  // Stessa altezza del container dei coins
-                            alignment: Alignment.center,  // Centra verticalmente i dot
+                            height: 32,
+                            alignment: Alignment.center,
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 300),
                               margin: const EdgeInsets.symmetric(horizontal: 6),

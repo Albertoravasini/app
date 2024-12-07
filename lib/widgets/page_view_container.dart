@@ -1,5 +1,6 @@
 // Crea un nuovo file lib/widgets/page_view_container.dart
 
+import 'package:Just_Learn/models/course.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import '../screens/Articles_screen.dart';
@@ -15,6 +16,9 @@ class PageViewContainer extends StatefulWidget {
   final LevelStep? questionStep;
   final Function(int)? onPageChanged;
   final String videoTitle;
+  final Course course;
+  final Function(Course?) onStartCourse;
+  final bool isInCourse;
 
   const PageViewContainer({
     Key? key,
@@ -22,8 +26,11 @@ class PageViewContainer extends StatefulWidget {
     required this.onCoinsUpdate,
     required this.topic,
     required this.videoTitle,
+    required this.course,
+    required this.onStartCourse,
     this.questionStep,
     this.onPageChanged,
+    this.isInCourse = false,
   }) : super(key: key);
 
   @override
@@ -88,6 +95,9 @@ class _PageViewContainerState extends State<PageViewContainer> {
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           ),
+          course: widget.course,
+          onStartCourse: widget.onStartCourse,
+          isInCourse: widget.isInCourse,
         ),
         NotesScreen(),
       ],

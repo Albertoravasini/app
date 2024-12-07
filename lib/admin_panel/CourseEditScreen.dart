@@ -174,6 +174,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                       title: sectionTitle!,
                       steps: [],
                       imageUrl: imageUrl,
+                      sectionNumber: _sections.length + 1,
                     ));
                   });
                   Navigator.pop(context);

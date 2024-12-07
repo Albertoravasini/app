@@ -172,19 +172,7 @@ Future<void> _loadUserProgress() async {
                           ),
                         );
                       }
-                      return VideoPlayerWidget(
-                        videoId: videoId,
-                        onShowQuestion: () {},
-                        onShowArticles: () {},
-                        onShowNotes: () {},
-                        isLiked: false,
-                        likeCount: 0,
-                        isSaved: false,
-                        onCoinsUpdate: (newCoins) {
-                          print("Coins aggiornati: $newCoins");
-                        },
-                        topic: widget.section.title,
-                      );
+                     
                     } else if (step.type == 'question') {
                       return CourseQuestionCard(
                         step: step,

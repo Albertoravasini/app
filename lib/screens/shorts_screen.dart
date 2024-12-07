@@ -23,6 +23,7 @@ class ShortsScreen extends StatefulWidget {
   final bool showSavedVideos;
   final Function(String)? onTopicChanged;
   final Function(int) onPageChanged;
+  final Function(int, int, bool) onSectionProgressUpdate;
 
   const ShortsScreen({
     super.key,
@@ -33,6 +34,7 @@ class ShortsScreen extends StatefulWidget {
     this.showSavedVideos = false,
     this.onTopicChanged,
     required this.onPageChanged,
+    required this.onSectionProgressUpdate,
   });
 
   @override
@@ -57,6 +59,11 @@ class _ShortsScreenState extends State<ShortsScreen> {
  UserModel? _currentUser;
  
   List<Course> _courses = [];
+  
+  bool isInCourseMode = false;
+  Section? currentSection;
+  int currentStepIndex = 0;
+  Course? currentCourse;
   
   @override
   void initState() {
@@ -106,32 +113,34 @@ Future<void> _loadCourses() async {
           course.sections.first.steps.any((step) => step.type == 'video')
         ).toList();
 
-        // Crea gli shorts steps dai primi video di ogni corso
-        allShortSteps = _courses.map((course) {
-          final firstSection = course.sections.first;
-          final firstVideoStep = firstSection.steps.firstWhere(
-            (step) => step.type == 'video',
-            orElse: () => throw Exception('No video found in course'),
-          );
+        // Se non siamo in modalità corso, mostra solo i primi video
+        if (!isInCourseMode) {
+          allShortSteps = _courses.map((course) {
+            final firstSection = course.sections.first;
+            final firstVideoStep = firstSection.steps.firstWhere(
+              (step) => step.type == 'video',
+              orElse: () => throw Exception('No video found in course'),
+            );
 
-          return {
-            'step': firstVideoStep,
-            'level': Level(
-              id: course.id,
-              levelNumber: 1,
-              topic: course.topic,
-              subtopic: course.subtopic,
-              title: course.title,
-              steps: firstSection.steps,
-              subtopicOrder: 1,
-            ),
-            'course': course,
-            'showQuestion': false,
-            'isLiked': false,
-            'likeCount': 0,
-            'isSaved': false,
-          };
-        }).toList();
+            return {
+              'step': firstVideoStep,
+              'level': Level(
+                id: course.id,
+                levelNumber: 1,
+                topic: course.topic,
+                subtopic: course.subtopic,
+                title: course.title,
+                steps: firstSection.steps,
+                subtopicOrder: 1,
+              ),
+              'course': course,
+              'showQuestion': false,
+              'isLiked': false,
+              'likeCount': 0,
+              'isSaved': false,
+            };
+          }).toList();
+        }
 
         // Inizializza i controller YouTube per ogni video
         _youtubeControllers = allShortSteps.map((shortStep) {
@@ -223,6 +232,41 @@ void _onVideoChanged(int index) {
   
   // Pulisci i controller non necessari
   _cleanupControllers(index);
+
+  if (isInCourseMode && currentCourse != null) {
+    final currentStep = allShortSteps[index];
+    final section = currentCourse!.sections.firstWhere(
+      (s) => s.steps.contains(currentStep['step']),
+      orElse: () => currentCourse!.sections.first,
+    );
+    
+    final stepIndex = section.steps.indexOf(currentStep['step']);
+    widget.onSectionProgressUpdate(stepIndex, section.steps.length, true);
+
+    // Salva il progresso nel Firestore
+    _saveProgress(section.title, stepIndex);
+
+    // Se siamo all'ultimo step della sezione, segna la sezione come completata
+    if (stepIndex == section.steps.length - 1) {
+      _markSectionAsCompleted(section.title);
+    }
+  }
+}
+
+Future<void> _saveProgress(String sectionTitle, int stepIndex) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    try {
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      
+      // Aggiorna currentSteps nel documento dell'utente
+      await userRef.update({
+        'currentSteps.$sectionTitle': stepIndex,
+      });
+    } catch (e) {
+      print('Error saving progress: $e');
+    }
+  }
 }
 
 void _cleanupControllers(int currentIndex) {
@@ -257,49 +301,41 @@ Future<void> _handleAsyncOperations(int index) async {
 @override
 void dispose() {
   for (var controller in _youtubeControllers) {
-    if (controller.initialVideoId.isNotEmpty) {
-      controller.dispose();
-    }
+    controller.dispose();
   }
   _pageController.dispose();
   super.dispose();
 }
 
   void _onContinuePressed(int index) {
-    if (!hasSwiped && mounted) { // Verifica se il widget è ancora montato
+    if (!hasSwiped && mounted) {
       setState(() {
         hasSwiped = true;
         final currentSteps = allShortSteps[index]['level'].steps;
         final currentStepIndex = currentSteps.indexOf(allShortSteps[index]['step']);
 
         if (currentStepIndex < currentSteps.length - 1) {
-          allShortSteps[index]['step'] = currentSteps[currentStepIndex + 1];
-          if (currentSteps[currentStepIndex + 1].type == 'question') {
-            allShortSteps[index]['showQuestion'] = true;
-            selectedChoice = null;
-          } else {
-            allShortSteps[index]['showQuestion'] = false;
-          }
+          final nextStep = currentSteps[currentStepIndex + 1];
+          allShortSteps[index]['step'] = nextStep;
+          allShortSteps[index]['showQuestion'] = nextStep.type == 'question';
+          if (nextStep.type == 'question') selectedChoice = null;
         }
       });
     }
   }
 
   void _onPreviousPressed(int index) {
-    if (!hasSwiped && mounted) { // Verifica se il widget è ancora montato
+    if (!hasSwiped && mounted) {
       setState(() {
         hasSwiped = true;
         final currentSteps = allShortSteps[index]['level'].steps;
         final currentStepIndex = currentSteps.indexOf(allShortSteps[index]['step']);
 
         if (currentStepIndex > 0) {
-          allShortSteps[index]['step'] = currentSteps[currentStepIndex - 1];
-          if (currentSteps[currentStepIndex - 1].type == 'question') {
-            allShortSteps[index]['showQuestion'] = true;
-            selectedChoice = null;
-          } else {
-            allShortSteps[index]['showQuestion'] = false;
-          }
+          final prevStep = currentSteps[currentStepIndex - 1];
+          allShortSteps[index]['step'] = prevStep;
+          allShortSteps[index]['showQuestion'] = prevStep.type == 'question';
+          if (prevStep.type == 'question') selectedChoice = null;
         }
       });
     }
@@ -308,30 +344,81 @@ void dispose() {
 
 
   Widget _buildVideoPlayer(int index) {
-    if (allShortSteps[index]['showQuestion'] == true) {
-      return const SizedBox.shrink();
-    }
-
     final currentStep = allShortSteps[index]['step'] as LevelStep;
+    
+    // Se è uno step di transizione, mostra la schermata nera personalizzata
+    if (currentStep.type == 'transition') {
+      return Container(
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                color: Colors.white,
+                size: 64,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                currentStep.content,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontFamily: 'Montserrat',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Icon(
+                Icons.keyboard_arrow_up,
+                color: Colors.white.withOpacity(0.7),
+                size: 48,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Se è una domanda, mostra il CourseQuestionCard
+    if (currentStep.type == 'question') {
+      return CourseQuestionCard(
+        step: currentStep,
+        onAnswered: (isCorrect) {
+          // Gestisci la risposta
+          if (isCorrect) {
+            widget.onCoinsUpdate(5); // Aggiorna le monete
+          }
+        },
+        onCompleteStep: () {
+          // Passa allo step successivo
+          _pageController.nextPage(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        },
+        topic: (allShortSteps[index]['level'] as Level).topic,
+      );
+    }
+    
+    // Altrimenti mostra il video player
     final level = allShortSteps[index]['level'] as Level;
+    final course = allShortSteps[index]['course'] as Course;
     final videoId = currentStep.content;
     final videoTitle = level.title;
-    final course = allShortSteps[index]['course'];
 
-    return Stack(
-      children: [
-        PageViewContainer(
-          videoId: videoId,
-          onCoinsUpdate: widget.onCoinsUpdate,
-          topic: level.topic,
-          questionStep: null,
-          onPageChanged: widget.onPageChanged,
-          videoTitle: videoTitle,
-        ),
-        
-        // Pulsante "Go To Course" se il corso esiste
-        
-      ],
+    return PageViewContainer(
+      videoId: videoId,
+      onCoinsUpdate: widget.onCoinsUpdate,
+      topic: level.topic,
+      questionStep: null,
+      onPageChanged: widget.onPageChanged,
+      videoTitle: videoTitle,
+      course: course,
+      onStartCourse: startCourse,
+      isInCourse: isInCourseMode,
     );
   }
 
@@ -374,6 +461,221 @@ void dispose() {
     },
   );
 }
+
+  Future<void> _markSectionAsCompleted(String sectionTitle) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+        final userDoc = await userRef.get();
+        
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final completedSections = List<String>.from(userData['completedSections'] ?? []);
+          
+          if (!completedSections.contains(sectionTitle)) {
+            completedSections.add(sectionTitle);
+            await userRef.update({
+              'completedSections': completedSections,
+            });
+          }
+        }
+      } catch (e) {
+        print('Error marking section as completed: $e');
+      }
+    }
+  }
+
+  Future<void> startCourse(Course? course) async {
+    if (mounted && course != null) {
+      setState(() {
+        isInCourseMode = true;
+        currentCourse = course;
+      });
+
+      final lastSection = await _findLastIncompleteSection(course);
+      if (lastSection != null) {
+        final lastProgress = await _loadLastProgress(course);
+        
+        if (mounted) {
+          setState(() {
+            allShortSteps = [];
+            int currentSectionIndex = 0;
+
+            for (var section in course.sections) {
+              for (var step in section.steps) {
+                allShortSteps.add({
+                  'step': step,
+                  'level': Level(
+                    id: course.id,
+                    levelNumber: currentSectionIndex + 1,
+                    topic: course.topic,
+                    subtopic: course.subtopic,
+                    title: course.title,
+                    steps: section.steps,
+                    subtopicOrder: 1,
+                  ),
+                  'course': course,
+                  'showQuestion': step.type == 'question',
+                  'isLiked': false,
+                  'likeCount': 0,
+                  'isSaved': false,
+                });
+              }
+              currentSectionIndex++;
+            }
+
+            _initializeControllers();
+          });
+
+          // Aggiorna immediatamente il progresso della sezione
+          final currentStep = allShortSteps[lastProgress]['step'] as LevelStep;
+          final currentSection = lastSection;
+          final stepIndex = currentSection.steps.indexOf(currentStep);
+          
+          // Notifica il progresso iniziale
+          widget.onSectionProgressUpdate(
+            stepIndex,
+            currentSection.steps.length,
+            true
+          );
+
+          // Salta alla posizione corretta se necessario
+          if (lastProgress > 0) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _pageController.jumpToPage(lastProgress);
+            });
+          }
+        }
+      }
+    } else if (course == null) {
+      setState(() {
+        isInCourseMode = false;
+        currentCourse = null;
+        widget.onSectionProgressUpdate(0, 0, false);
+      });
+      _loadCourses();
+    }
+  }
+
+  Future<Section?> _findLastIncompleteSection(Course course) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final completedSections = List<String>.from(userData['completedSections'] ?? []);
+
+          // Trova la prima sezione non completata
+          for (var section in course.sections) {
+            if (!completedSections.contains(section.title)) {
+              return section;
+            }
+          }
+
+          // Se tutte le sezioni sono completate, ritorna l'ultima sezione
+          return course.sections.last;
+        }
+      } catch (e) {
+        print('Error finding last incomplete section: $e');
+      }
+    }
+    // Se c'è un errore o non ci sono sezioni completate, ritorna la prima sezione
+    return course.sections.first;
+  }
+
+  Future<int> _loadLastProgress(Course course) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+          
+          // Trova l'ultima sezione completata
+          for (var section in course.sections.reversed) {
+            final stepIndex = currentSteps[section.title] as int? ?? -1;
+            if (stepIndex >= 0) {
+              // Calcola l'indice globale sommando gli step delle sezioni precedenti
+              int globalIndex = 0;
+              for (var s in course.sections) {
+                if (s.title == section.title) {
+                  return globalIndex + stepIndex;
+                }
+                globalIndex += s.steps.length;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        print('Error loading progress: $e');
+      }
+    }
+    return 0;
+  }
+
+  void exitCourseMode() {
+    setState(() {
+      isInCourseMode = false;
+      currentSection = null;
+      currentStepIndex = 0;
+      currentCourse = null;
+    });
+    _loadCourses(); // Ricarica i primi video di ogni corso
+  }
+
+  void _initializeControllers() {
+    // Disponi i controller esistenti
+    for (var controller in _youtubeControllers) {
+      if (controller.initialVideoId.isNotEmpty) {
+        controller.dispose();
+      }
+    }
+
+    // Inizializza i nuovi controller
+    _youtubeControllers = allShortSteps.map((step) {
+      final videoId = (step['step'] as LevelStep).content;
+      return YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: true,
+          disableDragSeek: true,
+          hideControls: true,
+          hideThumbnail: true,
+          forceHD: false,
+        ),
+      );
+    }).toList();
+
+    // Precarica il primo video
+    if (_youtubeControllers.isNotEmpty) {
+      _youtubeControllers.first.unMute();
+      _youtubeControllers.first.play();
+    }
+  }
+
+  void _handleQuitCourse() {
+    if (mounted) {
+      setState(() {
+        isInCourseMode = false;
+        currentCourse = null;
+        widget.onSectionProgressUpdate(0, 0, false);
+      });
+      _loadCourses(); // Ricarica i video normali
+      startCourse(null); // Chiama startCourse con null per resettare
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

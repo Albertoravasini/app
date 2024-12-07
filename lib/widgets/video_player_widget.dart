@@ -15,6 +15,7 @@ import '../screens/Articles_screen.dart';
 import '../screens/notes_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId; // Ora accetta solo videoId
@@ -29,6 +30,9 @@ class VideoPlayerWidget extends StatefulWidget {
   final Function(String)? onTopicChanged; // Callback per notificare il cambio di topic
   final VoidCallback onShowArticles;
   final VoidCallback onShowNotes;
+  final Course course; // Aggiungi questa proprietà
+  final Function(Course?) onStartCourse; // Aggiungi questa callback
+  final bool isInCourse; // Aggiungi questo parametro
 
   const VideoPlayerWidget({
     Key? key,
@@ -44,6 +48,9 @@ class VideoPlayerWidget extends StatefulWidget {
     this.onTopicChanged, // Richiedi questo parametro
     required this.onShowArticles,
     required this.onShowNotes,
+    required this.course, // Aggiungi questo parametro
+    required this.onStartCourse, // Aggiungi questo parametro
+    this.isInCourse = false, // Aggiungi questo parametro con default false
   }) : super(key: key);
 
   @override
@@ -442,6 +449,16 @@ void _onQuestionIconTap() {
     );
   }
 
+  // Aggiungi questo metodo per gestire l'inizio del corso
+  void _handleStartCourse() {
+    widget.onStartCourse(widget.course);
+  }
+
+  // Aggiungi questo metodo per gestire l'uscita dal corso
+  void _handleQuitCourse() {
+    widget.onStartCourse(null);
+  }
+
 @override
 Widget build(BuildContext context) {
   return YoutubePlayerBuilder(
@@ -696,86 +713,111 @@ Widget build(BuildContext context) {
           Positioned(
             left: 16,
             bottom: 20,
-            child: Container(
-              width: 274,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      _controller.metadata.title ?? 'Titolo non disponibile',
-                      textAlign: TextAlign.left,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.72,
-                      ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Titolo
+                SizedBox(
+                  width: 274, // Larghezza fissa per il titolo
+                  child: Text(
+                    _controller.metadata.title ?? 'Titolo non disponibile',
+                    textAlign: TextAlign.left,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.72,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: () => _showTopicSelection(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                      clipBehavior: Clip.antiAlias,
-                      decoration: ShapeDecoration(
-                        color: const Color(0x93333333),
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(
-                            width: 1,
-                            color: Colors.white.withOpacity(0.1),
+                ),
+                const SizedBox(height: 12),
+                // Row per topic e quit button
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _showTopicSelection(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                        clipBehavior: Clip.antiAlias,
+                        decoration: ShapeDecoration(
+                          color: const Color(0x93333333),
+                          shape: RoundedRectangleBorder(
+                            side: BorderSide(
+                              width: 1,
+                              color: Colors.white.withOpacity(0.1),
+                            ),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 15,
+                              height: 15,
+                              padding: const EdgeInsets.all(1.25),
+                              child: const Icon(
+                                Icons.school,
+                                color: Colors.white,
+                                size: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 1),
+                            Text(
+                              widget.topic,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.72,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 15,
-                            height: 15,
-                            padding: const EdgeInsets.all(1.25),
-                            child: const Icon(
-                              Icons.school,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 1),
-                          Text(
-                            widget.topic,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.72,
-                            ),
-                          ),
-                        ],
-                      ),
                     ),
-                  ),
-                ],
-              ),
+                    if (widget.isInCourse)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: GestureDetector(
+                          onTap: _handleQuitCourse,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            decoration: ShapeDecoration(
+                              color: Colors.yellowAccent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: const Text(
+                              'Quit',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
-          // Aggiungi questo Positioned dentro lo Stack esistente
           Positioned(
             left: 16,
             bottom: 100,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header con profilo e nome
+                // Header con profilo e nome (sempre visibile)
                 Row(
                   children: [
                     Container(
@@ -808,81 +850,90 @@ Widget build(BuildContext context) {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                // Card informativa con larghezza ridotta
-                Container(
-                  width: MediaQuery.of(context).size.width * 0.75, // Ridotta al 75% della larghezza dello schermo
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Color(0x93333333).withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              image: const DecorationImage(
-                                image: NetworkImage('https://picsum.photos/47'),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Formati gratis e cambia per sempre la tua vita.',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: Color(0xFFFFFF28),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                
+                // Container del corso (visibile solo quando non si è in corso)
+                if (!widget.isInCourse) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.75,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0x93333333).withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.only(left: 16),
-                              child: Text(
-                                'Start Course',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 14,
-                                  fontFamily: 'Montserrat',
-                                  fontWeight: FontWeight.w700,
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: const DecorationImage(
+                                  image: NetworkImage('https://picsum.photos/47'),
+                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
-                            Padding(
-                              padding: const EdgeInsets.only(right: 12),
-                              child: Icon(
-                                Icons.arrow_forward,
-                                color: Colors.black,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Formati gratis e cambia per sempre la tua vita.',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: Color(0xFFFFFF28),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: _handleStartCourse,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 16),
+                                    child: Text(
+                                      'Start Course',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 14,
+                                        fontFamily: 'Montserrat',
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: Icon(
+                                      Icons.arrow_forward,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
