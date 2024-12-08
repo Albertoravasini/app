@@ -14,6 +14,7 @@ import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/widgets/page_view_container.dart';
 import '../services/course_service.dart';
+import 'package:Just_Learn/screens/section_selection_sheet.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -492,23 +493,45 @@ void dispose() {
     }
   }
 
-  Future<void> startCourse(Course? course) async {
-    if (mounted && course != null) {
+  Future<void> startCourse(Course? course, {Section? selectedSection}) async {
+    if (mounted) {
+      if (course == null) {
+        setState(() {
+          isInCourseMode = false;
+          currentCourse = null;
+          currentSection = null;
+          currentStepIndex = 0;
+        });
+        
+        widget.onSectionProgressUpdate(0, 0, false);
+        await _loadCourses();
+        return;
+      }
+
       setState(() {
         isInCourseMode = true;
         currentCourse = course;
       });
 
-      final lastSection = await _findLastIncompleteSection(course);
-      if (lastSection != null) {
-        final lastProgress = await _loadLastProgress(course);
-        
+      // Carica l'ultimo progresso salvato
+      final lastProgressIndex = await _loadLastProgress(course);
+      final targetSection = selectedSection ?? await _findLastIncompleteSection(course);
+      
+      if (targetSection != null) {
         if (mounted) {
           setState(() {
             allShortSteps = [];
-            int currentSectionIndex = 0;
+            
+            // Riorganizza le sezioni per mettere quella selezionata per prima
+            final reorderedSections = [...course.sections];
+            if (selectedSection != null) {
+              reorderedSections.remove(selectedSection);
+              reorderedSections.insert(0, selectedSection);
+            }
 
-            for (var section in course.sections) {
+            // Aggiungi gli step di tutte le sezioni
+            int currentSectionIndex = 0;
+            for (var section in reorderedSections) {
               for (var step in section.steps) {
                 allShortSteps.add({
                   'step': step,
@@ -531,36 +554,14 @@ void dispose() {
               currentSectionIndex++;
             }
 
+            // Reinizializza i controller
             _initializeControllers();
           });
 
-          // Aggiorna immediatamente il progresso della sezione
-          final currentStep = allShortSteps[lastProgress]['step'] as LevelStep;
-          final currentSection = lastSection;
-          final stepIndex = currentSection.steps.indexOf(currentStep);
-          
-          // Notifica il progresso iniziale
-          widget.onSectionProgressUpdate(
-            stepIndex,
-            currentSection.steps.length,
-            true
-          );
-
-          // Salta alla posizione corretta se necessario
-          if (lastProgress > 0) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _pageController.jumpToPage(lastProgress);
-            });
-          }
+          // Vai all'ultimo step salvato invece che all'inizio
+          _pageController.jumpToPage(lastProgressIndex);
         }
       }
-    } else if (course == null) {
-      setState(() {
-        isInCourseMode = false;
-        currentCourse = null;
-        widget.onSectionProgressUpdate(0, 0, false);
-      });
-      _loadCourses();
     }
   }
 

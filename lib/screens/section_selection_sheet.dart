@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/course.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SectionSelectionSheet extends StatefulWidget {
   final Course course;
@@ -24,6 +27,14 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
   void initState() {
     super.initState();
     _selectedSection = widget.currentSection;
+  }
+
+  void _handleSectionSelection(Section section) {
+    // Chiudi il bottom sheet
+    Navigator.pop(context);
+    
+    // Chiama la callback con la sezione selezionata
+    widget.onSelectSection(section);
   }
 
   @override
@@ -61,109 +72,102 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
                 widget.course.title,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w800,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 20),
               
               // Lista delle sezioni
               Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: widget.course.sections.length,
-                  itemBuilder: (context, index) {
-                    final section = widget.course.sections[index];
-                    final isSelected = _selectedSection == section;
-                    final isCompleted = false; // Implementa la logica per verificare se la sezione è completata
-                    
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() => _selectedSection = section);
-                        widget.onSelectSection(section);
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isSelected 
-                            ? Colors.white.withOpacity(0.1) 
-                            : Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.12),
-                            width: 1,
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: Future.wait(
+                    widget.course.sections.map((section) async {
+                      final data = await _getCurrentStepForSection(section.title);
+                      return {
+                        'progress': _calculateTotalProgress(
+                          section,
+                          data['currentStep'] as int,
+                          List<String>.from(data['answeredQuestions']),
+                        ),
+                        'isCompleted': data['isCompleted'] as bool,
+                        'totalSteps': section.steps.length,
+                      };
+                    })
+                  ),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    return ListView.builder(
+                      controller: scrollController,
+                      itemCount: widget.course.sections.length,
+                      itemBuilder: (context, index) {
+                        final section = widget.course.sections[index];
+                        final data = snapshot.data![index];
+                        final currentProgress = data['progress'] as int;
+                        final isCompleted = data['isCompleted'] as bool;
+                        final totalSteps = data['totalSteps'] as int;
+                        
+                        return GestureDetector(
+                          onTap: () => _handleSectionSelection(section),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF181819),
+                              borderRadius: BorderRadius.circular(20),
+                              border: isCompleted 
+                                ? Border.all(color: Colors.yellowAccent.withOpacity(0), width: 1.5)
+                                : null,
+                            ),
+                            child: Stack(
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              section.title,
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isCompleted)
+                                            SvgPicture.asset(
+                                              'assets/solar_verified-check-linear.svg',
+                                              width: 24,
+                                              height: 24,
+                                            ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 15),
+                                      _buildSectionDetails(section),
+                                      SizedBox(height: 15),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: _buildProgressBar(
+                                          currentProgress,
+                                          totalSteps,
+                                          isCompleted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            // Indicatore di completamento
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isCompleted 
-                                  ? Colors.yellowAccent 
-                                  : Colors.white.withOpacity(0.1),
-                              ),
-                              child: Icon(
-                                isCompleted ? Icons.check : Icons.play_arrow,
-                                size: 16,
-                                color: isCompleted ? Colors.black : Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            
-                            // Informazioni della sezione
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Section ${index + 1}',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 12,
-                                      fontFamily: 'Montserrat',
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    section.title,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontFamily: 'Montserrat',
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${section.steps.length} steps',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.5),
-                                      fontSize: 12,
-                                      fontFamily: 'Montserrat',
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            
-                            // Indicatore di selezione
-                            if (isSelected)
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.yellowAccent,
-                                size: 24,
-                              ),
-                          ],
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -173,5 +177,120 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
         );
       },
     );
+  }
+
+  // Aggiungi questi metodi helper
+  Widget _buildProgressBar(int currentStep, int totalSteps, bool isCompleted) {
+    double progress = totalSteps > 0 ? currentStep / totalSteps : 0;
+    
+    return Container(
+      width: double.infinity,
+      height: 6,
+      decoration: BoxDecoration(
+        color: Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: progress,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isCompleted ? Colors.yellowAccent : Colors.white,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionDetails(Section section) {
+    int totalVideos = section.steps.where((step) => step.type == 'video').length;
+    int totalQuestions = section.steps.where((step) => step.type == 'question').length;
+    int totalTime = _calculateTotalTime(section);
+
+    return Row(
+      children: [
+        _buildDetailIconText(Icons.timer, '$totalTime minutes'),
+        const SizedBox(width: 23),
+        _buildDetailIconText(Icons.video_collection, '$totalVideos videos'),
+        const SizedBox(width: 23),
+        _buildDetailIconText(Icons.quiz, '$totalQuestions questions'),
+      ],
+    );
+  }
+
+  Widget _buildDetailIconText(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white.withOpacity(0.5), size: 16),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 12,
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<Map<String, dynamic>> _getCurrentStepForSection(String sectionTitle) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+          final answeredQuestions = userData['answeredQuestions'] as Map<String, dynamic>? ?? {};
+          final completedSections = List<String>.from(userData['completedSections'] ?? []);
+          
+          // Recupera il progresso per questa sezione
+          final currentStep = currentSteps[sectionTitle] as int? ?? 0;
+          final sectionAnswers = answeredQuestions[sectionTitle] as List<dynamic>? ?? [];
+          
+          return {
+            'currentStep': currentStep,
+            'answeredQuestions': sectionAnswers,
+            'isCompleted': completedSections.contains(sectionTitle),
+          };
+        }
+      } catch (e) {
+        print('Error getting section progress: $e');
+      }
+    }
+    return {
+      'currentStep': 0,
+      'answeredQuestions': [],
+      'isCompleted': false,
+    };
+  }
+
+  int _calculateTotalProgress(Section section, int currentStep, List<String> answeredQuestions) {
+    int progress = currentStep;
+    
+    // Conta gli step di tipo domanda che sono stati completati
+    for (var i = 0; i < section.steps.length; i++) {
+      if (section.steps[i].type == 'question' && 
+          answeredQuestions.contains(section.steps[i].content)) {
+        progress++;
+      }
+    }
+    
+    return progress;
+  }
+
+  int _calculateTotalTime(Section section) {
+    int totalVideos = section.steps.where((step) => step.type == 'video').length;
+    int totalQuestions = section.steps.where((step) => step.type == 'question').length;
+    double totalTime = totalVideos * 1 + totalQuestions * 0.5;
+    return totalTime.ceil();
   }
 } 
