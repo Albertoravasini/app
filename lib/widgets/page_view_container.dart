@@ -19,6 +19,7 @@ class PageViewContainer extends StatefulWidget {
   final Course course;
   final Function(Course?, Section?) onStartCourse;
   final bool isInCourse;
+  final Section? currentSection;
 
   const PageViewContainer({
     Key? key,
@@ -31,6 +32,7 @@ class PageViewContainer extends StatefulWidget {
     this.questionStep,
     this.onPageChanged,
     this.isInCourse = false,
+    this.currentSection,
   }) : super(key: key);
 
   @override
@@ -39,25 +41,11 @@ class PageViewContainer extends StatefulWidget {
 
 class _PageViewContainerState extends State<PageViewContainer> {
   final PageController _pageController = PageController(initialPage: 1);
-  late YoutubePlayerController _controller;
   String videoTitle = '';
 
   @override
   void initState() {
     super.initState();
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-      ),
-    )..addListener(() {
-      if (_controller.metadata.title != null) {
-        setState(() {
-          videoTitle = _controller.metadata.title!;
-        });
-      }
-    });
   }
 
   void _onPageChanged(int page) {
@@ -98,6 +86,7 @@ class _PageViewContainerState extends State<PageViewContainer> {
           course: widget.course,
           onStartCourse: widget.onStartCourse,
           isInCourse: widget.isInCourse,
+          currentSection: widget.currentSection,
         ),
         NotesScreen(),
       ],
@@ -106,7 +95,6 @@ class _PageViewContainerState extends State<PageViewContainer> {
 
   @override
   void dispose() {
-    _controller.dispose();
     _pageController.dispose();
     super.dispose();
   }

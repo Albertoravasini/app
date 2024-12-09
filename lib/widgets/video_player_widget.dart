@@ -672,7 +672,7 @@ Widget build(BuildContext context) {
                       child: SizedBox(
                         width: MediaQuery.of(context).size.width * _progress,
                         child: Container(
-                          color: Colors.yellowAccent,
+                          color: Colors.grey,
                         ),
                       ),
                     ),
@@ -780,33 +780,33 @@ GestureDetector(
       );
     }
   },
-  child: FittedBox(
-    fit: BoxFit.none,
-    child: Container(
-      height: 23,
-      decoration: ShapeDecoration(
-        color: Color(0x93333333),
-        shape: RoundedRectangleBorder(
-          side: BorderSide(
-            width: 1,
-            color: Colors.white.withOpacity(0.10000000149011612),
-          ),
-          borderRadius: BorderRadius.circular(20),
+  child: Container(
+    constraints: BoxConstraints(maxWidth: 240), // Limita la larghezza massima
+    height: 23,
+    decoration: ShapeDecoration(
+      color: Color(0x93333333),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(
+          width: 1,
+          color: Colors.white.withOpacity(0.10000000149011612),
         ),
+        borderRadius: BorderRadius.circular(20),
       ),
-      padding: EdgeInsets.symmetric(horizontal: 7),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.school,
-            color: Colors.white,
-            size: 15,
-          ),
-          SizedBox(width: 4),
-          Text(
+    ),
+    padding: EdgeInsets.symmetric(horizontal: 7),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.school,
+          color: Colors.white,
+          size: 15,
+        ),
+        SizedBox(width: 4),
+        Flexible(  // Aggiungi Flexible qui
+          child: Text(
             widget.isInCourse 
-                ? "Section ${widget.currentSection?.sectionNumber ?? 1}" 
+                ? widget.currentSection?.title ?? "Section 1"
                 : widget.topic,
             style: TextStyle(
               color: Colors.white,
@@ -815,9 +815,11 @@ GestureDetector(
               fontWeight: FontWeight.w500,
               letterSpacing: 0.72,
             ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   ),
 ),
@@ -827,21 +829,32 @@ GestureDetector(
                         child: GestureDetector(
                           onTap: _handleQuitCourse,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            height: 23,  // Stessa altezza del container della sezione
                             decoration: ShapeDecoration(
-                              color: Colors.yellowAccent,
+                              color: Color(0x93333333),  // Stesso colore di sfondo
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  width: 1,
+                                  color: Colors.yellowAccent.withOpacity(0.5),  // Bordo giallo
+                                ),
+                                borderRadius: BorderRadius.circular(20),  // Stesso border radius
                               ),
                             ),
-                            child: const Text(
-                              'Quit',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 12,
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.w500,
-                              ),
+                            padding: EdgeInsets.symmetric(horizontal: 7),  // Stesso padding
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Quit',
+                                  style: TextStyle(
+                                    color: Colors.yellowAccent,
+                                    fontSize: 12,
+                                    fontFamily: 'Montserrat',
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.72,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

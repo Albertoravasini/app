@@ -69,9 +69,17 @@ class _ShortsScreenState extends State<ShortsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCourses();
-    _loadCurrentUser();
+    // Rimuoviamo il caricamento da qui
     _pageController.addListener(_pageListener);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Carica i corsi solo se non sono già stati caricati
+    if (allShortSteps.isEmpty && !isInCourseMode) {
+      _loadCourses();
+    }
   }
 
   void _pageListener() {
@@ -109,60 +117,16 @@ Future<void> _loadCourses() async {
     
     if (mounted) {
       setState(() {
+        // Filtra i corsi una sola volta
         _courses = courses.where((course) => 
           course.sections.isNotEmpty && 
           course.sections.first.steps.any((step) => step.type == 'video')
         ).toList();
 
-        // Se non siamo in modalità corso, mostra solo i primi video
+        // Crea allShortSteps solo se non siamo in modalità corso
         if (!isInCourseMode) {
-          allShortSteps = _courses.map((course) {
-            final firstSection = course.sections.first;
-            final firstVideoStep = firstSection.steps.firstWhere(
-              (step) => step.type == 'video',
-              orElse: () => throw Exception('No video found in course'),
-            );
-
-            return {
-              'step': firstVideoStep,
-              'level': Level(
-                id: course.id,
-                levelNumber: 1,
-                topic: course.topic,
-                subtopic: course.subtopic,
-                title: course.title,
-                steps: firstSection.steps,
-                subtopicOrder: 1,
-              ),
-              'course': course,
-              'showQuestion': false,
-              'isLiked': false,
-              'likeCount': 0,
-              'isSaved': false,
-            };
-          }).toList();
-        }
-
-        // Inizializza i controller YouTube per ogni video
-        _youtubeControllers = allShortSteps.map((shortStep) {
-          final videoId = (shortStep['step'] as LevelStep).content;
-          return YoutubePlayerController(
-            initialVideoId: videoId,
-            flags: const YoutubePlayerFlags(
-              autoPlay: false,
-              mute: true,
-              disableDragSeek: true,
-              hideControls: true,
-              hideThumbnail: true,
-              forceHD: false,
-            ),
-          );
-        }).toList();
-
-        // Precarica il primo video
-        if (_youtubeControllers.isNotEmpty) {
-          _youtubeControllers.first.unMute();
-          _youtubeControllers.first.play();
+          allShortSteps = _createShortSteps(_courses);
+          _initializeFirstController();
         }
       });
     }
@@ -171,20 +135,67 @@ Future<void> _loadCourses() async {
   }
 }
 
-void _preloadNextVideo(int nextIndex) {
-  if (nextIndex < allShortSteps.length && nextIndex >= 0) {
-    final nextVideoId = (allShortSteps[nextIndex]['step'] as LevelStep).content;
-    
-    // Verifica se il controller successivo esiste e ha un video diverso
-    if (_youtubeControllers[nextIndex].initialVideoId != nextVideoId) {
-      // Disponi il vecchio controller se necessario
-      if (_youtubeControllers[nextIndex].initialVideoId.isNotEmpty) {
-        _youtubeControllers[nextIndex].dispose();
-      }
-      
-      // Crea un nuovo controller per il prossimo video
-      _youtubeControllers[nextIndex] = YoutubePlayerController(
-        initialVideoId: nextVideoId,
+// Estrai la logica di creazione degli shortSteps in un metodo separato
+List<Map<String, dynamic>> _createShortSteps(List<Course> courses) {
+  return courses.map((course) {
+    final firstSection = course.sections.first;
+    final firstVideoStep = firstSection.steps.firstWhere(
+      (step) => step.type == 'video',
+      orElse: () => throw Exception('No video found in course'),
+    );
+
+    return {
+      'step': firstVideoStep,
+      'level': Level(
+        id: course.id,
+        levelNumber: 1,
+        topic: course.topic,
+        subtopic: course.subtopic,
+        title: course.title,
+        steps: firstSection.steps,
+        subtopicOrder: 1,
+      ),
+      'course': course,
+      'showQuestion': false,
+      'isLiked': false,
+      'likeCount': 0,
+      'isSaved': false,
+    };
+  }).toList();
+}
+
+void _initializeFirstController() {
+  if (allShortSteps.isEmpty) return;
+  
+  final videoId = (allShortSteps[0]['step'] as LevelStep).content;
+  if (_youtubeControllers.isNotEmpty) {
+    _youtubeControllers[0].dispose();
+  }
+  
+  _youtubeControllers = [
+    YoutubePlayerController(
+      initialVideoId: videoId,
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+        disableDragSeek: true,
+        hideControls: true,
+        hideThumbnail: true,
+        forceHD: false,
+      ),
+    )
+  ];
+}
+
+void _preloadNextVideo(int index, String videoId) {
+  // Precarica in modo leggero solo se necessario
+  if (index < _youtubeControllers.length && 
+      _youtubeControllers[index].initialVideoId != videoId) {
+    _youtubeControllers[index].load(videoId, startAt: 0);
+  } else if (index >= _youtubeControllers.length) {
+    _youtubeControllers.add(
+      YoutubePlayerController(
+        initialVideoId: videoId,
         flags: const YoutubePlayerFlags(
           autoPlay: false,
           mute: true,
@@ -193,23 +204,76 @@ void _preloadNextVideo(int nextIndex) {
           hideThumbnail: true,
           forceHD: false,
         ),
-      );
-    }
-    
-    // Avvia il precaricamento
-    _youtubeControllers[nextIndex].load(nextVideoId);
+      )
+    );
   }
 }
 
 void _onVideoChanged(int index) {
-  // Gestisci il video corrente
-  _youtubeControllers[index].unMute();
-  _youtubeControllers[index].play();
+  if (!mounted) return;
   
-  // Registra l'evento video_play su Posthog
+  // Gestisci il video corrente
+  if (index < _youtubeControllers.length) {
+    _youtubeControllers[index].play();
+  } else {
+    // Crea un nuovo controller solo se necessario
+    final videoId = (allShortSteps[index]['step'] as LevelStep).content;
+    _youtubeControllers.add(
+      YoutubePlayerController(
+        initialVideoId: videoId,
+        flags: const YoutubePlayerFlags(
+          autoPlay: true,
+          mute: false,
+          disableDragSeek: true,
+          hideControls: true,
+          hideThumbnail: true,
+          forceHD: false,
+        ),
+      )
+    );
+  }
+
+  // Ottimizza la gestione dei controller adiacenti
+  _manageAdjacentControllers(index);
+  
+  // Registra l'evento e gestisci il progresso
+  _handleVideoAnalytics(index);
+}
+
+void _manageAdjacentControllers(int currentIndex) {
+  // Gestisci solo i controller necessari (corrente e adiacenti)
+  for (int i = 0; i < _youtubeControllers.length; i++) {
+    if (i == currentIndex) {
+      // Video corrente: riproduci
+      _youtubeControllers[i].play();
+    } else if (i == currentIndex + 1) {
+      // Prossimo video: precarica in muto
+      _youtubeControllers[i].mute();
+      _youtubeControllers[i].pause();
+    } else if (i == currentIndex - 1) {
+      // Video precedente: pausa
+      _youtubeControllers[i].pause();
+    } else {
+      // Altri video: disponi
+      if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
+        _youtubeControllers[i].dispose();
+        _youtubeControllers[i] = YoutubePlayerController(
+          initialVideoId: '',
+          flags: const YoutubePlayerFlags(
+            autoPlay: false,
+            mute: true,
+          ),
+        );
+      }
+    }
+  }
+}
+
+void _handleVideoAnalytics(int index) {
   final videoId = (allShortSteps[index]['step'] as LevelStep).content;
   final videoTitle = (allShortSteps[index]['level'] as Level).title;
   final user = FirebaseAuth.instance.currentUser;
+  
   if (user != null) {
     Posthog().capture(
       eventName: 'video_play',
@@ -222,35 +286,10 @@ void _onVideoChanged(int index) {
       },
     );
   }
-  
-  // Precarica il prossimo video
-  _preloadNextVideo(index + 1);
-  
-  // Gestisci i video precedenti e successivi
-  if (index > 0) {
-    _youtubeControllers[index - 1].pause();
-  }
-  
-  // Pulisci i controller non necessari
-  _cleanupControllers(index);
 
+  // Gestisci il progresso del corso se necessario
   if (isInCourseMode && currentCourse != null) {
-    final currentStep = allShortSteps[index];
-    final section = currentCourse!.sections.firstWhere(
-      (s) => s.steps.contains(currentStep['step']),
-      orElse: () => currentCourse!.sections.first,
-    );
-    
-    final stepIndex = section.steps.indexOf(currentStep['step']);
-    widget.onSectionProgressUpdate(stepIndex, section.steps.length, true);
-
-    // Salva il progresso nel Firestore
-    _saveProgress(section.title, stepIndex);
-
-    // Se siamo all'ultimo step della sezione, segna la sezione come completata
-    if (stepIndex == section.steps.length - 1) {
-      _markSectionAsCompleted(section.title);
-    }
+    _handleCourseProgress(index);
   }
 }
 
@@ -271,6 +310,7 @@ Future<void> _saveProgress(String sectionTitle, int stepIndex) async {
 }
 
 void _cleanupControllers(int currentIndex) {
+  // Mantieni solo i controller necessari (corrente e adiacenti)
   for (int i = 0; i < _youtubeControllers.length; i++) {
     if (i < currentIndex - 1 || i > currentIndex + 1) {
       if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
@@ -301,8 +341,11 @@ Future<void> _handleAsyncOperations(int index) async {
 
 @override
 void dispose() {
+  // Pulisci tutti i controller in modo efficiente
   for (var controller in _youtubeControllers) {
-    controller.dispose();
+    if (controller.initialVideoId.isNotEmpty) {
+      controller.dispose();
+    }
   }
   _pageController.dispose();
   super.dispose();
@@ -345,6 +388,10 @@ void dispose() {
 
 
   Widget _buildVideoPlayer(int index) {
+    if (index >= _youtubeControllers.length) {
+      _ensureControllerExists(index);
+    }
+    
     final currentStep = allShortSteps[index]['step'] as LevelStep;
     
     // Se è uno step di transizione, mostra la schermata nera personalizzata
@@ -383,27 +430,6 @@ void dispose() {
       );
     }
     
-    // Se è una domanda, mostra il CourseQuestionCard
-    if (currentStep.type == 'question') {
-      return CourseQuestionCard(
-        step: currentStep,
-        onAnswered: (isCorrect) {
-          // Gestisci la risposta
-          if (isCorrect) {
-            widget.onCoinsUpdate(5); // Aggiorna le monete
-          }
-        },
-        onCompleteStep: () {
-          // Passa allo step successivo
-          _pageController.nextPage(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          );
-        },
-        topic: (allShortSteps[index]['level'] as Level).topic,
-      );
-    }
-    
     // Altrimenti mostra il video player
     final level = allShortSteps[index]['level'] as Level;
     final course = allShortSteps[index]['course'] as Course;
@@ -411,6 +437,7 @@ void dispose() {
     final videoTitle = level.title;
 
     return PageViewContainer(
+      key: ValueKey('video_$index'),
       videoId: videoId,
       onCoinsUpdate: widget.onCoinsUpdate,
       topic: level.topic,
@@ -420,6 +447,7 @@ void dispose() {
       course: course,
       onStartCourse: (course, section) => startCourse(course, selectedSection: section),
       isInCourse: isInCourseMode,
+      currentSection: currentSection,
     );
   }
 
@@ -493,138 +521,159 @@ void dispose() {
     }
   }
 
-  Future<void> startCourse(Course? course, {Section? selectedSection}) async {
-    if (mounted) {
-      if (course == null) {
-        setState(() {
-          isInCourseMode = false;
-          currentCourse = null;
-          currentSection = null;
-          currentStepIndex = 0;
-        });
-        
-        widget.onSectionProgressUpdate(0, 0, false);
-        await _loadCourses();
-        return;
-      }
+  // Aggiungiamo un metodo dedicato per gestire i cambiamenti di sezione
+  void _updateCurrentSection(Section newSection, {bool forceUpdate = false}) {
+    if (forceUpdate || currentSection?.title != newSection.title) {
+      setState(() {
+        currentSection = newSection;
+      });
+    }
+  }
 
+  // Ottimizziamo startCourse
+  Future<void> startCourse(Course? course, {Section? selectedSection}) async {
+    if (!mounted) return;
+
+    if (course == null) {
+      setState(() {
+        isInCourseMode = false;
+        currentCourse = null;
+        currentSection = null;
+        currentStepIndex = 0;
+      });
+      
+      widget.onSectionProgressUpdate(0, 0, false);
+      await _loadCourses();
+      return;
+    }
+
+    try {
       setState(() {
         isInCourseMode = true;
         currentCourse = course;
-        allShortSteps = [];
-
-        // Trova l'indice della sezione selezionata
-        int selectedIndex = selectedSection != null ? 
-            course.sections.indexOf(selectedSection) : 0;
-
-        // Carica tutte le sezioni nell'ordine corretto
-        for (int i = 0; i < course.sections.length; i++) {
-          var section = course.sections[i];
-          for (var step in section.steps) {
-            allShortSteps.add({
-              'step': step,
-              'level': Level(
-                id: course.id,
-                levelNumber: i + 1,
-                topic: course.topic,
-                subtopic: course.subtopic,
-                title: course.title,
-                steps: section.steps,
-                subtopicOrder: 1,
-              ),
-              'course': course,
-              'showQuestion': step.type == 'question',
-              'isLiked': false,
-              'likeCount': 0,
-              'isSaved': false,
-            });
-          }
-        }
+        allShortSteps = _createCourseSteps(course);
       });
 
-      // Reinizializza i controller
-      _initializeControllers();
-
-      // Calcola l'indice di inizio per la sezione selezionata
+      // Gestisci la sezione iniziale
       if (selectedSection != null) {
-        int startIndex = 0;
-        for (var section in course.sections) {
-          if (section == selectedSection) break;
-          startIndex += section.steps.length;
-        }
+        _updateCurrentSection(selectedSection, forceUpdate: true);
+        final startIndex = _calculateSectionStartIndex(course, selectedSection);
         _pageController.jumpToPage(startIndex);
       } else {
-        // Se non c'è una sezione selezionata, carica l'ultimo progresso
         final lastProgressIndex = await _loadLastProgress(course);
         _pageController.jumpToPage(lastProgressIndex);
       }
+
+      _initializeControllers();
+    } catch (e) {
+      print('Error starting course: $e');
+      // Qui potresti aggiungere una gestione degli errori più sofisticata
     }
   }
 
-  Future<Section?> _findLastIncompleteSection(Course course) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final completedSections = List<String>.from(userData['completedSections'] ?? []);
-
-          // Trova la prima sezione non completata
-          for (var section in course.sections) {
-            if (!completedSections.contains(section.title)) {
-              return section;
-            }
-          }
-
-          // Se tutte le sezioni sono completate, ritorna l'ultima sezione
-          return course.sections.last;
-        }
-      } catch (e) {
-        print('Error finding last incomplete section: $e');
+  // Nuovo metodo per creare gli step del corso
+  List<Map<String, dynamic>> _createCourseSteps(Course course) {
+    List<Map<String, dynamic>> steps = [];
+    
+    for (var section in course.sections) {
+      for (var step in section.steps) {
+        steps.add({
+          'step': step,
+          'level': Level(
+            id: course.id,
+            levelNumber: course.sections.indexOf(section) + 1,
+            topic: course.topic,
+            subtopic: course.subtopic,
+            title: course.title,
+            steps: section.steps,
+            subtopicOrder: 1,
+          ),
+          'course': course,
+          'section': section, // Aggiungiamo la sezione per riferimento diretto
+          'showQuestion': step.type == 'question',
+          'isLiked': false,
+          'likeCount': 0,
+          'isSaved': false,
+        });
       }
     }
-    // Se c'è un errore o non ci sono sezioni completate, ritorna la prima sezione
-    return course.sections.first;
+    return steps;
   }
 
+  // Nuovo metodo per calcolare l'indice di inizio sezione
+  int _calculateSectionStartIndex(Course course, Section targetSection) {
+    int startIndex = 0;
+    for (var section in course.sections) {
+      if (section.title == targetSection.title) break;
+      startIndex += section.steps.length;
+    }
+    return startIndex;
+  }
+
+  // Ottimizziamo loadLastProgress
   Future<int> _loadLastProgress(Course course) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
-          
-          // Trova l'ultima sezione completata
-          for (var section in course.sections.reversed) {
-            final stepIndex = currentSteps[section.title] as int? ?? -1;
-            if (stepIndex >= 0) {
-              // Calcola l'indice globale sommando gli step delle sezioni precedenti
-              int globalIndex = 0;
-              for (var s in course.sections) {
-                if (s.title == section.title) {
-                  return globalIndex + stepIndex;
-                }
-                globalIndex += s.steps.length;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        print('Error loading progress: $e');
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _updateCurrentSection(course.sections.first, forceUpdate: true);
+        return 0;
       }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        _updateCurrentSection(course.sections.first, forceUpdate: true);
+        return 0;
+      }
+
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+      
+      // Trova l'ultima sezione con progresso
+      for (var section in course.sections.reversed) {
+        final stepIndex = currentSteps[section.title] as int? ?? -1;
+        if (stepIndex >= 0) {
+          int globalIndex = _calculateSectionStartIndex(course, section);
+          _updateCurrentSection(section, forceUpdate: true);
+          return globalIndex + stepIndex;
+        }
+      }
+
+      // Fallback alla prima sezione
+      _updateCurrentSection(course.sections.first, forceUpdate: true);
+      return 0;
+    } catch (e) {
+      print('Error loading progress: $e');
+      _updateCurrentSection(course.sections.first, forceUpdate: true);
+      return 0;
     }
-    return 0;
+  }
+
+  // Ottimizziamo handleCourseProgress
+  void _handleCourseProgress(int index) {
+    if (!mounted || currentCourse == null) return;
+
+    try {
+      final currentStep = allShortSteps[index];
+      final section = currentStep['section'] as Section; // Usiamo il riferimento diretto
+      
+      _updateCurrentSection(section);
+      
+      final stepIndex = section.steps.indexOf(currentStep['step']);
+      widget.onSectionProgressUpdate(stepIndex, section.steps.length, true);
+
+      // Gestione asincrona del progresso
+      Future.wait([
+        _saveProgress(section.title, stepIndex),
+        if (stepIndex == section.steps.length - 1) 
+          _markSectionAsCompleted(section.title),
+      ]).catchError((e) => print('Error updating progress: $e'));
+    } catch (e) {
+      print('Error handling course progress: $e');
+    }
   }
 
   void exitCourseMode() {
@@ -688,41 +737,83 @@ void dispose() {
           : PageView.builder(
               controller: _pageController,
               scrollDirection: Axis.vertical,
-              physics: const TikTokScrollPhysics(parent: BouncingScrollPhysics()),
+              physics: const PageScrollPhysics(),
               itemCount: allShortSteps.length,
               onPageChanged: (index) {
                 _onVideoChanged(index);
               },
               itemBuilder: (context, index) {
+                _preloadAdjacentPages(index);
+                
                 final showQuestion = allShortSteps[index]['showQuestion'] ?? false;
-                return GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onHorizontalDragStart: (_) => hasSwiped = false,
-                  onHorizontalDragUpdate: (details) {
-                    if (details.delta.dx.abs() > details.delta.dy.abs()) {
-                      if (!showQuestion) {
-                        if (details.delta.dx > 10 && !hasSwiped) {
-                          setState(() {}); // Aggiornamento minimo
-                          hasSwiped = true;
-                        }
-                      } else {
-                        if (details.delta.dx > 10 && !hasSwiped) {
-                          _onPreviousPressed(index);
-                          hasSwiped = true;
-                        } else if (details.delta.dx < -10 && !hasSwiped) {
-                          _onContinuePressed(index);
-                          hasSwiped = true;
+                return Container(
+                  key: ValueKey('page_$index'),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragStart: (_) => hasSwiped = false,
+                    onHorizontalDragUpdate: (details) {
+                      if (details.delta.dx.abs() > details.delta.dy.abs()) {
+                        if (!showQuestion) {
+                          if (details.delta.dx > 10 && !hasSwiped) {
+                            setState(() {}); 
+                            hasSwiped = true;
+                          }
+                        } else {
+                          if (details.delta.dx > 10 && !hasSwiped) {
+                            _onPreviousPressed(index);
+                            hasSwiped = true;
+                          } else if (details.delta.dx < -10 && !hasSwiped) {
+                            _onContinuePressed(index);
+                            hasSwiped = true;
+                          }
                         }
                       }
-                    }
-                  },
-                  onHorizontalDragEnd: (_) => hasSwiped = false,
-                  child: showQuestion
-                      ? _buildQuestionCard(allShortSteps[index]['step'], allShortSteps[index]['level'])
-                      : _buildVideoPlayer(index),
+                    },
+                    onHorizontalDragEnd: (_) => hasSwiped = false,
+                    child: showQuestion
+                        ? _buildQuestionCard(allShortSteps[index]['step'], allShortSteps[index]['level'])
+                        : _buildVideoPlayer(index),
+                  ),
                 );
               },
             ),
     );
+  }
+
+  void _preloadAdjacentPages(int currentIndex) {
+    // Pre-carica il video successivo
+    if (currentIndex < allShortSteps.length - 1) {
+      final nextStep = allShortSteps[currentIndex + 1]['step'] as LevelStep;
+      if (nextStep.type == 'video') {
+        _ensureControllerExists(currentIndex + 1);
+      }
+    }
+    
+    // Pre-carica il video precedente
+    if (currentIndex > 0) {
+      final prevStep = allShortSteps[currentIndex - 1]['step'] as LevelStep;
+      if (prevStep.type == 'video') {
+        _ensureControllerExists(currentIndex - 1);
+      }
+    }
+  }
+
+  void _ensureControllerExists(int index) {
+    if (index >= _youtubeControllers.length) {
+      final videoId = (allShortSteps[index]['step'] as LevelStep).content;
+      _youtubeControllers.add(
+        YoutubePlayerController(
+          initialVideoId: videoId,
+          flags: const YoutubePlayerFlags(
+            autoPlay: false,
+            mute: true,
+            disableDragSeek: true,
+            hideControls: true,
+            hideThumbnail: true,
+            forceHD: false,
+          ),
+        ),
+      );
+    }
   }
 }

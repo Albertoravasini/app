@@ -231,139 +231,135 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Stack(
-            children: [
-              ShortsScreen(
-                key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'),
-                selectedTopic: selectedTopic,
-                selectedSubtopic: selectedSubtopic,
-                onVideoTitleChange: _updateVideoTitle,
-                onCoinsUpdate: _updateCoins,
-                showSavedVideos: showSavedVideos,
-                onPageChanged: _onPageChanged,
-                onSectionProgressUpdate: updateSectionProgress,
-              ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 0.0),
-                  child: Stack(
-                    alignment: Alignment.topCenter,
-                    children: [
-                      // Container dei coins (a sinistra)
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 16.0),
-                          child: Container(
-                            height: 32,
-                            padding: const EdgeInsets.all(5),
-                            decoration: ShapeDecoration(
-                              color: Color(0x93333333),
-                              shape: RoundedRectangleBorder(
-                                side: BorderSide(
-                                  width: 1,
-                                  color: Colors.white.withOpacity(0.10000000149011612),
-                                ),
-                                borderRadius: BorderRadius.circular(22),
-                              ),
+          ShortsScreen(
+            key: ValueKey('$selectedTopic-$selectedSubtopic-$showSavedVideos'),
+            selectedTopic: selectedTopic,
+            selectedSubtopic: selectedSubtopic,
+            onVideoTitleChange: _updateVideoTitle,
+            onCoinsUpdate: _updateCoins,
+            showSavedVideos: showSavedVideos,
+            onPageChanged: _onPageChanged,
+            onSectionProgressUpdate: updateSectionProgress,
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 0.0),
+              child: Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  // Container dei coins (a sinistra)
+                  Align(
+                    alignment: Alignment.topLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16.0),
+                      child: Container(
+                        height: 32,
+                        padding: const EdgeInsets.all(5),
+                        decoration: ShapeDecoration(
+                          color: Color(0x93333333),
+                          shape: RoundedRectangleBorder(
+                            side: BorderSide(
+                              width: 1,
+                              color: Colors.white.withOpacity(0.10000000149011612),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.stars_rounded,
-                                  color: Colors.yellowAccent,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 14),
-                                Text(
-                                  '${currentUser?.coins ?? 0}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontFamily: 'Montserrat',
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.48,
-                                    height: 1.2,
-                                  ),
-                                ),
-                              ],
-                            ),
+                            borderRadius: BorderRadius.circular(22),
                           ),
                         ),
-                      ),
-
-                      // Indicatore di progresso del corso (a destra)
-                      if (isInCourse)
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 16.0),
-                            child: Container(
-                              height: 32,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                              decoration: ShapeDecoration(
-                                color: Color(0x93333333),
-                                shape: RoundedRectangleBorder(
-                                  side: BorderSide(
-                                    width: 1,
-                                    color: Colors.white.withOpacity(0.10000000149011612),
-                                  ),
-                                  borderRadius: BorderRadius.circular(22),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${currentSectionStep + 1}/$totalSectionSteps',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontFamily: 'Montserrat',
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.48,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.stars_rounded,
+                              color: Colors.yellowAccent,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 14),
+                            Text(
+                              '${currentUser?.coins ?? 0}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.48,
+                                height: 1.2,
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                      
-                      // Indicatore di pagina (al centro)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(3, (index) {
-                          return Container(
-                            height: 32,
-                            alignment: Alignment.center,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              margin: const EdgeInsets.symmetric(horizontal: 6),
-                              height: 12,
-                              width: _currentPage == index ? 32 : 12,
-                              decoration: BoxDecoration(
-                                color: _currentPage == index 
-                                  ? Colors.yellowAccent 
-                                  : Color(0x93333333),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.10000000149011612),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
                       ),
-                    ],
+                    ),
                   ),
-                ),
+
+                  // Indicatore di progresso del corso (a destra)
+                  if (isInCourse)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: Container(
+                          height: 32,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                          decoration: ShapeDecoration(
+                            color: Color(0x93333333),
+                            shape: RoundedRectangleBorder(
+                              side: BorderSide(
+                                width: 1,
+                                color: Colors.white.withOpacity(0.10000000149011612),
+                              ),
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${currentSectionStep + 1}/$totalSectionSteps',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.48,
+                                  height: 1.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Indicatore di pagina (al centro)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(3, (index) {
+                      return Container(
+                        height: 32,
+                        alignment: Alignment.center,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                          height: 12,
+                          width: _currentPage == index ? 32 : 12,
+                          decoration: BoxDecoration(
+                            color: _currentPage == index 
+                              ? Colors.yellowAccent 
+                              : Color(0x93333333),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.10000000149011612),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
 
           // Tutorial overlay
