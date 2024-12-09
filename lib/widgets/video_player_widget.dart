@@ -20,8 +20,7 @@ import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione 
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId;
-  final bool isLiked;
-  final int likeCount;
+ 
   final LevelStep? questionStep;
   final Function() onShowQuestion;
   final bool isSaved;
@@ -39,8 +38,7 @@ class VideoPlayerWidget extends StatefulWidget {
   const VideoPlayerWidget({
     Key? key,
     required this.videoId,
-    this.isLiked = false,
-    this.likeCount = 0,
+
     this.questionStep,
     required this.onShowQuestion,
     this.isSaved = false,
@@ -95,7 +93,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     _initializeController();
     _initializeAnimations();
     _initializeState();
-    _loadTopics();
   }
 
   void _initializeController() {
@@ -132,22 +129,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   }
 
   void _initializeState() {
-    isLiked = widget.isLiked;
-    likeCount = widget.likeCount;
     isSaved = widget.isSaved;
     _audioPlayer = AudioPlayer();
   }
 
-  Future<void> _loadTopics() async {
-    if (!mounted) return; // Verifica se il widget è ancora montato
-    
-    final topicsSnapshot = await FirebaseFirestore.instance.collection('topics').get();
-    if (mounted) { // Verifica nuovamente prima di chiamare setState
-      setState(() {
-        allTopics = topicsSnapshot.docs.map((doc) => doc.id).toList();
-      });
-    }
-  }
+
 
   void _updateProgress() {
     if (_controller.value.isPlaying) {
@@ -173,7 +159,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
         if (_progress >= 1.0 && !_completionHandled) {
           _completionHandled = true;
           _handleProgressCompletion();
-          _updateVideoStats('completion');
         }
       }
     }
@@ -249,8 +234,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   @override
   void dispose() {
-    _updateVideoStats('watch_time', _startWatchTime?.difference(DateTime.now()).inSeconds);
-    _updateVideoStats('view');
     _cleanupControllers();
     super.dispose();
   }
@@ -286,50 +269,11 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
   }
 
-  Future<void> _updateVideoStats(String action, [int? value]) async {
-    try {
-      await http.post(
-        Uri.parse('http://localhost:3000/update_video_stats'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'videoId': widget.videoId,
-          'userId': FirebaseAuth.instance.currentUser?.uid,
-          'action': action,
-          'watchTime': value,
-        }),
-      );
-    } catch (e) {
-      print('Errore nell\'aggiornamento delle statistiche: $e');
-    }
-  }
-
-  void _onButtonClick() {
-    _updateVideoStats('button_click');
-    // ... logica esistente ...
-  }
-
-  void _onVideoComplete() {
-    _updateVideoStats('completion');
-    // ... logica esistente ...
-  }
-
-
-void _onQuestionIconTap() {
-  _animationController.reverse().then((_) {
-    _animationController.forward();
-    widget.onShowQuestion();
-    
-    // Registra il click del bottone
-    _updateVideoStats('button_click');
-  });
-}
-
   // Funzione per aprire i commenti
   void _openComments(BuildContext context) {
     final videoId = widget.videoId;
     if (videoId.isNotEmpty) {
       // Registra il click del bottone
-      _updateVideoStats('button_click');
       
       showModalBottomSheet(
         context: context,
@@ -545,35 +489,7 @@ Widget build(BuildContext context) {
                       bottom: 5,
                       right: 15,
                       child: Column(
-                        children: [
-                          // Icona della domanda
-                          if (showQuestionIcon && widget.questionStep != null)
-                            GestureDetector(
-                              onTap: _onQuestionIconTap,
-                              child: AnimatedBuilder(
-                                animation: _animationController,
-                                builder: (context, child) {
-                                  return Transform.scale(
-                                    scale: _scaleAnimation.value,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(5),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.stars_rounded,
-                                        color: Colors.yellowAccent,
-                                        size: 35,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          const SizedBox(height: 20),
-
-                          // Preview link
+                        children: [ // Preview link
                           GestureDetector(
                             onTap: widget.onShowArticles,
                             child: Column(
@@ -587,31 +503,7 @@ Widget build(BuildContext context) {
                                 const SizedBox(height: 20),
                               ],
                             ),
-                          ),
-
-                          // Refresh con le proprietà del salvataggio
-                          GestureDetector(
-                            onTap: () {
-                              if (isSaved) {
-                                _unsaveVideo();
-                              } else {
-                                _saveVideo();
-                              }
-                            },
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/heroicons-solid_refresh.svg',
-                                  color: isSaved ? Colors.yellow : Colors.white70,
-                                  width: 30,
-                                  height: 30,
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            ),
-                          ),
-
-                          // Chat AI con le proprietà dei commenti
+                          ),// Chat AI con le proprietà dei commenti
                           GestureDetector(
                             onTap: () => _openComments(context),
                             child: Column(
@@ -866,7 +758,7 @@ GestureDetector(
           ),
           Positioned(
             left: 16,
-            bottom: 100,
+            bottom: 90,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

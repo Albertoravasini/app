@@ -68,11 +68,7 @@ class _PageViewContainerState extends State<PageViewContainer> {
           onCoinsUpdate: widget.onCoinsUpdate,
           topic: widget.topic,
           onShowQuestion: () {},
-          isLiked: false,
-          likeCount: 0,
-          isSaved: false,
           questionStep: widget.questionStep,
-          onVideoUnsaved: () {},
           onShowArticles: () => _pageController.animateToPage(
             0,
             duration: const Duration(milliseconds: 300),
