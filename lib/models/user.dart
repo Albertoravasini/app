@@ -22,6 +22,7 @@ class UserModel {
   final String? profileImageUrl;
   final String? username;
   final String? bio;
+  final String? coverImageUrl;
 
   UserModel({
     required this.uid,
@@ -44,6 +45,7 @@ class UserModel {
     this.profileImageUrl,
     this.username,
     this.bio,
+    this.coverImageUrl,
   }) ;
  
 
@@ -84,6 +86,7 @@ class UserModel {
       profileImageUrl: data['profileImageUrl'],
       username: data['username'],
       bio: data['bio'],
+      coverImageUrl: data['coverImageUrl'],
     );
   }
 
@@ -110,6 +113,7 @@ class UserModel {
       'profileImageUrl': profileImageUrl,
       'username': username,
       'bio': bio,
+      'coverImageUrl': coverImageUrl,
     };
   }
 }

@@ -25,7 +25,7 @@ class Course {
   int totalRatings;
   String authorId;
   String authorName;
-  String authorProfileUrl;
+  String? authorProfileUrl;
 
   Course({
     required this.id,
@@ -47,7 +47,7 @@ class Course {
     this.totalRatings = 0,
     required this.authorId,
     required this.authorName,
-    required this.authorProfileUrl,
+    this.authorProfileUrl,
   });
 
   factory Course.fromFirestore(DocumentSnapshot doc) {
@@ -79,7 +79,7 @@ class Course {
       totalRatings: data['totalRatings'] ?? 0,
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? 'Unknown Author',
-      authorProfileUrl: data['authorProfileUrl'] ?? '',
+      authorProfileUrl: data['authorProfileUrl'],
     );
   }
 

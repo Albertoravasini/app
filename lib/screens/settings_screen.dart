@@ -1,5 +1,7 @@
+import 'package:Just_Learn/firebase_options.dart';
 import 'package:Just_Learn/screens/NotificationsScreen.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user.dart';
@@ -9,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:Just_Learn/services/image_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   final UserModel? currentUser;
@@ -66,78 +69,12 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   GestureDetector(
                     onTap: () async {
-                      try {
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.gallery,
-                          maxWidth: 512, // Limita la dimensione dell'immagine
-                          maxHeight: 512,
-                          imageQuality: 75, // Comprime l'immagine al 75% della qualità
-                        );
-                        
-                        if (image != null) {
-                          try {
-                            // Mostra un indicatore di caricamento
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (BuildContext context) {
-                                return Center(
-                                  child: CircularProgressIndicator(),
-                                );
-                              },
-                            );
-
-                            // Crea un riferimento allo storage per l'immagine del profilo
-                            final storageRef = FirebaseStorage.instance
-                                .ref()
-                                .child('profile_images')
-                                .child(currentUser?.uid ?? '')
-                                .child('profile.jpg');
-
-                            // Carica l'immagine
-                            await storageRef.putFile(File(image.path));
-
-                            // Ottieni l'URL dell'immagine
-                            final imageUrl = await storageRef.getDownloadURL();
-
-                            // Aggiorna il documento dell'utente con il nuovo URL dell'immagine
-                            await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(currentUser?.uid)
-                                .update({'profileImageUrl': imageUrl});
-
-                            // Chiudi l'indicatore di caricamento
-                            Navigator.pop(context);
-
-                            // Mostra un messaggio di successo
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Profile picture updated successfully!'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          } catch (e) {
-                            // Chiudi l'indicatore di caricamento
-                            Navigator.pop(context);
-                            
-                            // Mostra un messaggio di errore
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error uploading image: ${e.toString()}'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error selecting image: ${e.toString()}'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
+                      if (currentUser == null) return;
+                      await ImageService.uploadProfileImage(
+                        userId: currentUser!.uid,
+                        isProfileImage: true,
+                        context: context,
+                      );
                     },
                     child: Container(
                       width: 72,
@@ -328,9 +265,6 @@ class SettingsScreen extends StatelessWidget {
         // Calcola la data per ogni giorno della settimana partendo dal lunedì
         DateTime currentDay = monday.add(Duration(days: index));
         
-        // Controlla se il giorno corrente è entro il range degli streak days e se è uguale o precedente all'ultimo accesso
-        bool isComplete = currentDay.isBefore(today) || currentDay.isAtSameMomentAs(today);
-
         // Marca il giorno come completato solo se rientra nella streak e non va oltre l'ultimo accesso
         bool shouldMarkDay = currentDay.isBefore(lastAccess.add(Duration(days: 1))) && (index < streakDays || currentDay.isAtSameMomentAs(today));
 

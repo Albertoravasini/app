@@ -18,6 +18,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
 import '../screens/profile_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import '../services/cache_manager.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId;
@@ -764,68 +767,97 @@ GestureDetector(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header con profilo e nome (sempre visibile)
-                GestureDetector(
-                  onTap: () async {
-                    // Carica i dati dell'utente
-                    final userDoc = await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(widget.course?.authorId)
-                        .get();
-                    
-                    if (!userDoc.exists || !context.mounted) return;
+GestureDetector(
+  onTap: () async {
+    // Metti in pausa il video
+    _controller.pause();
+    
+    // Carica i dati dell'utente
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.course?.authorId)
+        .get();
+    
+    if (!userDoc.exists || !context.mounted) return;
 
-                    // Crea un UserModel dall'autore
-                    final author = UserModel.fromMap(userDoc.data()!);
-                    
-                    // Naviga al profilo
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ProfileScreen(
-                          currentUser: author,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 45,
-                        height: 45,
-                        padding: const EdgeInsets.all(2),
-                        decoration: ShapeDecoration(
-                          shape: RoundedRectangleBorder(
-                            side: BorderSide(width: 2, color: Color(0xFFFFC021)),
-                            borderRadius: BorderRadius.circular(23),
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(21),
-                          child: Image.network(
-                            widget.course?.authorProfileUrl ?? "https://picsum.photos/200",
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[300],
-                                child: Icon(Icons.person, color: Colors.grey[600]),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        widget.course?.authorName ?? 'Unknown Author',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+    // Crea un UserModel dall'autore
+    final author = UserModel.fromMap(userDoc.data()!);
+    
+    // Naviga al profilo
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(
+          currentUser: author,
+        ),
+      ),
+    ).then((_) {
+      // Quando torni indietro, riprendi il video
+      _controller.play();
+    });
+  },
+  child: Row(
+    children: [
+      Container(
+        width: 45,
+        height: 45,
+        padding: const EdgeInsets.all(2),
+        decoration: ShapeDecoration(
+          shape: RoundedRectangleBorder(
+            side: BorderSide(width: 1.5, color: Colors.yellowAccent,),
+            borderRadius: BorderRadius.circular(23),
+          ),
+        ),
+        child: widget.course?.authorId != null && widget.course!.authorId.isNotEmpty
+            ? StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(widget.course!.authorId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return _buildPlaceholder(true);
+                  }
+
+                  final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                  if (userData == null) {
+                    return _buildPlaceholder(false);
+                  }
+
+                  final authorProfileUrl = userData['profileImageUrl'] as String?;
+                  
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(21),
+                    child: Image.network(
+                      authorProfileUrl ?? 'https://via.placeholder.com/45',
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return _buildPlaceholder(true);
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading image: $error');
+                        return _buildPlaceholder(false);
+                      },
+                    ),
+                  );
+                },
+              )
+            : _buildPlaceholder(false),
+      ),
+      const SizedBox(width: 8),
+      Text(
+        widget.course?.authorName ?? 'Unknown Author',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontFamily: 'Montserrat',
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ],
+  ),
+),
                 
                 // Container del corso (visibile solo quando non si è in corso)
                 if (!widget.isInCourse) ...[
@@ -932,4 +964,30 @@ extension YoutubePlayerControllerExtension on YoutubePlayerController {
       return true;
     }
   }
+}
+
+Widget _buildPlaceholder(bool isLoading) {
+  return AnimatedContainer(
+    duration: const Duration(milliseconds: 200),
+    decoration: BoxDecoration(
+      color: Colors.grey[300],
+      borderRadius: BorderRadius.circular(21),
+    ),
+    child: Center(
+      child: isLoading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+              ),
+            )
+          : Icon(
+              Icons.person,
+              color: Colors.grey[600],
+              size: 30,
+            ),
+    ),
+  );
 }
