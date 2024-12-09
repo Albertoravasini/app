@@ -33,7 +33,15 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
     // Chiudi il bottom sheet
     Navigator.pop(context);
     
-    // Chiama la callback con la sezione selezionata
+    // Aggiorna il currentStep nel database per la nuova sezione
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'currentSteps.${section.title}': 0  // Imposta lo step a 0 per la nuova sezione
+      });
+    }
+    
+    // Riavvia il corso con la sezione selezionata
     widget.onSelectSection(section);
   }
 

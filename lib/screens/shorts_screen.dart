@@ -418,7 +418,7 @@ void dispose() {
       onPageChanged: widget.onPageChanged,
       videoTitle: videoTitle,
       course: course,
-      onStartCourse: startCourse,
+      onStartCourse: (course, section) => startCourse(course, selectedSection: section),
       isInCourse: isInCourseMode,
     );
   }
@@ -511,56 +511,52 @@ void dispose() {
       setState(() {
         isInCourseMode = true;
         currentCourse = course;
+        allShortSteps = [];
+
+        // Trova l'indice della sezione selezionata
+        int selectedIndex = selectedSection != null ? 
+            course.sections.indexOf(selectedSection) : 0;
+
+        // Carica tutte le sezioni nell'ordine corretto
+        for (int i = 0; i < course.sections.length; i++) {
+          var section = course.sections[i];
+          for (var step in section.steps) {
+            allShortSteps.add({
+              'step': step,
+              'level': Level(
+                id: course.id,
+                levelNumber: i + 1,
+                topic: course.topic,
+                subtopic: course.subtopic,
+                title: course.title,
+                steps: section.steps,
+                subtopicOrder: 1,
+              ),
+              'course': course,
+              'showQuestion': step.type == 'question',
+              'isLiked': false,
+              'likeCount': 0,
+              'isSaved': false,
+            });
+          }
+        }
       });
 
-      // Carica l'ultimo progresso salvato
-      final lastProgressIndex = await _loadLastProgress(course);
-      final targetSection = selectedSection ?? await _findLastIncompleteSection(course);
-      
-      if (targetSection != null) {
-        if (mounted) {
-          setState(() {
-            allShortSteps = [];
-            
-            // Riorganizza le sezioni per mettere quella selezionata per prima
-            final reorderedSections = [...course.sections];
-            if (selectedSection != null) {
-              reorderedSections.remove(selectedSection);
-              reorderedSections.insert(0, selectedSection);
-            }
+      // Reinizializza i controller
+      _initializeControllers();
 
-            // Aggiungi gli step di tutte le sezioni
-            int currentSectionIndex = 0;
-            for (var section in reorderedSections) {
-              for (var step in section.steps) {
-                allShortSteps.add({
-                  'step': step,
-                  'level': Level(
-                    id: course.id,
-                    levelNumber: currentSectionIndex + 1,
-                    topic: course.topic,
-                    subtopic: course.subtopic,
-                    title: course.title,
-                    steps: section.steps,
-                    subtopicOrder: 1,
-                  ),
-                  'course': course,
-                  'showQuestion': step.type == 'question',
-                  'isLiked': false,
-                  'likeCount': 0,
-                  'isSaved': false,
-                });
-              }
-              currentSectionIndex++;
-            }
-
-            // Reinizializza i controller
-            _initializeControllers();
-          });
-
-          // Vai all'ultimo step salvato invece che all'inizio
-          _pageController.jumpToPage(lastProgressIndex);
+      // Calcola l'indice di inizio per la sezione selezionata
+      if (selectedSection != null) {
+        int startIndex = 0;
+        for (var section in course.sections) {
+          if (section == selectedSection) break;
+          startIndex += section.steps.length;
         }
+        _pageController.jumpToPage(startIndex);
+      } else {
+        // Se non c'è una sezione selezionata, carica l'ultimo progresso
+        final lastProgressIndex = await _loadLastProgress(course);
+        _pageController.jumpToPage(lastProgressIndex);
       }
     }
   }

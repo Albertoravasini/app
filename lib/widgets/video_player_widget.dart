@@ -34,7 +34,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final bool isInCourse;
   final Course? course;
   final Section? currentSection;
-  final Function(Course?) onStartCourse;
+  final Function(Course?, Section?) onStartCourse;
 
   const VideoPlayerWidget({
     Key? key,
@@ -256,11 +256,23 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   }
 
   void _cleanupControllers() {
-    _animationController.dispose();
-    _audioPlayer.dispose();
-    _controller.removeListener(_videoListener);
-    _controller.removeListener(_updateProgress);
-    _controller.dispose();
+    try {
+      _animationController.dispose();
+      _audioPlayer.dispose();
+      
+      // Rimuovi i listener prima di disporre il controller
+      if (_controller.hasListeners) {
+        _controller.removeListener(_videoListener);
+        _controller.removeListener(_updateProgress);
+      }
+
+      // Controlla se il controller è già stato disposto
+      if (!_controller.isDisposed) {
+        _controller.dispose();
+      }
+    } catch (e) {
+      print('Errore durante la pulizia dei controller: $e');
+    }
   }
 
   void _videoListener() {
@@ -454,12 +466,12 @@ void _onQuestionIconTap() {
 
   // Aggiungi questo metodo per gestire l'inizio del corso
   void _handleStartCourse() {
-    widget.onStartCourse(widget.course);
+    widget.onStartCourse(widget.course, null);
   }
 
   // Aggiungi questo metodo per gestire l'uscita dal corso
   void _handleQuitCourse() {
-    widget.onStartCourse(null);
+    widget.onStartCourse(null, null);
   }
 
 @override
@@ -751,8 +763,7 @@ GestureDetector(
           course: widget.course!,
           currentSection: widget.currentSection,
           onSelectSection: (selectedSection) {
-            widget.onStartCourse(widget.course);
-            Navigator.pop(context);
+            widget.onStartCourse(widget.course, selectedSection);
           },
         ),
       );
@@ -971,4 +982,18 @@ GestureDetector(
     },
   );
 }
+}
+
+// Aggiungi questa estensione per YoutubePlayerController
+extension YoutubePlayerControllerExtension on YoutubePlayerController {
+  bool get isDisposed {
+    try {
+      // Prova ad accedere a una proprietà del controller
+      // Se genera un errore, significa che è stato disposto
+      value;
+      return false;
+    } catch (e) {
+      return true;
+    }
+  }
 }
