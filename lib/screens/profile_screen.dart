@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -11,8 +13,48 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  bool isEditing = false;
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _bioController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.currentUser.name;
+    _bioController.text = widget.currentUser.bio ?? 'No bio yet';
+    _usernameController.text = widget.currentUser.username ?? 'username';
+  }
+
+  Future<void> _updateProfile() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUser.uid)
+          .update({
+        'name': _nameController.text,
+        'bio': _bioController.text,
+        'username': _usernameController.text,
+      });
+
+      setState(() {
+        isEditing = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profilo aggiornato con successo!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore nell\'aggiornamento: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    bool isTeacher = widget.currentUser.role == 'teacher';
+
     return Scaffold(
       backgroundColor: const Color(0xFF181819),
       body: SingleChildScrollView(
@@ -48,50 +90,102 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            'Just Learn',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w700,
+                          if (isEditing)
+                            Expanded(
+                              child: TextField(
+                                controller: _nameController,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 25,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                decoration: const InputDecoration(
+                                  border: UnderlineInputBorder(),
+                                  hintText: 'Il tuo nome',
+                                  hintStyle: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                            )
+                          else
+                            Text(
+                              widget.currentUser.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 25,
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              borderRadius: BorderRadius.circular(12),
+                          if (!isEditing)
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              margin: const EdgeInsets.only(left: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.verified,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.verified,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'theunderdog',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.65),
-                          fontSize: 14,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w600,
+                      if (isEditing)
+                        TextField(
+                          controller: _usernameController,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: const InputDecoration(
+                            border: UnderlineInputBorder(),
+                            hintText: '@username',
+                            hintStyle: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      else
+                        Text(
+                          '@${widget.currentUser.username ?? 'username'}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 16),
-                      Text(
-                        'I Will Inspire 10 million people to do what they love the best they can!',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.65),
-                          fontSize: 14,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w500,
+                      if (isEditing)
+                        TextField(
+                          controller: _bioController,
+                          maxLines: 3,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: const InputDecoration(
+                            border: UnderlineInputBorder(),
+                            hintText: 'Scrivi qualcosa su di te...',
+                            hintStyle: TextStyle(color: Colors.grey),
+                          ),
+                        )
+                      else
+                        Text(
+                          widget.currentUser.bio ?? 'No bio yet',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.65),
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 24),
                       // Rating stars
                       Row(
@@ -236,8 +330,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildCircularButton(Icons.arrow_back),
-                  _buildCircularButton(Icons.more_horiz),
+                  _buildCircularButton(
+                    Icons.arrow_back,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  _buildCircularButton(
+                    Icons.more_horiz,
+                    onPressed: () {
+                      // Mostra il menu solo se è il profilo dell'utente corrente
+                      if (FirebaseAuth.instance.currentUser?.uid == widget.currentUser.uid) {
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: const Color(0xFF282828),
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (context) => Container(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.edit, color: Colors.white),
+                                  title: const Text(
+                                    'Modifica Profilo',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    setState(() {
+                                      isEditing = true;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
@@ -394,7 +526,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildCircularButton(IconData icon) {
+  Widget _buildCircularButton(IconData icon, {required VoidCallback onPressed}) {
     return Container(
       width: 40,
       height: 40,
@@ -402,9 +534,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         color: const Color(0xEA282828),
         shape: BoxShape.circle,
       ),
-      child: Icon(
-        icon,
-        color: Colors.white,
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white),
+        onPressed: onPressed,
       ),
     );
   }

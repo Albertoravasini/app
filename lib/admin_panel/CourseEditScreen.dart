@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/course.dart';
 import '../models/level.dart';
 
@@ -682,51 +683,119 @@ void _saveCourse() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
-      final courseData = {
-        'title': _courseTitle!,
-        'description': _courseDescription!,
-        'cost': _courseCost!,
-        'topic': _selectedTopic!,
-        'visible': widget.course?.visible ?? true,
-        'sections': _sections.map((section) => section.toMap()).toList(),
-        'coverImageUrl': _coverImageUrl,
-        'sources': _sources,
-        'acknowledgments': _acknowledgments,
-        'recommendedBooks': _recommendedBooks,
-        'recommendedPodcasts': _recommendedPodcasts,
-        'recommendedWebsites': _recommendedWebsites,
-      };
-
-      if (_isEditing) {
-        FirebaseFirestore.instance
-            .collection('courses')
-            .doc(widget.course!.id)
-            .update(courseData)
-            .then((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Corso aggiornato con successo')),
-          );
-          Navigator.pop(context, true);
-        }).catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Errore nell\'aggiornare il corso: $error')),
-          );
-        });
-      } else {
-        FirebaseFirestore.instance
-            .collection('courses')
-            .add(courseData)
-            .then((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Corso creato con successo')),
-          );
-          Navigator.pop(context, true);
-        }).catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Errore nella creazione del corso: $error')),
-          );
-        });
+      // Ottieni l'utente corrente
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Devi essere autenticato per salvare un corso')),
+        );
+        return;
       }
+
+      // Ottieni i dati dell'utente da Firestore
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get()
+          .then((userDoc) {
+        if (!userDoc.exists) {
+          throw Exception('User document not found');
+        }
+
+        final userData = userDoc.data()!;
+        final courseData = {
+          'title': _courseTitle!,
+          'description': _courseDescription!,
+          'cost': _courseCost!,
+          'topic': _selectedTopic!,
+          'visible': widget.course?.visible ?? true,
+          'sections': _sections.map((section) => section.toMap()).toList(),
+          'coverImageUrl': _coverImageUrl,
+          'sources': _sources,
+          'acknowledgments': _acknowledgments,
+          'recommendedBooks': _recommendedBooks,
+          'recommendedPodcasts': _recommendedPodcasts,
+          'recommendedWebsites': _recommendedWebsites,
+          // Aggiungi i campi dell'autore
+          'authorId': user.uid,
+          'authorName': userData['name'] ?? 'Unknown Author',
+          'authorProfileUrl': userData['profileImageUrl'] ?? '',
+        };
+
+        if (_isEditing) {
+          FirebaseFirestore.instance
+              .collection('courses')
+              .doc(widget.course!.id)
+              .update(courseData)
+              .then((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Corso aggiornato con successo')),
+            );
+            Navigator.pop(context, true);
+          }).catchError((error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Errore nell\'aggiornare il corso: $error')),
+            );
+          });
+        } else {
+          FirebaseFirestore.instance
+              .collection('courses')
+              .add(courseData)
+              .then((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Corso creato con successo')),
+            );
+            Navigator.pop(context, true);
+          }).catchError((error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Errore nella creazione del corso: $error')),
+            );
+          });
+        }
+      }).catchError((error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Errore nel recuperare i dati dell\'utente: $error')),
+        );
+      });
+    }
+  }
+
+  // Aggiungi questa funzione per migrare i corsi esistenti
+  Future<void> migrateExistingCourses() async {
+    try {
+      final coursesRef = FirebaseFirestore.instance.collection('courses');
+      final QuerySnapshot coursesSnapshot = await coursesRef.get();
+
+      // Ottieni i dati dell'admin
+      final adminDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc('YOUR_ADMIN_USER_ID') // Sostituisci con l'ID del tuo utente admin
+          .get();
+
+      if (!adminDoc.exists) {
+        throw Exception('Admin user document not found');
+      }
+
+      final adminData = adminDoc.data()!;
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var doc in coursesSnapshot.docs) {
+        final courseData = doc.data() as Map<String, dynamic>;
+        
+        // Verifica se il corso ha già i campi dell'autore
+        if (!courseData.containsKey('authorId')) {
+          batch.update(doc.reference, {
+            'authorId': adminDoc.id,
+            'authorName': adminData['name'] ?? 'JustLearn Admin',
+            'authorProfileUrl': adminData['profileImageUrl'] ?? '',
+          });
+        }
+      }
+
+      await batch.commit();
+      print('Migrazione completata con successo');
+    } catch (e) {
+      print('Errore durante la migrazione: $e');
     }
   }
 

@@ -17,6 +17,7 @@ import '../screens/notes_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
+import '../screens/profile_screen.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId;
@@ -763,37 +764,67 @@ GestureDetector(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header con profilo e nome (sempre visibile)
-                Row(
-                  children: [
-                    Container(
-                      width: 45,
-                      height: 45,
-                      padding: const EdgeInsets.all(2),
-                      decoration: ShapeDecoration(
-                        shape: RoundedRectangleBorder(
-                          side: BorderSide(width: 2, color: Color(0xFFFFC021)),
-                          borderRadius: BorderRadius.circular(23),
+                GestureDetector(
+                  onTap: () async {
+                    // Carica i dati dell'utente
+                    final userDoc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(widget.course?.authorId)
+                        .get();
+                    
+                    if (!userDoc.exists || !context.mounted) return;
+
+                    // Crea un UserModel dall'autore
+                    final author = UserModel.fromMap(userDoc.data()!);
+                    
+                    // Naviga al profilo
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfileScreen(
+                          currentUser: author,
                         ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(21),
-                        child: Image.network(
-                          "https://picsum.photos/200",
-                          fit: BoxFit.cover,
+                    );
+                  },
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 45,
+                        height: 45,
+                        padding: const EdgeInsets.all(2),
+                        decoration: ShapeDecoration(
+                          shape: RoundedRectangleBorder(
+                            side: BorderSide(width: 2, color: Color(0xFFFFC021)),
+                            borderRadius: BorderRadius.circular(23),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(21),
+                          child: Image.network(
+                            widget.course?.authorProfileUrl ?? "https://picsum.photos/200",
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[300],
+                                child: Icon(Icons.person, color: Colors.grey[600]),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'JustLearn',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.course?.authorName ?? 'Unknown Author',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 
                 // Container del corso (visibile solo quando non si è in corso)
