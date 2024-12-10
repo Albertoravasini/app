@@ -45,6 +45,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         });
 
         return Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: const Color(0xFF121212),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
@@ -258,6 +259,43 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                   child: IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+
+              // Aggiungiamo il nuovo bottone in fondo
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black,
+                        Colors.black.withOpacity(0.9),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: _buildStartButton(context),
+                          ),
+                          
+                         
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -610,5 +648,133 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
       'currentStep': isCompleted ? section.steps.length : currentStep,
       'isCompleted': isCompleted,
     };
+  }
+
+  Widget _buildStartButton(BuildContext context) {
+    return SizedBox(
+      height: 60,
+      child: ElevatedButton(
+        onPressed: () => _showStartCourseOptions(context),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.yellowAccent,
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 8,
+        ),
+        child: const Text(
+          'Start Course',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+  void _showStartCourseOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Come vuoi iniziare il corso?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            _buildOptionButton(
+              icon: Icons.stars_rounded,
+              title: 'Usa ${widget.course.cost} coins',
+              subtitle: 'Sblocca il corso usando i tuoi coins',
+              onTap: () {
+                // TODO: Implementa la logica per sbloccare il corso usando i coins
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildOptionButton(
+              icon: Icons.workspace_premium_rounded,
+              title: 'Abbonamento Premium',
+              subtitle: 'Accedi a tutti i corsi senza limiti',
+              onTap:() {
+                // TODO: Implementa la logica per sbloccare il corso usando l'abbonamento Premium 
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.yellowAccent, size: 32),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Colors.white.withOpacity(0.5),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 } 

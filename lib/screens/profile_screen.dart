@@ -11,6 +11,7 @@ import '../models/course.dart';
 import '../widgets/profile_feed_tab.dart';
 import '../controllers/follow_controller.dart';
 import '../controllers/subscription_controller.dart';
+import '../widgets/private_chat_tab.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -557,32 +558,57 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Text(
-                                          '404 Follow',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12,
-                                            fontFamily: 'Montserrat',
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                        StreamBuilder<DocumentSnapshot>(
+                                          stream: FirebaseFirestore.instance
+                                              .collection('users')
+                                              .doc(widget.currentUser.uid)
+                                              .snapshots(),
+                                          builder: (context, snapshot) {
+                                            int followersCount = 0;
+                                            if (snapshot.hasData && snapshot.data != null) {
+                                              var userData = snapshot.data!.data() as Map<String, dynamic>;
+                                              followersCount = (userData['followers'] as List?)?.length ?? 0;
+                                            }
+                                            return Text(
+                                              '$followersCount Students',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                                fontFamily: 'Montserrat',
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            );
+                                          },
                                         ),
                                         Container(
                                           margin: const EdgeInsets.symmetric(horizontal: 10),
                                           width: 4,
                                           height: 4,
                                           decoration: BoxDecoration(
-                                            color: Colors.white70,
-                                            borderRadius: BorderRadius.circular(2),
+                                            color: Colors.white.withOpacity(0.5),
+                                            shape: BoxShape.circle,
                                           ),
                                         ),
-                                        const Text(
-                                          '13 Courses',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12,
-                                            fontFamily: 'Montserrat',
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                        StreamBuilder<QuerySnapshot>(
+                                          stream: FirebaseFirestore.instance
+                                              .collection('courses')
+                                              .where('authorId', isEqualTo: widget.currentUser.uid)
+                                              .snapshots(),
+                                          builder: (context, snapshot) {
+                                            int coursesCount = 0;
+                                            if (snapshot.hasData) {
+                                              coursesCount = snapshot.data!.docs.length;
+                                            }
+                                            return Text(
+                                              '$coursesCount Courses',
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                                fontFamily: 'Montserrat',
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ],
                                     ),
@@ -830,8 +856,22 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   userCourses: userCourses,
                   isLoading: isLoading,
                 ),
-                Container(), // Info tab
-                Container(), // Social tab
+                FirebaseAuth.instance.currentUser != null
+                    ? PrivateChatTab(
+                        profileUser: widget.currentUser,
+                        currentUser: FirebaseAuth.instance.currentUser!,
+                      )
+                    : const Center(
+                        child: Text(
+                          'Effettua il login per chattare',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 16,
+                            fontFamily: 'Montserrat',
+                          ),
+                        ),
+                      ),
+                Container(), // Calendar tab
               ],
             ),
           ),
