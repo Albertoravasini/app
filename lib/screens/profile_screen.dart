@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../services/image_service.dart';
+import '../models/course.dart';
+import '../widgets/profile_feed_tab.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -23,6 +25,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
+  List<Course> userCourses = [];
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -31,6 +35,32 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _nameController.text = widget.currentUser.name;
     _bioController.text = widget.currentUser.bio ?? 'No bio yet';
     _usernameController.text = widget.currentUser.username ?? 'username';
+    _loadUserCourses();
+  }
+
+  Future<void> _loadUserCourses() async {
+    try {
+      final coursesSnapshot = await FirebaseFirestore.instance
+          .collection('courses')
+          .where('authorId', isEqualTo: widget.currentUser.uid)
+          .get();
+
+      if (mounted) {
+        setState(() {
+          userCourses = coursesSnapshot.docs
+              .map((doc) => Course.fromFirestore(doc))
+              .toList();
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Errore nel caricamento dei corsi: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -691,60 +721,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             body: TabBarView(
               controller: _tabController,
               children: [
-                // Feed Tab
-                GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.8,
-                  ),
-                  itemCount: 10, // Esempio
-                  itemBuilder: (context, index) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF282828),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      // Qui puoi aggiungere il contenuto dei post
-                    );
-                  },
+                ProfileFeedTab(
+                  userCourses: userCourses,
+                  isLoading: isLoading,
                 ),
-
-                // Community Tab
-                ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: 10, // Esempio
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF282828),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      // Qui puoi aggiungere il contenuto dei post della community
-                    );
-                  },
-                ),
-
-                // Calendar Tab
-                ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: 10, // Esempio
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF282828),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      // Qui puoi aggiungere il contenuto degli eventi
-                    );
-                  },
-                ),
+                Container(), // Info tab
+                Container(), // Social tab
               ],
             ),
           ),
