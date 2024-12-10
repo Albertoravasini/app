@@ -20,13 +20,27 @@ class SectionSelectionSheet extends StatefulWidget {
   _SectionSelectionSheetState createState() => _SectionSelectionSheetState();
 }
 
-class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
+class _SectionSelectionSheetState extends State<SectionSelectionSheet> with SingleTickerProviderStateMixin {
   Section? _selectedSection;
+  late ScrollController _scrollController;
+  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
     _selectedSection = widget.currentSection;
+    _scrollController = ScrollController();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _animationController.dispose();
+    super.dispose();
   }
 
   void _handleSectionSelection(Section section) {
@@ -54,7 +68,6 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
       maxChildSize: 0.9,
       builder: (context, scrollController) {
         return Container(
-          padding: const EdgeInsets.all(16.0),
           decoration: const BoxDecoration(
             color: Color(0xFF121212),
             borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
@@ -62,31 +75,36 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Lineetta estetica in alto
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    // Lineetta estetica in alto
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    
+                    // Titolo del corso
+                    Text(
+                      widget.course.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               
-              // Titolo del corso
-              Text(
-                widget.course.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // Lista delle sezioni
               Expanded(
                 child: FutureBuilder<List<Map<String, dynamic>>>(
                   future: _getSectionsProgress(),
@@ -97,12 +115,13 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
 
                     return ListView.builder(
                       controller: scrollController,
+                      padding: EdgeInsets.zero,
                       itemCount: widget.course.sections.length,
                       itemBuilder: (context, index) {
                         final section = widget.course.sections[index];
                         final progressData = snapshot.data![index];
                         
-                        return _buildSectionCard(section, progressData);
+                        return _buildSectionCard(section, progressData, index);
                       },
                     );
                   },
@@ -153,53 +172,119 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
     );
   }
 
-  Widget _buildSectionCard(Section section, Map<String, dynamic> progressData) {
+  Widget _buildSectionCard(Section section, Map<String, dynamic> progressData, int index) {
     final currentStep = progressData['currentStep'] as int;
     final totalSteps = progressData['totalSteps'] as int;
     final isCompleted = progressData['isCompleted'] as bool;
 
+    // Animazione principale per l'entrata
+    final Animation<double> slideAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Interval(
+        (index * 0.1).clamp(0.0, 1.0),
+        ((index * 0.1) + 0.5).clamp(0.0, 1.0),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    // Animazione secondaria per lo scaling
+    final Animation<double> scaleAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Interval(
+        (index * 0.1).clamp(0.0, 1.0),
+        ((index * 0.1) + 0.7).clamp(0.0, 1.0),
+        curve: Curves.easeOutBack,
+      ),
+    );
+
+    // Animazione per la rotazione
+    final Animation<double> rotateAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Interval(
+        (index * 0.1).clamp(0.0, 1.0),
+        ((index * 0.1) + 0.6).clamp(0.0, 1.0),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
     return GestureDetector(
       onTap: () => _handleSectionSelection(section),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: Color(0xFF181819),
-          borderRadius: BorderRadius.circular(20),
-          border: isCompleted 
-            ? Border.all(color: Colors.yellowAccent.withOpacity(0.3), width: 1.5)
-            : null,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      section.title,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+      child: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Transform(
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateX((1 - rotateAnimation.value) * 0.2)
+              ..translate(
+                0.0,
+                50.0 * (1 - slideAnimation.value),
+                0.0,
+              ),
+            alignment: Alignment.center,
+            child: Opacity(
+              opacity: slideAnimation.value.clamp(0.0, 1.0),
+              child: Transform.scale(
+                scale: 0.6 + (0.4 * scaleAnimation.value),
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Color(0xFF181819),
+                borderRadius: BorderRadius.circular(20),
+                border: isCompleted 
+                  ? Border.all(color: Colors.yellowAccent.withOpacity(0.3), width: 1.5)
+                  : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: Offset(0, 5),
                   ),
-                  if (isCompleted)
-                    SvgPicture.asset(
-                      'assets/solar_verified-check-linear.svg',
-                      width: 24,
-                      height: 24,
-                    ),
                 ],
               ),
-              SizedBox(height: 15),
-              _buildSectionDetails(section),
-              SizedBox(height: 15),
-              _buildProgressBar(currentStep, totalSteps, isCompleted),
-            ],
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            section.title,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        if (isCompleted)
+                          SvgPicture.asset(
+                            'assets/solar_verified-check-linear.svg',
+                            width: 24,
+                            height: 24,
+                          ),
+                      ],
+                    ),
+                    SizedBox(height: 15),
+                    _buildSectionDetails(section),
+                    SizedBox(height: 15),
+                    _buildProgressBar(currentStep, totalSteps, isCompleted),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
