@@ -23,6 +23,8 @@ class UserModel {
   final String? username;
   final String? bio;
   final String? coverImageUrl;
+  final List<String> followers;
+  final List<String> following;
 
   UserModel({
     required this.uid,
@@ -46,6 +48,8 @@ class UserModel {
     this.username,
     this.bio,
     this.coverImageUrl,
+    this.followers = const [],
+    this.following = const [],
   }) ;
  
 
@@ -87,6 +91,8 @@ class UserModel {
       username: data['username'],
       bio: data['bio'],
       coverImageUrl: data['coverImageUrl'],
+      followers: List<String>.from(data['followers'] ?? []),
+      following: List<String>.from(data['following'] ?? []),
     );
   }
 
@@ -114,6 +120,8 @@ class UserModel {
       'username': username,
       'bio': bio,
       'coverImageUrl': coverImageUrl,
+      'followers': followers,
+      'following': following,
     };
   }
 }

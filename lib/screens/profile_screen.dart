@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +9,8 @@ import 'dart:io';
 import '../services/image_service.dart';
 import '../models/course.dart';
 import '../widgets/profile_feed_tab.dart';
+import '../controllers/follow_controller.dart';
+import '../controllers/subscription_controller.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -27,6 +30,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   final ImagePicker _picker = ImagePicker();
   List<Course> userCourses = [];
   bool isLoading = true;
+  final FollowController _followController = FollowController();
+  final SubscriptionController _subscriptionController = SubscriptionController();
+  bool _isFollowing = false;
+  bool _isSubscribed = false;
 
   @override
   void initState() {
@@ -36,6 +43,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _bioController.text = widget.currentUser.bio ?? 'No bio yet';
     _usernameController.text = widget.currentUser.username ?? 'username';
     _loadUserCourses();
+    _checkFollowStatus();
+    _checkSubscriptionStatus();
   }
 
   Future<void> _loadUserCourses() async {
@@ -60,6 +69,96 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _checkFollowStatus() async {
+    if (FirebaseAuth.instance.currentUser?.uid != null) {
+      final isFollowing = await _followController.isFollowing(
+        followerId: FirebaseAuth.instance.currentUser!.uid,
+        followedId: widget.currentUser.uid,
+      );
+      setState(() {
+        _isFollowing = isFollowing;
+      });
+    }
+  }
+
+  Future<void> _checkSubscriptionStatus() async {
+    if (FirebaseAuth.instance.currentUser?.uid != null) {
+      final isSubscribed = await _subscriptionController.isSubscribed(
+        subscriberId: FirebaseAuth.instance.currentUser!.uid,
+        creatorId: widget.currentUser.uid,
+      );
+      setState(() {
+        _isSubscribed = isSubscribed;
+      });
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Devi effettuare l\'accesso per seguire questo utente')),
+      );
+      return;
+    }
+
+    try {
+      if (_isFollowing) {
+        await _followController.unfollowUser(
+          followerId: currentUser.uid,
+          followedId: widget.currentUser.uid,
+        );
+      } else {
+        await _followController.followUser(
+          followerId: currentUser.uid,
+          followedId: widget.currentUser.uid,
+        );
+      }
+      setState(() {
+        _isFollowing = !_isFollowing;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore: $e')),
+      );
+    }
+  }
+
+  Future<void> _toggleSubscription() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Devi effettuare l\'accesso per iscriverti')),
+      );
+      return;
+    }
+
+    try {
+      if (_isSubscribed) {
+        await _subscriptionController.unsubscribe(
+          subscriberId: currentUser.uid,
+          creatorId: widget.currentUser.uid,
+        );
+      } else {
+        await _subscriptionController.subscribe(
+          subscriberId: currentUser.uid,
+          creatorId: widget.currentUser.uid,
+        );
+      }
+      setState(() {
+        _isSubscribed = !_isSubscribed;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_isSubscribed ? 'Iscrizione effettuata!' : 'Iscrizione annullata')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore: $e')),
+      );
     }
   }
 
@@ -255,8 +354,43 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Logica per la sottoscrizione
+                    onPressed: () async {
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      if (currentUser == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Devi effettuare l\'accesso per iscriverti')),
+                        );
+                        return;
+                      }
+
+                      try {
+                        // Implementa la logica di sottoscrizione
+                        await _subscriptionController.subscribe(
+                          subscriberId: currentUser.uid,
+                          creatorId: widget.currentUser.uid,
+                        );
+                        
+                        // Aggiorna lo stato di iscrizione nel database
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(currentUser.uid)
+                            .update({
+                          'subscriptions': FieldValue.arrayUnion([widget.currentUser.uid]),
+                        });
+
+                        setState(() {
+                          _isSubscribed = true;
+                        });
+
+                        Navigator.pop(context); // Chiudi il modal
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Iscrizione effettuata con successo!')),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Errore durante l\'iscrizione: $e')),
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.yellowAccent,
@@ -266,9 +400,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Subscribe',
-                      style: TextStyle(
+                    child: Text(
+                      _isSubscribed ? 'Unsubscribe' : 'Subscribe',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontFamily: 'Montserrat',
                         fontWeight: FontWeight.w700,
@@ -418,36 +552,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                   mainAxisSize: MainAxisSize.min,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 11,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF282828),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: Colors.yellowAccent.withOpacity(0.3),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.add, size: 19, color: Colors.yellowAccent.withOpacity(0.8)),
-                                          const SizedBox(width: 7),
-                                          Text(
-                                            'Follow',
-                                            style: TextStyle(
-                                              color: Colors.yellowAccent.withOpacity(0.8),
-                                              fontSize: 14,
-                                              fontFamily: 'Montserrat',
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                    _buildFollowButton(),
                                     const SizedBox(height: 12),
                                     Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -802,6 +907,76 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       child: IconButton(
         icon: Icon(icon, color: Colors.white),
         onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildFollowButton() {
+    return Hero(
+      tag: 'followButton${widget.currentUser.uid}',
+      child: Material(
+        color: Colors.transparent,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: _isFollowing 
+              ? Colors.yellowAccent 
+              : const Color(0xFF282828),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.yellowAccent.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: () {
+              HapticFeedback.mediumImpact();
+              _toggleFollow();
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return ScaleTransition(
+                      scale: animation,
+                      child: child,
+                    );
+                  },
+                  child: Icon(
+                    _isFollowing ? Icons.check : Icons.add,
+                    key: ValueKey<bool>(_isFollowing),
+                    size: 20,
+                    color: _isFollowing 
+                      ? Colors.black 
+                      : Colors.yellowAccent,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: TextStyle(
+                    color: _isFollowing 
+                      ? Colors.black 
+                      : Colors.yellowAccent,
+                    fontSize: 14,
+                    fontFamily: 'Montserrat',
+                    fontWeight: FontWeight.w700,
+                  ),
+                  child: Text(
+                    _isFollowing ? 'Following' : 'Follow',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

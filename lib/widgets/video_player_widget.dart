@@ -18,6 +18,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
 import '../screens/profile_screen.dart';
+import '../controllers/follow_controller.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId;
@@ -88,12 +89,100 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 
   List<String> allTopics = [];
 
+  final FollowController _followController = FollowController();
+  bool _isFollowing = false;
+
   @override
   void initState() {
     super.initState();
     _initializeController();
     _initializeAnimations();
     _initializeState();
+    _checkFollowStatus();
+  }
+
+  Future<void> _checkFollowStatus() async {
+    if (widget.course?.authorId != null && FirebaseAuth.instance.currentUser != null) {
+      final isFollowing = await _followController.isFollowing(
+        followerId: FirebaseAuth.instance.currentUser!.uid,
+        followedId: widget.course!.authorId,
+      );
+      setState(() {
+        _isFollowing = isFollowing;
+      });
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || widget.course?.authorId == null) return;
+
+    try {
+      if (_isFollowing) {
+        await _followController.unfollowUser(
+          followerId: user.uid,
+          followedId: widget.course!.authorId,
+        );
+      } else {
+        await _followController.followUser(
+          followerId: user.uid,
+          followedId: widget.course!.authorId,
+        );
+      }
+      setState(() {
+        _isFollowing = !_isFollowing;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Errore: $e')),
+      );
+    }
+  }
+
+  void _showSubscriptionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: Text(
+          'Iscriviti al canale',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Vuoi iscriverti al canale di ${widget.course?.authorName}?',
+              style: TextStyle(color: Colors.white70),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Benefici dell\'iscrizione:',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '• Accesso a tutti i corsi\n• Contenuti esclusivi\n• Supporto prioritario',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Annulla'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Implementa la logica di iscrizione
+              _toggleFollow();
+              Navigator.pop(context);
+            },
+            child: Text('Iscriviti'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _initializeController() {
