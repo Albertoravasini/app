@@ -856,21 +856,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   userCourses: userCourses,
                   isLoading: isLoading,
                 ),
-                FirebaseAuth.instance.currentUser != null
-                    ? PrivateChatTab(
-                        profileUser: widget.currentUser,
-                        currentUser: FirebaseAuth.instance.currentUser!,
-                      )
-                    : const Center(
-                        child: Text(
-                          'Effettua il login per chattare',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            fontFamily: 'Montserrat',
-                          ),
+                FirebaseAuth.instance.currentUser?.uid != widget.currentUser.uid
+                  ? PrivateChatTab(
+                      currentUser: FirebaseAuth.instance.currentUser!,
+                      profileUser: widget.currentUser,
+                    )
+                  : const Center(
+                      child: Text(
+                        'Questa è la tua chat personale',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontFamily: 'Montserrat',
                         ),
                       ),
+                    ),
                 Container(), // Calendar tab
               ],
             ),
@@ -954,66 +954,33 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget _buildFollowButton() {
     return Hero(
       tag: 'followButton${widget.currentUser.uid}',
-      child: Material(
-        color: Colors.transparent,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 12,
-          ),
-          decoration: BoxDecoration(
-            color: _isFollowing 
-              ? Colors.yellowAccent 
-              : const Color(0xFF282828),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.yellowAccent.withOpacity(0.3),
-              width: 1,
+      child: SizedBox(
+        height: 45, // Altezza fissa del pulsante
+        child: ElevatedButton.icon(
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            _toggleFollow();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isFollowing ? Colors.yellowAccent : const Color(0xFF282828),
+            foregroundColor: _isFollowing ? Colors.black : Colors.yellowAccent,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            minimumSize: const Size(120, 45), // Dimensione minima
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Colors.yellowAccent.withOpacity(0.3),
+                width: 1,
+              ),
             ),
           ),
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.mediumImpact();
-              _toggleFollow();
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  transitionBuilder: (Widget child, Animation<double> animation) {
-                    return ScaleTransition(
-                      scale: animation,
-                      child: child,
-                    );
-                  },
-                  child: Icon(
-                    _isFollowing ? Icons.check : Icons.add,
-                    key: ValueKey<bool>(_isFollowing),
-                    size: 20,
-                    color: _isFollowing 
-                      ? Colors.black 
-                      : Colors.yellowAccent,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 200),
-                  style: TextStyle(
-                    color: _isFollowing 
-                      ? Colors.black 
-                      : Colors.yellowAccent,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w700,
-                  ),
-                  child: Text(
-                    _isFollowing ? 'Following' : 'Follow',
-                  ),
-                ),
-              ],
+          icon: Icon(_isFollowing ? Icons.check : Icons.add),
+          label: Text(
+            _isFollowing ? 'Following' : 'Follow',
+            style: const TextStyle(
+              fontSize: 14,
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),

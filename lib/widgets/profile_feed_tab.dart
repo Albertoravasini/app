@@ -78,63 +78,51 @@ class ProfileFeedTab extends StatelessWidget {
         final course = userCourses[index];
         return Hero(
           tag: 'course_${course.id}',
-          child: Material(
-            color: Colors.transparent,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF282828),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _showCoursePreview(context, course);
-                  },
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Card(
+            color: const Color(0xFF282828),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 4,
+            margin: const EdgeInsets.only(bottom: 16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                _showCoursePreview(context, course);
+              },
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Stack per l'immagine di copertina e il badge del prezzo
+                  Stack(
                     children: [
-                      // Stack per l'immagine di copertina e il badge del prezzo
-                      Stack(
-                        children: [
-                          _buildCoverImage(course),
-                          Positioned(
-                            top: 12,
-                            right: 12,
-                            child: _buildPriceBadge(course.cost),
-                          ),
-                        ],
-                      ),
-                      // Contenuto del corso
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Titolo e descrizione
-                            _buildTitleAndDescription(course),
-                            const SizedBox(height: 16),
-                            // Statistiche del corso
-                            _buildCourseStats(course),
-                            const SizedBox(height: 16),
-                            // Sezioni e progresso
-                            _buildSectionsProgress(course),
-                          ],
-                        ),
+                      _buildCoverImage(course),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: _buildPriceBadge(course.cost),
                       ),
                     ],
                   ),
-                ),
+                  // Contenuto del corso
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Titolo e descrizione
+                        _buildTitleAndDescription(course),
+                        const SizedBox(height: 16),
+                        // Statistiche del corso
+                        _buildCourseStats(course),
+                        const SizedBox(height: 16),
+                        // Sezioni e progresso
+                        _buildSectionsProgress(course),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -144,53 +132,56 @@ class ProfileFeedTab extends StatelessWidget {
   }
 
   Widget _buildCoverImage(Course course) {
-    return Container(
-      height: 180,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.3),
-            Colors.black.withOpacity(0.7),
-          ],
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      child: Container(
+        height: 180,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.3),
+              Colors.black.withOpacity(0.7),
+            ],
+          ),
         ),
-      ),
-      child: course.coverImageUrl != null
-          ? Image.network(
-              course.coverImageUrl!,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: Colors.grey[800],
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.image_not_supported,
-                      color: Colors.white.withOpacity(0.3),
-                      size: 40,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Immagine non disponibile',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 12,
+        child: course.coverImageUrl != null
+            ? Image.network(
+                course.coverImageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.grey[800],
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.image_not_supported,
+                        color: Colors.white.withOpacity(0.3),
+                        size: 40,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        'Immagine non disponibile',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : Container(
+                color: Colors.grey[800],
+                child: Icon(
+                  Icons.school,
+                  color: Colors.white.withOpacity(0.3),
+                  size: 48,
                 ),
               ),
-            )
-          : Container(
-              color: Colors.grey[800],
-              child: Icon(
-                Icons.school,
-                color: Colors.white.withOpacity(0.3),
-                size: 48,
-              ),
-            ),
+      ),
     );
   }
 
