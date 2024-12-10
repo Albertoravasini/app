@@ -8,6 +8,7 @@ const path = require('path');
 const aiSummaryRouter = require('./ai_summary');
 const aiChatRouter = require('./ai_chat');
 const cors = require('cors');
+const NotificationService = require('./notification_service');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -163,3 +164,65 @@ app.use('/ai', aiChatRouter);
 
 // Abilita CORS
 app.use(cors());
+
+const notificationService = new NotificationService();
+
+app.post('/update_last_access', async (req, res) => {
+  const { uid, fcmToken, lastAccessTime, timezone } = req.body;
+  console.log('Ricevuta richiesta update_last_access:', { uid, lastAccessTime });
+
+  try {
+    // Salva l'ultimo accesso
+    await redisClient.set(`user_last_access_${uid}`, lastAccessTime);
+    await admin.firestore().collection('users').doc(uid).update({
+      lastAccess: lastAccessTime,
+      fcmToken: fcmToken
+    });
+
+    // Programma la notifica
+    console.log('Programmazione notifica per token:', fcmToken.substring(0, 10) + '...');
+    await notificationService.schedulePushNotification(uid, fcmToken, admin.firestore(), redisClient);
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Errore:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post('/send_test_notification', async (req, res) => {
+  try {
+    const { token, title, body } = req.body;
+    
+    console.log('Invio notifica di test a:', token.substring(0, 10) + '...');
+    
+    const message = {
+      token: token,
+      notification: {
+        title: title || 'Test Notifica',
+        body: body || 'Questa è una notifica di test'
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'learning_reminders'
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default'
+          }
+        }
+      }
+    };
+
+    const response = await admin.messaging().send(message);
+    console.log('Notifica inviata con successo:', response);
+    
+    res.status(200).json({ success: true, messageId: response });
+  } catch (error) {
+    console.error('Errore invio notifica:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});

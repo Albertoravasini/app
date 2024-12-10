@@ -7,130 +7,114 @@
  */
 
 const admin = require('firebase-admin');
+const { getNextNotificationDelay } = require('./utils/notification_utils');
 
-/**
- * Sends a push notification to a specific device.
- * @param {string} token - The device token.
- * @param {string} title - The notification title.
- * @param {string} body - The notification body.
- */
-async function sendPushNotification(token, title, body) {
-  const message = {
-    notification: {
-      title: title,
-      body: body,
-    },
-    token: token,
-  };
+class NotificationService {
+  async schedulePushNotification(uid, token, db, redisClient) {
+    try {
+      const lastAccess = await redisClient.get(`user_last_access_${uid}`);
+      if (!lastAccess) return;
 
-  try {
-    const response = await admin.messaging().send(message);
-    console.log(`Successfully sent message: ${response}`);
-  } catch (error) {
-    console.error(`Error sending message to token ${token}:`, error);
-  }
-}
+      let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
+      lastNotificationDelay = lastNotificationDelay ? parseInt(lastNotificationDelay) : null;
 
-/**
- * Calculates the next notification delay using exponential backoff.
- * @param {number|null} lastNotificationDelay - The last delay in milliseconds.
- * @returns {number} - The next delay in milliseconds.
- */
-function getNextNotificationDelay(lastNotificationDelay) {
-  if (lastNotificationDelay == null) {
-    return 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-  } else if (lastNotificationDelay < 24 * 60 * 60 * 1000) {
-    return lastNotificationDelay * 2; // Double the interval
-  } else {
-    return 24 * 60 * 60 * 1000; // Maximum 24 hours in milliseconds
-  }
-}
+      const nextNotificationDelay = getNextNotificationDelay(lastNotificationDelay);
 
-/**
- * Schedules a push notification with a specified delay, avoiding nighttime hours.
- * @param {string} token - The device token.
- * @param {string} title - The notification title.
- * @param {string} body - The notification body.
- * @param {number} delay - The delay in milliseconds.
- */
-function scheduleNotification(token, title, body, delay) {
-  let sendTime = Date.now() + delay;
-  let sendDate = new Date(sendTime);
-  let hours = sendDate.getHours();
+      // Recupera info utente
+      const userDoc = await db.collection('users').doc(uid).get();
+      const userData = userDoc.exists ? userDoc.data() : null;
+      const userName = userData?.name || 'Amico';
 
-  // If the time is between 10 PM and 8 AM, postpone to the next 8 AM
-  if (hours >= 22 || hours < 8) {
-    let nextMorning = new Date(sendDate);
-    if (hours >= 22) {
-      // Add a day if it's after 10 PM
-      nextMorning.setDate(nextMorning.getDate() + 1);
+      // Personalizza il messaggio in base al tempo trascorso
+      const messages = {
+        6: [  // 6 ore
+          {
+            title: '🧠 Missing Out on Learning?',
+            body: `While others scroll mindlessly, you could be learning something amazing.`
+          },
+          {
+            title: '💫 Quick Learning Break?',
+            body: 'Turn your scrolling time into growth time. New content waiting for you.'
+          }
+        ],
+        12: [  // 12 ore
+          {
+            title: '🎯 Feed Your Mind',
+            body: 'Transform your scroll breaks into power moves. Your personalized learning feed is ready.'
+          },
+          {
+            title: '⚡ Procrastinating?',
+            body: 'Turn FOMO into GOMO - Growth Over Missing Out. Your learning feed is fresh.'
+          }
+        ],
+        24: [  // 24 ore
+          {
+            title: '🔥 Feeling Unproductive?',
+            body: 'Others are learning while scrolling. Jump back into your educational feed.'
+          },
+          {
+            title: '✨ Miss That Learning Dopamine?',
+            body: 'Get your daily dose of smart scrolling. New content waiting for you.'
+          }
+        ]
+      };
+
+      const hoursElapsed = nextNotificationDelay / (1000 * 60 * 60);
+      const messageKey = Object.keys(messages)
+        .map(Number)
+        .find(key => hoursElapsed <= key) || 24;
+      
+      const randomMessage = messages[messageKey][Math.floor(Math.random() * messages[messageKey].length)];
+
+      // Programma la notifica evitando orari notturni
+      await this.scheduleNotification(token, randomMessage.title, randomMessage.body, nextNotificationDelay);
+
+      await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay);
+
+    } catch (error) {
+      console.error('Errore nella programmazione della notifica:', error);
     }
-    nextMorning.setHours(8, 0, 0, 0);
-    delay = nextMorning.getTime() - Date.now();
   }
 
-  console.log(`Scheduling notification: "${title}" to be sent after ${delay / 1000} seconds`);
+  async scheduleNotification(token, title, body, delay) {
+    const sendTime = new Date(Date.now() + delay);
+    const hours = sendTime.getHours();
 
-  setTimeout(() => {
-    console.log(`Sending notification: "${title}" now`);
-    sendPushNotification(token, title, body);
-  }, delay);
-}
-
-/**
- * Schedules a push notification for a user based on their last notification delay.
- * @param {string} uid - The user ID.
- * @param {string} token - The device token.
- * @param {FirebaseFirestore.Firestore} db - Firestore instance.
- * @param {RedisClientType} redisClient - Redis client instance.
- */
-async function schedulePushNotification(uid, token, db, redisClient) {
-  console.log(`Scheduling notifications for user ${uid} with token ${token}`);
-  const lastAccess = await redisClient.get(`user_last_access_${uid}`);
-
-  if (!lastAccess) {
-    console.log(`No last access time found for user ${uid}`);
-    return;
-  }
-
-  console.log(`Last access for user ${uid}: ${lastAccess}`);
-
-  // Get the last notification delay
-  let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
-  lastNotificationDelay = lastNotificationDelay ? parseInt(lastNotificationDelay) : null;
-
-  // Calculate the next notification delay
-  const nextNotificationDelay = getNextNotificationDelay(lastNotificationDelay);
-
-  // Save the next notification delay
-  await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay);
-
-  // Retrieve user information to personalize the notification
-  let userName = 'Amico';
-  try {
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (userDoc.exists) {
-      const userData = userDoc.data();
-      userName = userData.name || 'Amico';
+    // Evita le notifiche tra le 22:00 e le 08:00
+    if (hours >= 22 || hours < 8) {
+      const nextMorning = new Date(sendTime);
+      nextMorning.setHours(8, 0, 0, 0);
+      if (hours >= 22) {
+        nextMorning.setDate(nextMorning.getDate() + 1);
+      }
+      delay = nextMorning.getTime() - Date.now();
     }
-  } catch (error) {
-    console.error(`Error fetching user data for uid ${uid}:`, error);
+
+    setTimeout(async () => {
+      try {
+        await admin.messaging().send({
+          token,
+          notification: { title, body },
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'learning_reminders',
+              sound: 'default'
+            }
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default'
+              }
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Errore nell\'invio della notifica:', error);
+      }
+    }, delay);
   }
-
-  // Customize the notification message
-  const notificationTitle = `⏰ Time’s Ticking!`;
-  const notificationBody = `Don’t let another minute go to waste. Enhance your skills now! 💡📱`;
-
-  // Schedule the notification
-  scheduleNotification(
-    token,
-    notificationTitle,
-    notificationBody,
-    nextNotificationDelay
-  );
 }
 
-module.exports = {
-  sendPushNotification,
-  schedulePushNotification,
-};
+module.exports = NotificationService;

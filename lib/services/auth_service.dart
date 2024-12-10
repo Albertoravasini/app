@@ -5,48 +5,25 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:math';
+import 'notification_service.dart';
 
 class AuthService {
+  static final AuthService _instance = AuthService._internal();
+  factory AuthService() => _instance;
+  AuthService._internal();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final NotificationService _notificationService = NotificationService();
 
   /// Sign in with Google
   Future<User?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        return null; // L'utente ha annullato il login
-      }
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
-      final User? user = userCredential.user;
-
+      final User? user = await _signInWithGoogleBase();
       if (user != null) {
-        // Verifica se l'utente esiste in Firestore
-        final userDoc = await _firestore.collection('users').doc(user.uid).get();
-
-        if (!userDoc.exists) {
-          // Se l'utente non esiste, crealo
-          await _firestore.collection('users').doc(user.uid).set({
-            'uid': user.uid,
-            'email': user.email,
-            'name': user.displayName ?? '',
-            'topics': [],
-            'completedLevels': [],
-            'consecutiveDays': 0,
-            'role': 'user',
-            'lastAccess': DateTime.now().toIso8601String(),
-          });
-        }
+        await initializeServices();
       }
-
       return user;
     } catch (e) {
       print('Errore durante il login con Google: $e');
@@ -157,5 +134,59 @@ class AuthService {
       return '';
     }
     return '$firstName $lastName'.trim();
+  }
+
+  /// Aggiungi questo metodo
+  Future<void> initializeServices() async {
+    try {
+      // Inizializza le notifiche dopo il login
+      await _notificationService.initialize();
+      print('Servizi inizializzati correttamente');
+    } catch (e) {
+      print('Errore inizializzazione servizi: $e');
+    }
+  }
+
+  /// Modifica il metodo signInWithGoogle
+  Future<User?> _signInWithGoogleBase() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return null; // L'utente ha annullato il login
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        // Verifica se l'utente esiste in Firestore
+        final userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+        if (!userDoc.exists) {
+          // Se l'utente non esiste, crealo
+          await _firestore.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'email': user.email,
+            'name': user.displayName ?? '',
+            'topics': [],
+            'completedLevels': [],
+            'consecutiveDays': 0,
+            'role': 'user',
+            'lastAccess': DateTime.now().toIso8601String(),
+          });
+        }
+      }
+
+      return user;
+    } catch (e) {
+      print('Errore durante il login con Google: $e');
+      return null;
+    }
   }
 }

@@ -42,45 +42,32 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('Handling a background message: ${message.messageId}');
 }
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
   try {
-    if (isWeb) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.web,
-      );
-      
-      // Modifica questa parte per gestire entrambi gli URL
-      final path = Uri.base.path;
-      if (path == '/privacy-policy') {
-        runApp(const MaterialApp(
-          home: PrivacyPolicyScreen(),
-        ));
-        return;
-      } else if (path == '/support') {
-        runApp(const MaterialApp(
-          home: SupportScreen(),
-        ));
-        return;
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).then((app) async {
+      print('Firebase inizializzato correttamente');
+    }).catchError((e) {
+      if (e.toString().contains('duplicate-app')) {
+        print('Firebase già inizializzato, continuo...');
+      } else {
+        print('Errore inizializzazione Firebase: $e');
       }
-    } else {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      
-      // Inizializza il servizio notifiche solo su piattaforme mobili
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      final NotificationService notificationService = NotificationService();
-      await notificationService.initialize();
-    }
+    });
+
+    // Sposta l'inizializzazione del NotificationService fuori dal then
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    print('NotificationService inizializzato');
+    
   } catch (e) {
-    print('Errore inizializzazione Firebase: $e');
+    print('Errore generale: $e');
   }
 
-  // Se non è un URL speciale, continua con il normale flusso dell'app
-  User? currentUser = FirebaseAuth.instance.currentUser;
-  runApp(MyApp(user: currentUser));
+  runApp(const MyApp(user: null));
 }
 
 class MyApp extends StatelessWidget {
@@ -269,4 +256,16 @@ void _checkDailyReset() async {
       ),
     );
   }
+}
+
+// Aggiungi questa funzione globale
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Assicurati che Firebase sia inizializzato anche in background
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
+  print('Gestione notifica in background: ${message.messageId}');
 }

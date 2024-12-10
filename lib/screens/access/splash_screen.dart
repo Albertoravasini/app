@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:Just_Learn/main.dart';
+import 'package:Just_Learn/services/notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -25,82 +26,90 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
 Future<void> _navigateToNextScreen() async {
-  // Inizia a caricare l'utente contemporaneamente al delay
-  Future<UserModel?> userModelFuture = _loadUserData();
+  try {
+    // Inizia a caricare l'utente contemporaneamente al delay
+    Future<UserModel?> userModelFuture = _loadUserData();
 
-  // Simula il tempo di caricamento (1 secondo)
-  await Future.delayed(const Duration(seconds: 1));
+    // Simula il tempo di caricamento (1 secondo)
+    await Future.delayed(const Duration(seconds: 1));
 
-  // Una volta che il caricamento simulato è finito, controlla i dati dell'utente
-  UserModel? userModel = await userModelFuture;
+    // Una volta che il caricamento simulato è finito, controlla i dati dell'utente
+    UserModel? userModel = await userModelFuture;
 
-  if (userModel != null) {
-    // Controlla se `consecutiveDays` è aumentato rispetto all'ultimo accesso
-    final now = DateTime.now();
-    final lastAccess = userModel.lastAccess;
+    if (userModel != null) {
+      // Aggiorna il token e l'ultimo accesso
+      final notificationService = NotificationService();
+      await notificationService.getAndUpdateToken();  // Rimosso underscore
 
-    // Confrontiamo solo le date, ignorando l'ora
-    final lastAccessDate = DateTime(lastAccess.year, lastAccess.month, lastAccess.day);
-    final todayDate = DateTime(now.year, now.month, now.day);
+      // Controlla se `consecutiveDays` è aumentato rispetto all'ultimo accesso
+      final now = DateTime.now();
+      final lastAccess = userModel.lastAccess;
 
-    final difference = todayDate.difference(lastAccessDate).inDays;
+      // Confrontiamo solo le date, ignorando l'ora
+      final lastAccessDate = DateTime(lastAccess.year, lastAccess.month, lastAccess.day);
+      final todayDate = DateTime(now.year, now.month, now.day);
 
-    if (difference >= 1) { 
-      // Se è passata almeno una giornata
-      if (difference == 1) {
-        // Incrementa consecutiveDays solo se è passato un solo giorno
-        userModel.consecutiveDays += 1;
-      } else {
-        // Se è passato più di un giorno, resetta il conteggio a 0
-        userModel.consecutiveDays = 0;
-      }
+      final difference = todayDate.difference(lastAccessDate).inDays;
 
-      // Aggiorna lastAccess e consecutiveDays nel database
-      await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
-        'consecutiveDays': userModel.consecutiveDays,
-        'lastAccess': now.toIso8601String(),
-      });
+      if (difference >= 1) { 
+        // Se è passata almeno una giornata
+        if (difference == 1) {
+          // Incrementa consecutiveDays solo se è passato un solo giorno
+          userModel.consecutiveDays += 1;
+        } else {
+          // Se è passato più di un giorno, resetta il conteggio a 0
+          userModel.consecutiveDays = 0;
+        }
 
-      if (difference == 1) {
-        // Mostra la schermata di streak solo se la serie è incrementata
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => StreakScreen(
-              consecutiveDays: userModel.consecutiveDays,
-              coins: userModel.coins,
-              userModel: userModel, // Passa l'UserModel
-              onCollectCoins: () async {
-                print('onCollectCoins called'); // Debugging
+        // Aggiorna lastAccess e consecutiveDays nel database
+        await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
+          'consecutiveDays': userModel.consecutiveDays,
+          'lastAccess': now.toIso8601String(),
+        });
 
-                // Aumenta i coins quando l'utente raccoglie la ricompensa
-                try {
-                  await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
-                    'coins': FieldValue.increment(10 + (userModel.consecutiveDays - 1) * 5),
-                  });
-                  print('Coins updated in Firestore'); // Debugging
-                } catch (e) {
-                  print('Error updating coins: $e'); // Debugging
-                }
+        if (difference == 1) {
+          // Mostra la schermata di streak solo se la serie è incrementata
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => StreakScreen(
+                consecutiveDays: userModel.consecutiveDays,
+                coins: userModel.coins,
+                userModel: userModel, // Passa l'UserModel
+                onCollectCoins: () async {
+                  print('onCollectCoins called'); // Debugging
 
-                // Naviga alla schermata principale dopo aver raccolto i coin
-                _navigateToMainScreen(userModel);
-              },
+                  // Aumenta i coins quando l'utente raccoglie la ricompensa
+                  try {
+                    await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
+                      'coins': FieldValue.increment(10 + (userModel.consecutiveDays - 1) * 5),
+                    });
+                    print('Coins updated in Firestore'); // Debugging
+                  } catch (e) {
+                    print('Error updating coins: $e'); // Debugging
+                  }
+
+                  // Naviga alla schermata principale dopo aver raccolto i coin
+                  _navigateToMainScreen(userModel);
+                },
+              ),
             ),
-          ),
-        );
-        return; // Interrompi l'esecuzione per evitare la navigazione immediata
+          );
+          return; // Interrompi l'esecuzione per evitare la navigazione immediata
+        }
       }
-    }
 
-    // Se difference >=1 ma !=1, oppure difference <1
-    _navigateToMainScreen(userModel);
-  } else {
-    // Se non c'è un utente loggato o non esiste l'utente, mostra l'OnboardingScreen
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const OnboardingScreen()),
-    );
+      // Se difference >=1 ma !=1, oppure difference <1
+      _navigateToMainScreen(userModel);
+    } else {
+      // Se non c'è un utente loggato o non esiste l'utente, mostra l'OnboardingScreen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+      );
+    }
+  } catch (e) {
+    print('Errore in _navigateToNextScreen: $e');
   }
 }
 
