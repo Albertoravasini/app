@@ -89,20 +89,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
               // Lista delle sezioni
               Expanded(
                 child: FutureBuilder<List<Map<String, dynamic>>>(
-                  future: Future.wait(
-                    widget.course.sections.map((section) async {
-                      final data = await _getCurrentStepForSection(section.title);
-                      return {
-                        'progress': _calculateTotalProgress(
-                          section,
-                          data['currentStep'] as int,
-                          List<String>.from(data['answeredQuestions']),
-                        ),
-                        'isCompleted': data['isCompleted'] as bool,
-                        'totalSteps': section.steps.length,
-                      };
-                    })
-                  ),
+                  future: _getSectionsProgress(),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) {
                       return const Center(child: CircularProgressIndicator());
@@ -113,68 +100,9 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
                       itemCount: widget.course.sections.length,
                       itemBuilder: (context, index) {
                         final section = widget.course.sections[index];
-                        final data = snapshot.data![index];
-                        final currentProgress = data['progress'] as int;
-                        final isCompleted = data['isCompleted'] as bool;
-                        final totalSteps = data['totalSteps'] as int;
+                        final progressData = snapshot.data![index];
                         
-                        return GestureDetector(
-                          onTap: () => _handleSectionSelection(section),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            decoration: BoxDecoration(
-                              color: Color(0xFF181819),
-                              borderRadius: BorderRadius.circular(20),
-                              border: isCompleted 
-                                ? Border.all(color: Colors.yellowAccent.withOpacity(0), width: 1.5)
-                                : null,
-                            ),
-                            child: Stack(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(20),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              section.title,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 0.5,
-                                              ),
-                                            ),
-                                          ),
-                                          if (isCompleted)
-                                            SvgPicture.asset(
-                                              'assets/solar_verified-check-linear.svg',
-                                              width: 24,
-                                              height: 24,
-                                            ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 15),
-                                      _buildSectionDetails(section),
-                                      SizedBox(height: 15),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: _buildProgressBar(
-                                          currentProgress,
-                                          totalSteps,
-                                          isCompleted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
+                        return _buildSectionCard(section, progressData);
                       },
                     );
                   },
@@ -187,8 +115,99 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
     );
   }
 
-  // Aggiungi questi metodi helper
+  Future<List<Map<String, dynamic>>> _getSectionsProgress() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return [];
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) return [];
+
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+    final completedSections = List<String>.from(userData['completedSections'] ?? []);
+
+    return Future.wait(
+      widget.course.sections.map((section) async {
+        final currentStep = (currentSteps[section.title] ?? 0) + 1;
+        final totalSteps = section.steps.length;
+        
+        // Una sezione è completata se:
+        // 1. È nella lista delle sezioni completate
+        // 2. OPPURE se l'utente ha raggiunto l'ultimo step
+        final isCompleted = completedSections.contains(section.title) || 
+                          currentStep >= totalSteps;
+
+        // Se la sezione è completata, mostriamo il progresso come completo
+        final displayedProgress = isCompleted ? totalSteps : currentStep;
+
+        return {
+          'currentStep': displayedProgress,  // Mostra progresso completo se la sezione è completata
+          'totalSteps': totalSteps,
+          'isCompleted': isCompleted
+        };
+      }),
+    );
+  }
+
+  Widget _buildSectionCard(Section section, Map<String, dynamic> progressData) {
+    final currentStep = progressData['currentStep'] as int;
+    final totalSteps = progressData['totalSteps'] as int;
+    final isCompleted = progressData['isCompleted'] as bool;
+
+    return GestureDetector(
+      onTap: () => _handleSectionSelection(section),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Color(0xFF181819),
+          borderRadius: BorderRadius.circular(20),
+          border: isCompleted 
+            ? Border.all(color: Colors.yellowAccent.withOpacity(0.3), width: 1.5)
+            : null,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      section.title,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  if (isCompleted)
+                    SvgPicture.asset(
+                      'assets/solar_verified-check-linear.svg',
+                      width: 24,
+                      height: 24,
+                    ),
+                ],
+              ),
+              SizedBox(height: 15),
+              _buildSectionDetails(section),
+              SizedBox(height: 15),
+              _buildProgressBar(currentStep, totalSteps, isCompleted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildProgressBar(int currentStep, int totalSteps, bool isCompleted) {
+    // Calcola il progresso esattamente come viene mostrato nel contatore
     double progress = totalSteps > 0 ? currentStep / totalSteps : 0;
     
     return Container(
@@ -243,56 +262,6 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> {
         ),
       ],
     );
-  }
-
-  Future<Map<String, dynamic>> _getCurrentStepForSection(String sectionTitle) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
-          final answeredQuestions = userData['answeredQuestions'] as Map<String, dynamic>? ?? {};
-          final completedSections = List<String>.from(userData['completedSections'] ?? []);
-          
-          // Recupera il progresso per questa sezione
-          final currentStep = currentSteps[sectionTitle] as int? ?? 0;
-          final sectionAnswers = answeredQuestions[sectionTitle] as List<dynamic>? ?? [];
-          
-          return {
-            'currentStep': currentStep,
-            'answeredQuestions': sectionAnswers,
-            'isCompleted': completedSections.contains(sectionTitle),
-          };
-        }
-      } catch (e) {
-        print('Error getting section progress: $e');
-      }
-    }
-    return {
-      'currentStep': 0,
-      'answeredQuestions': [],
-      'isCompleted': false,
-    };
-  }
-
-  int _calculateTotalProgress(Section section, int currentStep, List<String> answeredQuestions) {
-    int progress = currentStep;
-    
-    // Conta gli step di tipo domanda che sono stati completati
-    for (var i = 0; i < section.steps.length; i++) {
-      if (section.steps[i].type == 'question' && 
-          answeredQuestions.contains(section.steps[i].content)) {
-        progress++;
-      }
-    }
-    
-    return progress;
   }
 
   int _calculateTotalTime(Section section) {

@@ -2,7 +2,7 @@ name: Just_Learn
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 2.3.13+55
+version: 2.3.13+56
 
 environment:
   sdk: '>=3.4.3 <4.0.0'
@@ -92,3 +92,4 @@ flutter:
     - assets/heroicons-solid_refresh.svg
     - assets/ri_chat-ai-line.svg
     - assets/solar_pen-bold.png
+    - assets/Error Sound Effect.mp3

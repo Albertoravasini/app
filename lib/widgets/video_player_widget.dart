@@ -18,9 +18,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
 import '../screens/profile_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import '../services/cache_manager.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoId;
@@ -154,7 +151,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
             // Se il video è completato e c'è una domanda disponibile
             if (!_completionHandled && widget.questionStep != null) {
               _completionHandled = true;
-              widget.onShowQuestion(); // Notifica che è il momento di mostrare la domanda
+              setState(() {
+                showQuestionIcon = true;
+              });
             }
           }
         });
@@ -420,6 +419,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   // Aggiungi questo metodo per gestire l'uscita dal corso
   void _handleQuitCourse() {
     widget.onStartCourse(null, null);
+  }
+
+  void _handleQuestionButtonClick() {
+    if (showQuestionIcon && widget.questionStep != null) {
+      widget.onShowQuestion();
+    }
   }
 
 @override
@@ -879,8 +884,10 @@ GestureDetector(
                               height: 46,
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
-                                image: const DecorationImage(
-                                  image: NetworkImage('https://picsum.photos/47'),
+                                image: DecorationImage(
+                                  // Usa l'immagine di copertina del corso se disponibile
+                                  image: NetworkImage(widget.course?.coverImageUrl ?? 
+                                      'https://picsum.photos/47'),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -888,13 +895,16 @@ GestureDetector(
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Formati gratis e cambia per sempre la tua vita.',
+                                // Usa il titolo del corso
+                                widget.course?.title ?? 'Corso non disponibile',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
                                   fontFamily: 'Montserrat',
                                   fontWeight: FontWeight.w500,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],

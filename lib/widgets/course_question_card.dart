@@ -464,12 +464,18 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
       setState(() {
         _showCoins = true;
       });
-      _animationController?.forward(from: 0);
+      _animationController?.forward();
 
-      await _addCoinsToUser();
+      await Future.wait([
+        _saveAnsweredQuestion(),
+        _addCoinsToUser(),
+      ]);
+    } else {
+      if (await Vibration.hasVibrator() ?? false) {
+        Vibration.vibrate(duration: 200); // Vibrazione più lunga per l'errore
+      }
+      _audioPlayer?.play(AssetSource('Error Sound Effect.mp3'));
     }
-
-    await _saveAnsweredQuestion();
   }
 
   Future<void> _addCoinsToUser() async {

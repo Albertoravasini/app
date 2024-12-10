@@ -471,6 +471,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 if (isEditing)
                                   Expanded(
@@ -500,18 +501,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     ),
                                   ),
                                 if (!isEditing)
-                                  Container(
-                                    padding: const EdgeInsets.all(4),
-                                    margin: const EdgeInsets.only(left: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: const Icon(
-                                      Icons.verified,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
+                                  const SizedBox(width: 8),
+                                if (!isEditing)
+                                  const Icon(
+                                    Icons.verified,
+                                    color: Colors.white,
+                                    size: 20,
                                   ),
                               ],
                             ),

@@ -210,8 +210,43 @@ void _preloadNextVideo(int index, String videoId) {
 }
 
 void _onVideoChanged(int index) {
+  if (isInCourseMode && currentSection != null) {
+    // Aggiorna il currentStep nel database per ogni cambio di pagina,
+    // sia per video che per domande
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'currentSteps.${currentSection!.title}': index
+      });
+    }
+
+    // Aggiorna il contatore degli step
+    setState(() {
+      currentStepIndex = index;
+      widget.onSectionProgressUpdate(
+        index + 1, // currentStep (1-based)
+        currentSection!.steps.length, // totalSteps
+        isInCourseMode
+      );
+    });
+  }
+
   if (!mounted) return;
   
+  // Aggiorna sempre il progresso quando si scorre, indipendentemente dal tipo di step
+  if (isInCourseMode && currentCourse != null) {
+    final currentStep = allShortSteps[index]['step'] as LevelStep;
+    final currentSection = allShortSteps[index]['section'] as Section;
+    
+    int stepIndex = currentSection.steps.indexOf(currentStep);
+    widget.onSectionProgressUpdate(stepIndex, currentSection.steps.length, true);
+  }
+
+  // Se è una domanda, non procedere con la gestione del video
+  if (allShortSteps[index]['showQuestion'] == true) {
+    return;
+  }
+
   // Gestisci il video corrente
   if (index < _youtubeControllers.length) {
     _youtubeControllers[index].play();
@@ -452,47 +487,20 @@ void dispose() {
   }
 
   Widget _buildQuestionCard(LevelStep step, Level level) {
-    if (step.choices == null || step.choices!.isEmpty) {
-      return const Center(
-        child: Text(
-          'Errore: Domanda non disponibile.',
-          style: TextStyle(color: Colors.red, fontSize: 24),
-        ),
-      );
-    }
-
-    // Aggiungi un Container con Center per centrare il CourseQuestionCard
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.only(top: 80, right: 16, left: 16),
-        child: CourseQuestionCard(
-          step: step,
-          topic: level.topic,
-          onAnswered: (bool isCorrect) async {
-            if (isCorrect) {
-              _onContinuePressed(_pageController.page!.toInt());
-
-              // Recupera i coins attuali e aggiungi 10
-              final user = FirebaseAuth.instance.currentUser;
-              if (user != null) {
-                final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-                final doc = await docRef.get();
-                if (doc.exists) {
-                  final userData = doc.data() as Map<String, dynamic>;
-                  final currentCoins = userData['coins'] ?? 0;
-
-                  // Aggiorna i coins con l'incremento di 10
-                  widget.onCoinsUpdate(currentCoins + 0);  // Incrementa i coins di 10
-                }
-              }
-            } else {
-              // Gestisci la risposta errata
-            }
-          },
-          onCompleteStep: () {
-            // Azioni da fare quando lo step è completato
-          },
-        ),
+    return Container(
+      padding: const EdgeInsets.only(top: 80, right: 16, left: 16),
+      alignment: Alignment.center, // Centra il contenuto verticalmente
+      child: CourseQuestionCard(
+        step: step,
+        onAnswered: (isCorrect) {
+          setState(() {
+            allShortSteps[_pageController.page!.round()]['showQuestion'] = true;
+          });
+        },
+        onCompleteStep: () {
+          // Manteniamo vuoto questo callback come prima
+        },
+        topic: widget.selectedTopic ?? 'Just Learn',
       ),
     );
   }
@@ -747,11 +755,15 @@ void dispose() {
                 
                 final showQuestion = allShortSteps[index]['showQuestion'] ?? false;
                 return Container(
-                  key: ValueKey('page_$index'),
+                  key: ValueKey('page_${index}_${showQuestion}'),
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onHorizontalDragStart: (_) => hasSwiped = false,
                     onHorizontalDragUpdate: (details) {
+                      if (showQuestion) {
+                        // Disabilita lo swipe quando viene mostrata una domanda
+                        return;
+                      }
                       if (details.delta.dx.abs() > details.delta.dy.abs()) {
                         if (!showQuestion) {
                           if (details.delta.dx > 10 && !hasSwiped) {
