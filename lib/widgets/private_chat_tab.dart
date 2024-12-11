@@ -3,66 +3,41 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/services.dart';
-
 class PrivateChatTab extends StatefulWidget {
   final UserModel profileUser;
   final User currentUser;
-
   const PrivateChatTab({
     Key? key,
     required this.profileUser,
     required this.currentUser,
   }) : super(key: key);
-
   @override
   State<PrivateChatTab> createState() => _PrivateChatTabState();
 }
-
 class _PrivateChatTabState extends State<PrivateChatTab> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? selectedChatUserId;
-  bool _isSubscribed = false;
-
   @override
   void initState() {
     super.initState();
+    // Se non siamo il proprietario del profilo, impostiamo automaticamente l'ID dell'utente del profilo
     if (widget.currentUser.uid != widget.profileUser.uid) {
       selectedChatUserId = widget.profileUser.uid;
-      _checkSubscriptionStatus();
     }
   }
-
-  Future<void> _checkSubscriptionStatus() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUser.uid)
-          .get();
-      final subscriptions = List<String>.from(doc.data()?['subscriptions'] ?? []);
-      setState(() {
-        _isSubscribed = subscriptions.contains(widget.profileUser.uid);
-      });
-    } catch (e) {
-      print('Errore nel controllo della subscription: $e');
-    }
-  }
-
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
-
   String _getChatId(String otherUserId) {
     final List<String> ids = [widget.currentUser.uid, otherUserId]..sort();
     return '${ids[0]}_${ids[1]}';
   }
-
   Future<void> _sendMessage(String message) async {
     if (message.trim().isEmpty || selectedChatUserId == null) return;
-
     final chatId = _getChatId(selectedChatUserId!);
     
     await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
@@ -70,7 +45,6 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
       'lastMessage': message,
       'lastMessageTime': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-
     await FirebaseFirestore.instance
         .collection('chats')
         .doc(chatId)
@@ -82,11 +56,9 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
       'timestamp': FieldValue.serverTimestamp(),
       'isRead': false,
     });
-
     _messageController.clear();
     _scrollToBottom();
   }
-
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -96,85 +68,241 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
       );
     }
   }
-
   @override
   Widget build(BuildContext context) {
-    if (!_isSubscribed && widget.currentUser.uid != widget.profileUser.uid) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Profile image with yellow border
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.yellowAccent,
-                    Colors.yellowAccent.withOpacity(0.5),
+    // Se non è il proprietario del profilo, mostra la chat singola
+    if (widget.currentUser.uid != widget.profileUser.uid) {
+      return _buildSingleChat();
+    }
+    // Se è il proprietario, mostra la lista delle chat
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('chats')
+          .where('participants', arrayContains: widget.currentUser.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+            ),
+          );
+        }
+        final chats = snapshot.data!.docs;
+        if (selectedChatUserId != null) {
+          return _buildSingleChat(userId: selectedChatUserId);
+        }
+        if (chats.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.message_outlined,
+                  size: 64,
+                  color: Colors.white.withOpacity(0.3),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Non hai ancora messaggi',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
+                    fontFamily: 'Montserrat',
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        return Scaffold(
+          backgroundColor: const Color(0xFF181819),
+          body: Column(
+            children: [
+              // Header elegante
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: const [
+                    Text(
+                      'Chat',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Montserrat',
+                      ),
+                    ),
                   ],
                 ),
               ),
-              child: CircleAvatar(
-                radius: 40,
-                backgroundColor: const Color(0xFF282828),
-                backgroundImage: NetworkImage(
-                  widget.profileUser.profileImageUrl ?? 'https://via.placeholder.com/80',
+              // Lista chat con animazioni
+              Expanded(
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: chats.length,
+                  itemBuilder: (context, index) {
+                    final chat = chats[index];
+                    final otherUserId = ((chat.data() as Map<String, dynamic>)['participants'] as List)
+                        .firstWhere((id) => id != widget.currentUser.uid);
+                    return FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(otherUserId)
+                          .get(),
+                      builder: (context, userSnapshot) {
+                        if (!userSnapshot.hasData) {
+                          return const SizedBox();
+                        }
+                        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                        final userName = userData['name'] ?? 'Utente';
+                        final userImage = userData['profileImageUrl'];
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF282828),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(16),
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                setState(() {
+                                  selectedChatUserId = otherUserId;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Hero(
+                                      tag: 'avatar_$otherUserId',
+                                      child: CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: Colors.yellowAccent,
+                                        child: CircleAvatar(
+                                          radius: 26,
+                                          backgroundImage: userImage != null
+                                              ? NetworkImage(userImage)
+                                              : null,
+                                          child: userImage == null
+                                              ? Text(
+                                                  userName[0].toUpperCase(),
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            userName,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              fontFamily: 'Montserrat',
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          StreamBuilder<QuerySnapshot>(
+                                            stream: FirebaseFirestore.instance
+                                                .collection('chats')
+                                                .doc(chat.id)
+                                                .collection('messages')
+                                                .orderBy('timestamp', descending: true)
+                                                .limit(1)
+                                                .snapshots(),
+                                            builder: (context, messageSnapshot) {
+                                              if (!messageSnapshot.hasData ||
+                                                  messageSnapshot.data!.docs.isEmpty) {
+                                                return const SizedBox();
+                                              }
+                                              final lastMessage = messageSnapshot
+                                                  .data!.docs.first
+                                                  .data() as Map<String, dynamic>;
+                                              final isMyMessage = 
+                                                  lastMessage['senderId'] == widget.currentUser.uid;
+                                              return Row(
+                                                children: [
+                                                  if (isMyMessage)
+                                                    const Icon(
+                                                      Icons.reply,
+                                                      size: 16,
+                                                      color: Colors.yellowAccent,
+                                                    ),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    child: Text(
+                                                      lastMessage['message'] as String,
+                                                      style: TextStyle(
+                                                        color: Colors.white.withOpacity(0.7),
+                                                        fontFamily: 'Montserrat',
+                                                        fontSize: 14,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.yellowAccent,
+                                      size: 24,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Elegant title
-            Text(
-              'Private Chat Locked',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 24,
-                fontFamily: 'Montserrat',
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            
-            // Descriptive subtitle
-            Text(
-              'To chat with ${widget.profileUser.name} you need to be subscribed to their profile',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
-                fontSize: 16,
-                fontFamily: 'Montserrat',
-                height: 1.5,
-              ),
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // Stylized lock icon
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.yellowAccent.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.lock_outline_rounded,
-                size: 32,
-                color: Colors.yellowAccent.withOpacity(0.8),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return _buildSingleChat();
+            ],
+          ),
+        );
+      },
+    );
   }
-
   Widget _buildSingleChat({String? userId}) {
     final chatUserId = userId ?? widget.profileUser.uid;
     
@@ -259,7 +387,6 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
               ],
             ),
           ),
-
           // Area messaggi
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
@@ -277,9 +404,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                     ),
                   );
                 }
-
                 final messages = snapshot.data!.docs;
-
                 return ListView.builder(
                   controller: _scrollController,
                   physics: const BouncingScrollPhysics(),
@@ -289,7 +414,6 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                     final message = messages[index].data() as Map<String, dynamic>;
                     final isMe = message['senderId'] == widget.currentUser.uid;
                     final timestamp = (message['timestamp'] as Timestamp?)?.toDate();
-
                     return FutureBuilder<DocumentSnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('users')
@@ -301,7 +425,6 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                           final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
                           userImage = userData?['profileImageUrl'] as String?;
                         }
-
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Row(
@@ -383,7 +506,6 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
               },
             ),
           ),
-
           // Input area migliorata
           Container(
             padding: const EdgeInsets.all(16),

@@ -899,21 +899,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   userCourses: userCourses,
                   isLoading: isLoading,
                 ),
-                FirebaseAuth.instance.currentUser?.uid != widget.currentUser.uid
-                  ? PrivateChatTab(
-                      currentUser: FirebaseAuth.instance.currentUser!,
-                      profileUser: widget.currentUser,
-                    )
-                  : const Center(
-                      child: Text(
-                        'Questa è la tua chat personale',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                          fontFamily: 'Montserrat',
-                        ),
-                      ),
-                    ),
+                PrivateChatTab(
+                  currentUser: FirebaseAuth.instance.currentUser!,
+                  profileUser: widget.currentUser,
+                ),
                 Container(), // Calendar tab
               ],
             ),
