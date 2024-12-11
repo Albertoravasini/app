@@ -28,7 +28,7 @@ class ProfileFeedTab extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Caricamento corsi...',
+              'Loading courses...',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.7),
                 fontSize: 14,
@@ -51,7 +51,7 @@ class ProfileFeedTab extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Nessun corso pubblicato',
+              'No published courses',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.7),
                 fontSize: 16,
@@ -60,7 +60,7 @@ class ProfileFeedTab extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'I tuoi corsi appariranno qui',
+              'Your courses will appear here',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.5),
                 fontSize: 14,
@@ -101,7 +101,7 @@ class ProfileFeedTab extends StatelessWidget {
                       Positioned(
                         top: 12,
                         right: 12,
-                        child: _buildPriceBadge(course.cost),
+                        child: _buildPriceBadge(course.cost, course.id),
                       ),
                     ],
                   ),
@@ -163,7 +163,7 @@ class ProfileFeedTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Immagine non disponibile',
+                        'Image not available',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.5),
                           fontSize: 12,
@@ -185,36 +185,47 @@ class ProfileFeedTab extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceBadge(int cost) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.yellowAccent.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.stars_rounded,
-            size: 16,
-            color: Colors.yellowAccent,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$cost',
-            style: const TextStyle(
-              color: Colors.yellowAccent,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+  Widget _buildPriceBadge(int cost, String courseId) {
+    return FutureBuilder<bool>(
+      future: _isCourseUnlocked(courseId),
+      builder: (context, snapshot) {
+        final isUnlocked = snapshot.data ?? false;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: isUnlocked 
+                ? Colors.black.withOpacity(0.7)
+                : Colors.black.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isUnlocked 
+                  ? Colors.yellowAccent.withOpacity(0.3)
+                  : Colors.yellowAccent.withOpacity(0.3),
+              width: 1,
             ),
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isUnlocked ? Icons.lock_open : Icons.stars_rounded,
+                size: 16,
+                color: Colors.yellowAccent,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                isUnlocked ? 'Unlocked' : '$cost',
+                style: const TextStyle(
+                  color: Colors.yellowAccent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -251,12 +262,12 @@ class ProfileFeedTab extends StatelessWidget {
       children: [
         _buildStat(Icons.star_rounded, course.rating.toStringAsFixed(1), 'Rating'),
         _buildDivider(),
-        _buildStat(Icons.people_outline_rounded, '${course.totalRatings}', 'Studenti'),
+        _buildStat(Icons.people_outline_rounded, '${course.totalRatings}', 'Students'),
         _buildDivider(),
         _buildStat(
           Icons.timer_outlined,
           '${_calculateTotalDuration(course)} min',
-          'Durata',
+          'Duration',
         ),
       ],
     );
@@ -314,7 +325,7 @@ class ProfileFeedTab extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '$totalSections sezioni',
+                  '$totalSections sections',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -322,7 +333,7 @@ class ProfileFeedTab extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${course.sections.fold(0, (sum, section) => sum + section.steps.length)} lezioni',
+                  '${course.sections.fold(0, (sum, section) => sum + section.steps.length)} Steps',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 12,
@@ -415,5 +426,34 @@ Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
       isScrollControlled: true,
       builder: (context) => CoursePreviewSheet(course: course),
     );
+  }
+
+  Future<bool> _isCourseUnlocked(String courseId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) return false;
+
+    // Ottieni i dati del corso
+    final courseDoc = await FirebaseFirestore.instance
+        .collection('courses')
+        .doc(courseId)
+        .get();
+
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final unlockedCourses = List<String>.from(userData['unlockedCourses'] ?? []);
+    final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+    
+    // Controlla se l'utente ha una subscription al creatore del corso
+    if (courseDoc.exists && subscriptions.contains(courseDoc.get('authorId'))) {
+      return true;
+    }
+    
+    return unlockedCourses.contains(courseId);
   }
 } 

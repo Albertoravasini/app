@@ -92,6 +92,9 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
   final FollowController _followController = FollowController();
   bool _isFollowing = false;
 
+  bool _showUnlockOptions = false;
+  bool _isAnimating = false;
+
   @override
   void initState() {
     super.initState();
@@ -500,9 +503,116 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     );
   }
 
-  // Aggiungi questo metodo per gestire l'inizio del corso
+  Future<bool> _hasSubscription(String authorId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) return false;
+
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+    return subscriptions.contains(authorId);
+  }
+
   void _handleStartCourse() {
-    widget.onStartCourse(widget.course, null);
+    if (widget.course != null) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Controlla prima la subscription
+        _hasSubscription(widget.course!.authorId).then((hasSubscription) {
+          if (hasSubscription) {
+            // Se ha la subscription, inizia subito il corso
+            widget.onStartCourse(widget.course, null);
+          } else {
+            // Altrimenti controlla se il corso è già sbloccato
+            FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get()
+                .then((doc) {
+              if (doc.exists) {
+                final userData = UserModel.fromMap(doc.data()!);
+                if (userData.unlockedCourses.contains(widget.course!.id)) {
+                  widget.onStartCourse(widget.course, null);
+                } else {
+                  setState(() {
+                    _showUnlockOptions = true;
+                  });
+                }
+              }
+            });
+          }
+        });
+      }
+    }
+  }
+
+  // Aggiungi questi nuovi metodi
+  void _handleSubscribe() {
+    Navigator.pushNamed(
+      context, 
+      '/profile',
+      arguments: UserModel(
+        uid: widget.course!.authorId,
+        email: '',
+        name: widget.course!.authorName,
+        topics: [],
+        WatchedVideos: {},
+        answeredQuestions: {},
+        currentSteps: {},
+        completedSections: [],
+        consecutiveDays: 0,
+        lastAccess: DateTime.now(),
+        role: 'creator',
+        coins: 0,
+      ),
+    ).then((_) {
+      // Chiudi le opzioni di sblocco
+      setState(() {
+        _showUnlockOptions = false;
+        _isAnimating = false;
+      });
+    });
+  }
+
+  Future<void> _handleUnlockCourse() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final doc = await docRef.get();
+      
+      if (doc.exists) {
+        final userData = UserModel.fromMap(doc.data()!);
+        
+        if (userData.coins >= widget.course!.cost) {
+          // Deduci i coins e sblocca il corso
+          await docRef.update({
+            'coins': userData.coins - widget.course!.cost,
+            'unlockedCourses': [...userData.unlockedCourses, widget.course!.id],
+          });
+
+          // Aggiorna le monete nell'AppBar
+          widget.onCoinsUpdate(userData.coins - widget.course!.cost);
+          
+          // Inizia il corso
+          widget.onStartCourse(widget.course, null);
+          
+          setState(() {
+            _showUnlockOptions = false;
+            _isAnimating = false;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Non hai abbastanza coins')),
+          );
+        }
+      }
+    }
   }
 
   // Aggiungi questo metodo per gestire l'uscita dal corso
@@ -516,332 +626,106 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
     }
   }
 
-@override
-Widget build(BuildContext context) {
-  return YoutubePlayerBuilder(
-    player: YoutubePlayer(
-      controller: _controller,
-      showVideoProgressIndicator: false,
-      aspectRatio: 9/16,
-      onReady: () {
-        print("Youtube Player è pronto.");
-      },
-      onEnded: (metaData) {
-        if (!_completionHandled) {
-          _completionHandled = true;
-          _handleProgressCompletion();
-        }
-      },
-    ),
-    builder: (context, player) {
-      return Stack(
-        children: [
-          _showArticles 
-          ? ArticlesWidget(
-              videoTitle: _controller.metadata.title ?? 'Untitled',
-              levelId: widget.videoId ?? 'no level id found',
-            )
-          : _showNotes 
-          ? NotesScreen(
-            
-            )
-          : Column(
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    // Contenitore per il player con overflow nascosto
-                    ClipRect(
-                      child: Transform.scale(
-                        scale: 1.21,
-                        child: IgnorePointer(
-                          ignoring: true,
-                          child: Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            child: player,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Layer invisibile per tapping e dragging
-                    GestureDetector(
-                      onTap: () {
-                        if (_controller.value.isPlaying) {
-                          _controller.pause();
-                        } else {
-                          _controller.play();
-                        }
-                      },
-                      onHorizontalDragStart: _onHorizontalDragStart,
-                      onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                      onHorizontalDragEnd: _onHorizontalDragEnd,
-                      child: Container(
-                        color: Colors.transparent,
-                        width: double.infinity,
-                        height: double.infinity,
-                      ),
-                    ),
-                    // Bottoni e overlay
-                    Positioned(
-                      bottom: 5,
-                      right: 15,
-                      child: Column(
-                        children: [ // Preview link
-                          GestureDetector(
-                            onTap: widget.onShowArticles,
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/fluent_preview-link-24-filled.svg',
-                                  color: Colors.white70,
-                                  width: 30,
-                                  height: 30,
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            ),
-                          ),// Chat AI con le proprietà dei commenti
-                          GestureDetector(
-                            onTap: () => _openComments(context),
-                            child: Column(
-                              children: [
-                                SvgPicture.asset(
-                                  'assets/ri_chat-ai-line.svg',
-                                  color: Colors.white70,
-                                  width: 30,
-                                  height: 30,
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            ),
-                          ),
-
-                          // Pen
-                          GestureDetector(
-                            onTap: widget.onShowNotes,
-                            child: Column(
-                              children: [
-                                Image.asset(
-                                  'assets/solar_pen-bold.png',
-                                  color: Colors.white70,
-                                  width: 30,
-                                  height: 30,
-                                ),
-                                const SizedBox(height: 20),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Barra di progresso sotto il video
-              Container(
-                height: 4,
-                width: double.infinity,
-                child: Stack(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1F1F1F),
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(3),
-                          bottomRight: Radius.circular(3),
-                        ),
-                      ),
-                    ),
-                    ClipRRect(
-                      borderRadius: BorderRadius.only(
-                        topRight: Radius.circular(3),
-                        bottomRight: Radius.circular(3),
-                      ),
-                      child: SizedBox(
-                        width: MediaQuery.of(context).size.width * _progress,
+  Widget _buildStartCourseButton() {
+    return Hero(
+      tag: 'startCourse${widget.course!.id}',
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: double.infinity,
+        height: 38,
+        decoration: BoxDecoration(
+          color: _showUnlockOptions ? Colors.transparent : const Color(0xFFFFFF28),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: _showUnlockOptions ? null : _handleStartCourse,
+            child: _showUnlockOptions
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Pulsante Subscribe
+                      Expanded(
                         child: Container(
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // Overlay per l'animazione delle monete
-          if (_showCoinsCompletion)
-            Positioned.fill(
-              child: Center(
-                child: AnimatedBuilder(
-                  animation: _animationController,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: 1.0 - _animationController.value,
-                      child: Transform.translate(
-                        offset: Offset(0, -150 * _animationController.value),
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: Icon(
-                    Icons.stars_rounded,
-                    size: 100,
-                    color: Colors.yellowAccent,
-                  ),
-                ),
-              ),
-            ),
-          // Overlay per il feedback del seeking
-          if (_isDragging)
-            Positioned(
-              top: 20, // Posiziona in alto
-              right: 20, // Posiziona a destra
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5), // Quasi trasparente
-                  borderRadius: BorderRadius.circular(10), // Bordi arrotondati
-                ),
-                child: Text(
-                  '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-          // Aggiungi questo widget dentro lo Stack esistente, dopo il player video
-          Positioned(
-            left: 16,
-            bottom: 20,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Titolo
-                SizedBox(
-                  width: 274, // Larghezza fissa per il titolo
-                  child: Text(
-                    _controller.metadata.title ?? 'Titolo non disponibile',
-                    textAlign: TextAlign.left,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.72,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Row per topic e quit button
-                Row(
-                  children: [
-GestureDetector(
-  onTap: () {
-    if (widget.isInCourse) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => SectionSelectionSheet(
-          course: widget.course!,
-          currentSection: widget.currentSection,
-          onSelectSection: (selectedSection) {
-            widget.onStartCourse(widget.course, selectedSection);
-          },
-        ),
-      );
-    } else {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => TopicSelectionSheet(
-          allTopics: allTopics,
-          selectedTopic: widget.topic,
-          onSelectTopic: widget.onTopicChanged!,
-        ),
-      );
-    }
-  },
-  child: Container(
-    constraints: BoxConstraints(maxWidth: 240), // Limita la larghezza massima
-    height: 23,
-    decoration: ShapeDecoration(
-      color: Color(0x93333333),
-      shape: RoundedRectangleBorder(
-        side: BorderSide(
-          width: 1,
-          color: Colors.white.withOpacity(0.10000000149011612),
-        ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-    ),
-    padding: EdgeInsets.symmetric(horizontal: 7),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.school,
-          color: Colors.white,
-          size: 15,
-        ),
-        SizedBox(width: 4),
-        Flexible(  // Aggiungi Flexible qui
-          child: Text(
-            widget.isInCourse 
-                ? widget.currentSection?.title ?? "Section 1"
-                : widget.topic,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.72,
-            ),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-          ),
-        ),
-      ],
-    ),
-  ),
-),
-                    if (widget.isInCourse)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: GestureDetector(
-                          onTap: _handleQuitCourse,
-                          child: Container(
-                            height: 23,  // Stessa altezza del container della sezione
-                            decoration: ShapeDecoration(
-                              color: Color(0x93333333),  // Stesso colore di sfondo
-                              shape: RoundedRectangleBorder(
-                                side: BorderSide(
-                                  width: 1,
-                                  color: Colors.yellowAccent.withOpacity(0.5),  // Bordo giallo
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: Colors.yellowAccent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: TextButton(
+                            onPressed: () async {
+                              // Metti in pausa il video
+                              _controller.pause();
+                              
+                              // Carica i dati dell'utente
+                              final userDoc = await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(widget.course?.authorId)
+                                  .get();
+                              
+                              if (!userDoc.exists || !context.mounted) return;
+
+                              // Crea un UserModel dall'autore
+                              final author = UserModel.fromMap(userDoc.data()!);
+                              
+                              // Naviga al profilo
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProfileScreen(
+                                    currentUser: author,
+                                  ),
                                 ),
-                                borderRadius: BorderRadius.circular(20),  // Stesso border radius
+                              ).then((_) {
+                                // Quando torni indietro, riprendi il video
+                                _controller.play();
+                              });
+                            },
+                            child: const Text(
+                              'Subscribe',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 14,
+                                fontFamily: 'Montserrat',
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            padding: EdgeInsets.symmetric(horizontal: 7),  // Stesso padding
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Pulsante Coins
+                      Expanded(
+                        child: Container(
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E1E),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.yellowAccent.withOpacity(0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: TextButton(
+                            onPressed: _handleUnlockCourse,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
+                                Icon(
+                                  Icons.stars_rounded,
+                                  color: Colors.yellowAccent,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Quit',
-                                  style: TextStyle(
-                                    color: Colors.yellowAccent,
-                                    fontSize: 12,
+                                  '${widget.course!.cost}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
                                     fontFamily: 'Montserrat',
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 0.72,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -849,20 +733,39 @@ GestureDetector(
                           ),
                         ),
                       ),
-                  ],
-                ),
-              ],
-            ),
+                    ],
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 16),
+                        child: Text(
+                          'Start Course',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(right: 12),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
-          Positioned(
-            left: 16,
-            bottom: 90,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header con profilo e nome (sempre visibile)
-GestureDetector(
-  onTap: () async {
+        ),
+      ),
+    );
+  }
+
+  Future<void> _navigateToAuthorProfile() async {
     // Metti in pausa il video
     _controller.pause();
     
@@ -889,151 +792,157 @@ GestureDetector(
       // Quando torni indietro, riprendi il video
       _controller.play();
     });
-  },
-  child: Row(
+  }
+
+@override
+Widget build(BuildContext context) {
+  return Stack(
     children: [
-      Container(
-        width: 45,
-        height: 45,
-        padding: const EdgeInsets.all(2),
-        decoration: ShapeDecoration(
-          shape: RoundedRectangleBorder(
-            side: BorderSide(width: 1.5, color: Colors.yellowAccent,),
-            borderRadius: BorderRadius.circular(23),
-          ),
+      YoutubePlayerBuilder(
+        player: YoutubePlayer(
+          controller: _controller,
+          showVideoProgressIndicator: false,
+          aspectRatio: 9/16,
+          onReady: () {
+            print("Youtube Player è pronto.");
+          },
+          onEnded: (metaData) {
+            if (!_completionHandled) {
+              _completionHandled = true;
+              _handleProgressCompletion();
+            }
+          },
         ),
-        child: widget.course?.authorId != null && widget.course!.authorId.isNotEmpty
-            ? StreamBuilder<DocumentSnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(widget.course!.authorId)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return _buildPlaceholder(true);
-                  }
-
-                  final userData = snapshot.data!.data() as Map<String, dynamic>?;
-                  if (userData == null) {
-                    return _buildPlaceholder(false);
-                  }
-
-                  final authorProfileUrl = userData['profileImageUrl'] as String?;
-                  
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(21),
-                    child: Image.network(
-                      authorProfileUrl ?? 'https://via.placeholder.com/45',
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return _buildPlaceholder(true);
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        print('Error loading image: $error');
-                        return _buildPlaceholder(false);
-                      },
-                    ),
-                  );
-                },
-              )
-            : _buildPlaceholder(false),
-      ),
-      const SizedBox(width: 8),
-      Text(
-        widget.course?.authorName ?? 'Unknown Author',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontFamily: 'Montserrat',
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ],
-  ),
-),
+        builder: (context, player) {
+          return Stack(
+            children: [
+              _showArticles 
+              ? ArticlesWidget(
+                  videoTitle: _controller.metadata.title ?? 'Untitled',
+                  levelId: widget.videoId ?? 'no level id found',
+                )
+              : _showNotes 
+              ? NotesScreen(
                 
-                // Container del corso (visibile solo quando non si è in corso)
-                if (!widget.isInCourse) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    width: MediaQuery.of(context).size.width * 0.75,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Color(0x93333333).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                )
+              : Column(
+                children: [
+                  Expanded(
+                    child: Stack(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  // Usa l'immagine di copertina del corso se disponibile
-                                  image: NetworkImage(widget.course?.coverImageUrl ?? 
-                                      'https://picsum.photos/47'),
-                                  fit: BoxFit.cover,
-                                ),
+                        // Contenitore per il player con overflow nascosto
+                        ClipRect(
+                          child: Transform.scale(
+                            scale: 1.21,
+                            child: IgnorePointer(
+                              ignoring: true,
+                              child: Container(
+                                width: double.infinity,
+                                height: double.infinity,
+                                child: player,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                // Usa il titolo del corso
-                                widget.course?.title ?? 'Corso non disponibile',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontFamily: 'Montserrat',
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 12),
+                        // Layer invisibile per tapping e dragging
+                        GestureDetector(
+                          onTap: () {
+                            if (_controller.value.isPlaying) {
+                              _controller.pause();
+                            } else {
+                              _controller.play();
+                            }
+                          },
+                          onHorizontalDragStart: _onHorizontalDragStart,
+                          onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                          onHorizontalDragEnd: _onHorizontalDragEnd,
+                          child: Container(
+                            color: Colors.transparent,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                        ),
+                        // Bottoni e overlay
+                        Positioned(
+                          bottom: 5,
+                          right: 15,
+                          child: Column(
+                            children: [ // Preview link
+                              GestureDetector(
+                                onTap: widget.onShowArticles,
+                                child: Column(
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/fluent_preview-link-24-filled.svg',
+                                      color: Colors.white70,
+                                      width: 30,
+                                      height: 30,
+                                    ),
+                                    const SizedBox(height: 20),
+                                  ],
+                                ),
+                              ),// Chat AI con le proprietà dei commenti
+                              GestureDetector(
+                                onTap: () => _openComments(context),
+                                child: Column(
+                                  children: [
+                                    SvgPicture.asset(
+                                      'assets/ri_chat-ai-line.svg',
+                                      color: Colors.white70,
+                                      width: 30,
+                                      height: 30,
+                                    ),
+                                    const SizedBox(height: 20),
+                                  ],
+                                ),
+                              ),
+
+                              // Pen
+                              GestureDetector(
+                                onTap: widget.onShowNotes,
+                                child: Column(
+                                  children: [
+                                    Image.asset(
+                                      'assets/solar_pen-bold.png',
+                                      color: Colors.white70,
+                                      width: 30,
+                                      height: 30,
+                                    ),
+                                    const SizedBox(height: 20),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Barra di progresso sotto il video
+                  Container(
+                    height: 4,
+                    width: double.infinity,
+                    child: Stack(
+                      children: [
                         Container(
                           width: double.infinity,
-                          height: 38,
                           decoration: BoxDecoration(
-                            color: Color(0xFFFFFF28),
-                            borderRadius: BorderRadius.circular(8),
+                            color: const Color(0xFF1F1F1F),
+                            borderRadius: BorderRadius.only(
+                              topRight: Radius.circular(3),
+                              bottomRight: Radius.circular(3),
+                            ),
                           ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: _handleStartCourse,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 16),
-                                    child: Text(
-                                      'Start Course',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontSize: 14,
-                                        fontFamily: 'Montserrat',
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 12),
-                                    child: Icon(
-                                      Icons.arrow_forward,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                        ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.only(
+                            topRight: Radius.circular(3),
+                            bottomRight: Radius.circular(3),
+                          ),
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width * _progress,
+                            child: Container(
+                              color: Colors.grey,
                             ),
                           ),
                         ),
@@ -1041,12 +950,321 @@ GestureDetector(
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-        ],
-      );
-    },
+              ),
+              // Overlay per l'animazione delle monete
+              if (_showCoinsCompletion)
+                Positioned.fill(
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: 1.0 - _animationController.value,
+                          child: Transform.translate(
+                            offset: Offset(0, -150 * _animationController.value),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Icon(
+                        Icons.stars_rounded,
+                        size: 100,
+                        color: Colors.yellowAccent,
+                      ),
+                    ),
+                  ),
+                ),
+              // Overlay per il feedback del seeking
+              if (_isDragging)
+                Positioned(
+                  top: 20, // Posiziona in alto
+                  right: 20, // Posiziona a destra
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5), // Quasi trasparente
+                      borderRadius: BorderRadius.circular(10), // Bordi arrotondati
+                    ),
+                    child: Text(
+                      '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              // Aggiungi questo widget dentro lo Stack esistente, dopo il player video
+              Positioned(
+                left: 16,
+                bottom: 20,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Titolo
+                    SizedBox(
+                      width: 274, // Larghezza fissa per il titolo
+                      child: Text(
+                        _controller.metadata.title ?? 'Titolo non disponibile',
+                        textAlign: TextAlign.left,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.72,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Row per topic e quit button
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            if (widget.isInCourse) {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => SectionSelectionSheet(
+                                  course: widget.course!,
+                                  currentSection: widget.currentSection,
+                                  onSelectSection: (selectedSection) {
+                                    widget.onStartCourse(widget.course, selectedSection);
+                                  },
+                                ),
+                              );
+                            } else {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => TopicSelectionSheet(
+                                  allTopics: allTopics,
+                                  selectedTopic: widget.topic,
+                                  onSelectTopic: widget.onTopicChanged!,
+                                ),
+                              );
+                            }
+                          },
+                          child: Container(
+                            constraints: BoxConstraints(maxWidth: 240), // Limita la larghezza massima
+                            height: 23,
+                            decoration: ShapeDecoration(
+                              color: Color(0x93333333),
+                              shape: RoundedRectangleBorder(
+                                side: BorderSide(
+                                  width: 1,
+                                  color: Colors.white.withOpacity(0.10000000149011612),
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            padding: EdgeInsets.symmetric(horizontal: 7),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.school,
+                                  color: Colors.white,
+                                  size: 15,
+                                ),
+                                SizedBox(width: 4),
+                                Flexible(  // Aggiungi Flexible qui
+                                  child: Text(
+                                    widget.isInCourse 
+                                        ? widget.currentSection?.title ?? "Section 1"
+                                        : widget.topic,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.72,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (widget.isInCourse)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: GestureDetector(
+                              onTap: _handleQuitCourse,
+                              child: Container(
+                                height: 23,  // Stessa altezza del container della sezione
+                                decoration: ShapeDecoration(
+                                  color: Color(0x93333333),  // Stesso colore di sfondo
+                                  shape: RoundedRectangleBorder(
+                                    side: BorderSide(
+                                      width: 1,
+                                      color: Colors.yellowAccent.withOpacity(0.5),  // Bordo giallo
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),  // Stesso border radius
+                                  ),
+                                ),
+                                padding: EdgeInsets.symmetric(horizontal: 7),  // Stesso padding
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Quit',
+                                      style: TextStyle(
+                                        color: Colors.yellowAccent,
+                                        fontSize: 12,
+                                        fontFamily: 'Montserrat',
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.72,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(
+                left: 16,
+                bottom: 90,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header con profilo e nome (sempre visibile)
+                    GestureDetector(
+                      onTap: _navigateToAuthorProfile,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 45,
+                            height: 45,
+                            padding: const EdgeInsets.all(2),
+                            decoration: ShapeDecoration(
+                              shape: RoundedRectangleBorder(
+                                side: BorderSide(width: 1.5, color: Colors.yellowAccent,),
+                                borderRadius: BorderRadius.circular(23),
+                              ),
+                            ),
+                            child: widget.course?.authorId != null && widget.course!.authorId.isNotEmpty
+                                ? StreamBuilder<DocumentSnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(widget.course!.authorId)
+                                        .snapshots(),
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData) {
+                                        return _buildPlaceholder(true);
+                                      }
+
+                                      final userData = snapshot.data!.data() as Map<String, dynamic>?;
+                                      if (userData == null) {
+                                        return _buildPlaceholder(false);
+                                      }
+
+                                      final authorProfileUrl = userData['profileImageUrl'] as String?;
+                                      
+                                      return ClipRRect(
+                                        borderRadius: BorderRadius.circular(21),
+                                        child: Image.network(
+                                          authorProfileUrl ?? 'https://via.placeholder.com/45',
+                                          fit: BoxFit.cover,
+                                          loadingBuilder: (context, child, loadingProgress) {
+                                            if (loadingProgress == null) return child;
+                                            return _buildPlaceholder(true);
+                                          },
+                                          errorBuilder: (context, error, stackTrace) {
+                                            print('Error loading image: $error');
+                                            return _buildPlaceholder(false);
+                                          },
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : _buildPlaceholder(false),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.course?.authorName ?? 'Unknown Author',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Container del corso (visibile solo quando non si è in corso)
+                    if (!widget.isInCourse) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: MediaQuery.of(context).size.width * 0.75,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Color(0x93333333).withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      // Usa l'immagine di copertina del corso se disponibile
+                                      image: NetworkImage(widget.course?.coverImageUrl ?? 
+                                          'https://picsum.photos/47'),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    // Usa il titolo del corso
+                                    widget.course?.title ?? 'Corso non disponibile',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildStartCourseButton(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ],
   );
 }
 }

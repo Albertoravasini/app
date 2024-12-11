@@ -6,19 +6,37 @@ class ProfileController {
   
   Future<void> updateProfile({
     required String userId,
-    required String name,
-    required String username,
-    required String bio,
+    required Map<String, dynamic> updates,
   }) async {
     try {
-      await _firestore.collection('users').doc(userId).update({
-        'name': name,
-        'username': username,
-        'bio': bio,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+      await _firestore.collection('users').doc(userId).update(updates);
     } catch (e) {
       throw ProfileUpdateException('Errore nell\'aggiornamento del profilo: $e');
+    }
+  }
+
+  Future<void> updateSubscriptionSettings({
+    required String userId,
+    required double price,
+    required List<String> benefits,
+  }) async {
+    if (benefits.length != 3) {
+      throw ProfileUpdateException('Sono richiesti esattamente 3 benefici');
+    }
+    
+    try {
+      await updateProfile(
+        userId: userId,
+        updates: {
+          'subscriptionPrice': price,
+          'subscriptionDescription1': benefits[0],
+          'subscriptionDescription2': benefits[1],
+          'subscriptionDescription3': benefits[2],
+        },
+      );
+    } catch (e) {
+      throw ProfileUpdateException('Errore nell\'aggiornamento delle impostazioni subscription: $e');
     }
   }
 

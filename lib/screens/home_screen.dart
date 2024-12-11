@@ -1,3 +1,4 @@
+import 'package:Just_Learn/models/course.dart';
 import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,14 +9,21 @@ import '../models/user.dart';
 import '../widgets/tutorial_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int? initialTabIndex;
+  final Map<String, dynamic>? initialCourseData;
+
+  const HomeScreen({
+    super.key,
+    this.initialTabIndex,
+    this.initialCourseData,
+  });
 
   @override
-  // ignore: library_private_types_in_public_api
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late int _selectedIndex;
   String? selectedTopic;
   String? selectedSubtopic;
   bool isLoading = true;
@@ -34,6 +42,15 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialTabIndex ?? 1;
+    
+    // Se c'è un corso iniziale, inizializza ShortsScreen con esso
+    if (widget.initialCourseData != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Inizializza ShortsScreen con i dati del corso
+        // Questo verrà gestito attraverso lo state management
+      });
+    }
     // Manteniamo questo tracciamento per la visualizzazione iniziale
     Posthog().screen(
       screenName: 'Video Screen',  // Cambiato da 'Home Screen' a 'Video Screen'

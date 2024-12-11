@@ -1,3 +1,4 @@
+import 'package:Just_Learn/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/user.dart';
@@ -12,6 +13,7 @@ import '../widgets/profile_feed_tab.dart';
 import '../controllers/follow_controller.dart';
 import '../controllers/subscription_controller.dart';
 import '../widgets/private_chat_tab.dart';
+import '../controllers/profile_controller.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -35,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   final SubscriptionController _subscriptionController = SubscriptionController();
   bool _isFollowing = false;
   bool _isSubscribed = false;
+  final ProfileController _profileController = ProfileController();
 
   @override
   void initState() {
@@ -169,16 +172,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  Future<void> _updateProfile() async {
+  Future<void> _updateProfile(Map<String, dynamic> updates) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUser.uid)
-          .update({
-        'name': _nameController.text,
-        'bio': _bioController.text,
-        'username': _usernameController.text,
-      });
+      await _profileController.updateProfile(
+        userId: widget.currentUser.uid,
+        updates: updates,
+      );
 
       setState(() {
         isEditing = false;
@@ -195,6 +194,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showSubscriptionModal(BuildContext context) {
+    // Controllers per i benefici
+    final benefitControllers = [
+      TextEditingController(text: widget.currentUser.subscriptionDescription1),
+      TextEditingController(text: widget.currentUser.subscriptionDescription2),
+      TextEditingController(text: widget.currentUser.subscriptionDescription3),
+    ];
+    final priceController = TextEditingController(
+      text: widget.currentUser.subscriptionPrice.toString()
+    );
+
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF181819),
@@ -289,7 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   ),
                 ),
                 const SizedBox(height: 24),
-                // Lista dei benefici
+                // Lista dei benefici con icone
                 ...List.generate(3, (index) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -309,14 +318,23 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          "Full access to this user's content",
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w500,
-                          ),
+                        Expanded(
+                          child: isEditing
+                              ? CustomTextField(
+                                  controller: benefitControllers[index],
+                                  label: 'Benefit ${index + 1}',
+                                )
+                              : Text(
+                                  index == 0 ? widget.currentUser.subscriptionDescription1 :
+                                  index == 1 ? widget.currentUser.subscriptionDescription2 :
+                                  widget.currentUser.subscriptionDescription3,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                    fontFamily: 'Montserrat',
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                         ),
                       ],
                     ),
@@ -325,32 +343,36 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
                 const SizedBox(height: 16),
 
-                // Prezzo con lo stile del topic
+                // Prezzo
                 Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF1E1E1E),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        '\$ 9.99 / month',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontFamily: 'Montserrat',
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: isEditing
+                      ? CustomTextField(
+                          controller: priceController,
+                          label: 'Subscription Price',
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        )
+                      : Text(
+                          '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
 
                 const SizedBox(height: 16),
+
                 // Pulsante Subscribe
                 SizedBox(
                   width: double.infinity,
@@ -416,7 +438,28 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      // Salva i valori quando il modal viene chiuso
+      if (isEditing) {
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.currentUser.uid)
+            .update({
+          'subscriptionPrice': double.tryParse(priceController.text) ?? 9.99,
+          'subscriptionDescription1': benefitControllers[0].text,
+          'subscriptionDescription2': benefitControllers[1].text,
+          'subscriptionDescription3': benefitControllers[2].text,
+        }).then((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Subscription settings updated!')),
+          );
+        }).catchError((error) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error updating subscription: $error')),
+          );
+        });
+      }
+    });
   }
 
   @override
@@ -799,9 +842,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                           width: 1,
                                         ),
                                       ),
-                                      child: const Text(
-                                        '\$ 9.99 / mo',
-                                        style: TextStyle(
+                                      child: Text(
+                                        '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 14,
                                           fontFamily: 'Montserrat',
@@ -891,7 +934,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 isEditing
                     ? _buildCircularButton(
                         Icons.save,
-                        onPressed: _updateProfile,
+                        onPressed: () => _updateProfile({
+                          'name': _nameController.text,
+                          'bio': _bioController.text,
+                          'username': _usernameController.text,
+                        }),
                       )
                     : _buildCircularButton(
                         Icons.more_horiz,

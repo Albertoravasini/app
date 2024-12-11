@@ -1,9 +1,13 @@
 import 'package:Just_Learn/models/level.dart';
+import 'package:Just_Learn/models/user.dart';
+import 'package:Just_Learn/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import '../models/course.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:Just_Learn/screens/course_screen.dart';
+import 'package:Just_Learn/screens/profile_screen.dart';
 
 class CoursePreviewSheet extends StatefulWidget {
   final Course course;
@@ -21,13 +25,177 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
   late AnimationController _animationController;
   bool isExpanded = false;
   double _scrollOffset = 0;
+  String _startButtonText = 'Start Course';
 
+  // Stato del corso con ValueNotifier per aggiornamenti reattivi
+  late final ValueNotifier<CourseState> _courseState;
+  
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
+    );
+    // Inizializza subito con locked per mostrare il testo
+    _courseState = ValueNotifier<CourseState>(CourseState.locked);
+    // Poi verifica lo stato reale
+    _checkCourseState();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _courseState.dispose();
+    super.dispose();
+  }
+
+  // Verifica lo stato del corso
+  Future<void> _checkCourseState() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _courseState.value = CourseState.error;
+        return;
+      }
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (!userDoc.exists) {
+        _courseState.value = CourseState.error;
+        return;
+      }
+
+      final userData = UserModel.fromMap(userDoc.data()!);
+      _courseState.value = userData.unlockedCourses.contains(widget.course.id) 
+          ? CourseState.unlocked 
+          : CourseState.locked;
+    } catch (e) {
+      _courseState.value = CourseState.error;
+    }
+  }
+
+  // Gestisce l'acquisto con coins
+  Future<void> _unlockWithCoins(UserModel userData) async {
+    try {
+      if (userData.coins < widget.course.cost) {
+        _showError('Insufficient Coins!');
+        return;
+      }
+
+      // Aggiorna immediatamente l'UI
+      _courseState.value = CourseState.unlocked;
+      
+      // Chiude il bottom sheet delle opzioni
+      Navigator.pop(context);
+
+      // Aggiorna il database in background
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final userRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(userData.uid);
+            
+        // Aggiorna atomicamente coins e corsi sbloccati
+        transaction.update(userRef, {
+          'coins': userData.coins - widget.course.cost,
+          'unlockedCourses': [...userData.unlockedCourses, widget.course.id],
+        });
+      });
+
+      _showSuccess('Course unlocked successfully!');
+    } catch (e) {
+      // In caso di errore, ripristina lo stato precedente
+      _courseState.value = CourseState.locked;
+      _showError('Error unlocking course');
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
+  }
+
+  void _showStartCourseOptions() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+    
+    if (!userDoc.exists || !mounted) return;
+    
+    final userData = UserModel.fromMap(userDoc.data()!);
+    final subscriptions = userData.subscriptions ?? [];
+
+    // Se l'utente è iscritto al creatore, il corso è automaticamente sbloccato
+    if (subscriptions.contains(widget.course.authorId)) {
+      setState(() {
+        _courseState.value = CourseState.unlocked;
+      });
+      _showSuccess('Corso disponibile con la tua subscription');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ValueListenableBuilder<CourseState>(
+        valueListenable: _courseState,
+        builder: (context, state, child) {
+          return Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (state == CourseState.locked) ...[
+                  _buildOptionButton(
+                    icon: Icons.stars_rounded,
+                    title: 'Unlock with ${widget.course.cost} coins',
+                    subtitle: 'You have ${userData.coins} coins available',
+                    onTap: () => _unlockWithCoins(userData),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildOptionButton(
+                    icon: Icons.workspace_premium_rounded,
+                    title: 'Premium Subscription',
+                    subtitle: 'Access all courses without limits',
+                    onTap: () {
+                      Navigator.pop(context); // Chiude il bottom sheet delle opzioni
+                      Navigator.pop(context); // Torna al profilo
+                    },
+                  ),
+                ] else if (state == CourseState.unlocked) ...[
+                  _buildOptionButton(
+                    icon: Icons.play_circle_filled,
+                    title: 'Start Course',
+                    subtitle: 'Course is unlocked',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -157,7 +325,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                                     ),
                                   ),
                                   Text(
-                                    'Creatore del corso',
+                                    'Course Creator',
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.7),
                                       fontSize: 14,
@@ -188,7 +356,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Descrizione',
+                            'Description',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -217,7 +385,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Contenuto del corso',
+                            'Course Content',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -289,10 +457,19 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                         children: [
                           Expanded(
                             flex: 2,
-                            child: _buildStartButton(context),
+                            child: ValueListenableBuilder<CourseState>(
+                              valueListenable: _courseState,
+                              builder: (context, state, child) {
+                                return Stack(
+                                  children: [
+                                    // ... resto del contenuto ...
+                                    _buildStartButton(state),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                           
-                         
                         ],
                       ),
                     ],
@@ -322,9 +499,9 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         children: [
           _buildStat(Icons.star_rounded, '${widget.course.rating}', 'Rating'),
           _buildVerticalDivider(),
-          _buildStat(Icons.people_alt_rounded, '${widget.course.totalRatings}', 'Recensioni'),
+          _buildStat(Icons.people_alt_rounded, '${widget.course.totalRatings}', 'Reviews'),
           _buildVerticalDivider(),
-          _buildStat(Icons.stars_rounded, '${widget.course.cost}', 'Costo'),
+          _buildStat(Icons.stars_rounded, '${widget.course.cost}', 'Cost'),
         ],
       ),
     );
@@ -554,19 +731,19 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (widget.course.sources.isNotEmpty) ...[
-          _buildInfoSection('Fonti', widget.course.sources),
+          _buildInfoSection('Sources', widget.course.sources),
           const SizedBox(height: 24),
         ],
         if (widget.course.recommendedBooks.isNotEmpty) ...[
-          _buildInfoSection('Libri consigliati', widget.course.recommendedBooks),
+          _buildInfoSection('Recommended Books', widget.course.recommendedBooks),
           const SizedBox(height: 24),
         ],
         if (widget.course.recommendedPodcasts.isNotEmpty) ...[
-          _buildInfoSection('Podcast consigliati', widget.course.recommendedPodcasts),
+          _buildInfoSection('Recommended Podcasts', widget.course.recommendedPodcasts),
           const SizedBox(height: 24),
         ],
         if (widget.course.recommendedWebsites.isNotEmpty)
-          _buildInfoSection('Siti web consigliati', widget.course.recommendedWebsites),
+          _buildInfoSection('Recommended Websites', widget.course.recommendedWebsites),
       ],
     );
   }
@@ -650,75 +827,46 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     };
   }
 
-  Widget _buildStartButton(BuildContext context) {
-    return SizedBox(
-      height: 60,
-      child: ElevatedButton(
-        onPressed: () => _showStartCourseOptions(context),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.yellowAccent,
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+  Widget _buildStartButton(CourseState state) {
+    final buttonConfig = switch (state) {
+      CourseState.locked => _ButtonConfig(
+          text: 'Unlock Course',
+          onPressed: _showStartCourseOptions,
+        ),
+      CourseState.unlocked => _ButtonConfig(
+          text: 'Start Course',
+          onPressed: () => Navigator.pop(context),
+        ),
+      _ => _ButtonConfig(
+          text: 'Loading...',
+          onPressed: null,
+        ),
+    };
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: SizedBox(
+        height: 60,
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: buttonConfig.onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.yellowAccent,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 8,
           ),
-          elevation: 8,
-        ),
-        child: const Text(
-          'Start Course',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
+          child: Text(
+            buttonConfig.text,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-
-
-  void _showStartCourseOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Come vuoi iniziare il corso?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildOptionButton(
-              icon: Icons.stars_rounded,
-              title: 'Usa ${widget.course.cost} coins',
-              subtitle: 'Sblocca il corso usando i tuoi coins',
-              onTap: () {
-                // TODO: Implementa la logica per sbloccare il corso usando i coins
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildOptionButton(
-              icon: Icons.workspace_premium_rounded,
-              title: 'Abbonamento Premium',
-              subtitle: 'Accedi a tutti i corsi senza limiti',
-              onTap:() {
-                // TODO: Implementa la logica per sbloccare il corso usando l'abbonamento Premium 
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
         ),
       ),
     );
@@ -777,4 +925,14 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
       ),
     );
   }
-} 
+}
+
+// Enums e classi di supporto
+enum CourseState { loading, locked, unlocked, error }
+
+class _ButtonConfig {
+  final String text;
+  final VoidCallback? onPressed;
+  
+  const _ButtonConfig({required this.text, this.onPressed});
+}

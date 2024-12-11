@@ -25,6 +25,11 @@ class UserModel {
   final String? coverImageUrl;
   final List<String> followers;
   final List<String> following;
+  final List<String> subscriptions;
+  final double subscriptionPrice;
+  final String subscriptionDescription1;
+  final String subscriptionDescription2;
+  final String subscriptionDescription3;
 
   UserModel({
     required this.uid,
@@ -50,6 +55,11 @@ class UserModel {
     this.coverImageUrl,
     this.followers = const [],
     this.following = const [],
+    this.subscriptions = const [],
+    this.subscriptionPrice = 9.99,
+    this.subscriptionDescription1 = 'Full access to this user\'s content',
+    this.subscriptionDescription2 = 'Full access to this user\'s content',
+    this.subscriptionDescription3 = 'Full access to this user\'s content',
   }) ;
  
 
@@ -93,6 +103,11 @@ class UserModel {
       coverImageUrl: data['coverImageUrl'],
       followers: List<String>.from(data['followers'] ?? []),
       following: List<String>.from(data['following'] ?? []),
+      subscriptions: List<String>.from(data['subscriptions'] ?? []),
+      subscriptionPrice: (data['subscriptionPrice'] ?? 9.99).toDouble(),
+      subscriptionDescription1: data['subscriptionDescription1'] ?? 'Full access to this user\'s content',
+      subscriptionDescription2: data['subscriptionDescription2'] ?? 'Full access to this user\'s content',
+      subscriptionDescription3: data['subscriptionDescription3'] ?? 'Full access to this user\'s content',
     );
   }
 
@@ -122,6 +137,11 @@ class UserModel {
       'coverImageUrl': coverImageUrl,
       'followers': followers,
       'following': following,
+      'subscriptions': subscriptions,
+      'subscriptionPrice': subscriptionPrice,
+      'subscriptionDescription1': subscriptionDescription1,
+      'subscriptionDescription2': subscriptionDescription2,
+      'subscriptionDescription3': subscriptionDescription3,
     };
   }
 }

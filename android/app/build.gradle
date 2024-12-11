@@ -45,7 +45,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.justlearn"
+        applicationId = "com.justlearnapp.justlearnapp"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
