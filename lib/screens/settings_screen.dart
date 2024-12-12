@@ -1,4 +1,5 @@
 import 'package:Just_Learn/firebase_options.dart';
+import 'package:Just_Learn/models/course.dart';
 import 'package:Just_Learn/screens/NotificationsScreen.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -12,6 +13,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:Just_Learn/services/image_service.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatelessWidget {
   final UserModel? currentUser;
@@ -21,7 +24,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF121212),
+      backgroundColor: const Color(0xFF181819),
       appBar: AppBar(
         backgroundColor: const Color(0xFF121212),
         elevation: 0,
@@ -44,6 +47,8 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           children: [
             _buildWelcomeSection(),
+            if (currentUser?.role == 'teacher')
+              _buildTeacherDashboard(),
             const SizedBox(height: 20),
             _buildStreakSection(),
             const SizedBox(height: 20),
@@ -147,24 +152,26 @@ class SettingsScreen extends StatelessWidget {
                     return;
                   }
 
-                  try {
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(currentUser?.uid)
-                        .update({'role': 'teacher'});
-
+                  if (currentUser?.role == 'teacher') {
+                    // Se l'utente è già un insegnante, naviga al suo profilo
                     Navigator.pushNamed(
                       context,
                       '/profile',
                       arguments: currentUser,
                     );
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Errore: ${e.toString()}'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                  } else {
+                    // Se l'utente non è un insegnante, apri il link Calendly
+                    final Uri url = Uri.parse('https://calendly.com/ravasini-aziendale/become-a-teacher-on-justlearn');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Impossibile aprire il link'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 },
                 child: const Text(
@@ -576,5 +583,195 @@ class SettingsScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Widget _buildTeacherDashboard() {
+    if (currentUser?.role != 'teacher') return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header con stile simile a profile_screen
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E),
+              borderRadius: BorderRadius.circular(16),
+              image: DecorationImage(
+                image: NetworkImage(currentUser?.coverImageUrl ?? 'https://picsum.photos/375/200'),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.4),
+                  BlendMode.darken,
+                ),
+              ),
+            ),
+            child: Stack(
+              children: [
+                // Overlay gradient
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
+                ),
+                // Contenuto
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Dashboard Insegnante',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundImage: NetworkImage(
+                              currentUser?.profileImageUrl ?? 'https://picsum.photos/40/40',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            currentUser?.name ?? '',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Statistiche in stile card
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Row(
+              children: [
+                _buildStatCard(
+                  'Studenti',
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(currentUser?.uid)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      return Text(
+                        '${snapshot.data?['followers']?.length ?? 0}',
+                        style: const TextStyle(
+                          color: Colors.yellowAccent,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                  Icons.people,
+                  Colors.yellowAccent,
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  'Guadagno',
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('transactions')
+                        .where('teacherId', isEqualTo: currentUser?.uid)
+                        .where('date', isGreaterThan: DateTime.now().subtract(const Duration(days: 30)))
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final earnings = snapshot.data?.docs.fold<double>(
+                        0,
+                        (sum, doc) => sum + (doc.data() as Map<String, dynamic>)['amount'] as double,
+                      ) ?? 0;
+                      return Text(
+                        '€${earnings.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Colors.greenAccent,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      );
+                    },
+                  ),
+                  Icons.euro,
+                  Colors.greenAccent,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, Widget value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF282828),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 12),
+            value,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 14,
+                fontFamily: 'Montserrat',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTimestamp(Timestamp timestamp) {
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final diff = now.difference(date);
+
+    if (diff.inDays == 0) {
+      return DateFormat('HH:mm').format(date);
+    } else if (diff.inDays == 1) {
+      return 'Ieri';
+    } else {
+      return DateFormat('dd/MM').format(date);
+    }
   }
 }

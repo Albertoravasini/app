@@ -1,3 +1,6 @@
+import 'package:Just_Learn/models/certification.dart';
+import 'package:Just_Learn/models/experience.dart';
+import 'package:Just_Learn/models/review.dart';
 import 'package:Just_Learn/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +17,11 @@ import '../controllers/follow_controller.dart';
 import '../controllers/subscription_controller.dart';
 import '../widgets/private_chat_tab.dart';
 import '../controllers/profile_controller.dart';
+import '../widgets/about_tab.dart';
+import '../widgets/experience_manager.dart';
+import '../widgets/certification_manager.dart';
+import '../widgets/social_contacts_manager.dart';
+import '../widgets/review_manager.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -462,6 +470,141 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     });
   }
 
+  void _showExperienceManager() async {
+    final experiences = await _getExperiences();
+    if (!mounted) return;
+    
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Color(0xFF181819),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: ExperienceManager(
+          userId: widget.currentUser.uid,
+          experiences: experiences,
+        ),
+      ),
+    );
+  }
+
+  Future<List<Experience>> _getExperiences() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUser.uid)
+        .collection('experiences')
+        .orderBy('startDate', descending: true)
+        .get();
+
+    return snapshot.docs.map((doc) => Experience.fromFirestore(doc)).toList();
+  }
+
+  void _showCertificationManager() async {
+    final certifications = await _getCertifications();
+    if (!mounted) return;
+    
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Color(0xFF181819),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: CertificationManager(
+          userId: widget.currentUser.uid,
+          certifications: certifications,
+        ),
+      ),
+    );
+  }
+
+  void _showSocialManager() async {
+    final contacts = await _getSocialContacts();
+    if (!mounted) return;
+    
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Color(0xFF181819),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SocialContactsManager(
+          userId: widget.currentUser.uid,
+          contacts: contacts,
+        ),
+      ),
+    );
+  }
+
+  Future<List<SocialContact>> _getSocialContacts() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUser.uid)
+        .collection('contacts')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => SocialContact.fromMap(doc.data()))
+        .toList();
+  }
+
+  Future<List<Certification>> _getCertifications() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUser.uid)
+        .collection('certifications')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Certification.fromFirestore(doc))
+        .toList();
+  }
+
+  void _showReviewManager() async {
+    final reviews = await _getReviews();
+    if (!mounted) return;
+    
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: Color(0xFF181819),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: ReviewManager(
+          userId: widget.currentUser.uid,
+          reviews: reviews,
+        ),
+      ),
+    );
+  }
+
+  Future<List<Review>> _getReviews() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUser.uid)
+        .collection('reviews')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => Review.fromFirestore(doc))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isTeacher = widget.currentUser.role == 'teacher';
@@ -771,20 +914,60 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             // Rating stars
                             Row(
                               children: [
-                                ...List.generate(5, (index) => const Icon(
-                                  Icons.star,
-                                  color: Colors.yellow,
-                                  size: 18,
-                                )),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '26 reviews',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.65),
-                                    fontSize: 14,
-                                    fontFamily: 'Montserrat',
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(widget.currentUser.uid)
+                                      .collection('reviews')
+                                      .snapshots(),
+                                  builder: (context, snapshot) {
+                                    if (!snapshot.hasData) {
+                                      return Row(
+                                        children: [
+                                          ...List.generate(5, (index) => const Icon(
+                                            Icons.star,
+                                            color: Colors.yellowAccent,
+                                            size: 18,
+                                          )),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '0 reviews',
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.65),
+                                              fontSize: 14,
+                                              fontFamily: 'Montserrat',
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }
+
+                                    final reviews = snapshot.data!.docs;
+                                    final averageRating = reviews.isEmpty 
+                                        ? 0.0 
+                                        : reviews.map((doc) => doc['rating'] as num).reduce((a, b) => a + b) / reviews.length;
+
+                                    return Row(
+                                      children: [
+                                        ...List.generate(5, (index) => Icon(
+                                          index < averageRating.round() ? Icons.star : Icons.star_border,
+                                          color: Colors.yellowAccent,
+                                          size: 18,
+                                        )),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '${reviews.length} reviews',
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(0.65),
+                                            fontSize: 14,
+                                            fontFamily: 'Montserrat',
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -884,8 +1067,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       ),
                       tabs: const [
                         Tab(text: 'Feed'),
-                        Tab(text: 'Community'),
-                        Tab(text: 'Calendar'),
+                        Tab(text: 'Chat'),
+                        Tab(text: 'About'),
                       ],
                     ),
                   ),
@@ -900,10 +1083,13 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   isLoading: isLoading,
                 ),
                 PrivateChatTab(
-                  currentUser: FirebaseAuth.instance.currentUser!,
                   profileUser: widget.currentUser,
+                  currentUser: FirebaseAuth.instance.currentUser!,
                 ),
-                Container(), // Calendar tab
+                AboutTab(
+                  profileUser: widget.currentUser,
+                  currentUser: FirebaseAuth.instance.currentUser!,
+                ),
               ],
             ),
           ),
@@ -955,6 +1141,39 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                         setState(() {
                                           isEditing = true;
                                         });
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.work_outline, color: Colors.white),
+                                      title: const Text(
+                                        'Gestisci Esperienze',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _showExperienceManager();
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.verified, color: Colors.white),
+                                      title: const Text(
+                                        'Gestisci Certificazioni',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _showCertificationManager();
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.group, color: Colors.white),
+                                      title: const Text(
+                                        'Gestisci Social e Contatti',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        _showSocialManager();
                                       },
                                     ),
                                   ],

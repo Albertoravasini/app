@@ -30,6 +30,7 @@ class UserModel {
   final String subscriptionDescription1;
   final String subscriptionDescription2;
   final String subscriptionDescription3;
+  final String? location;
 
   UserModel({
     required this.uid,
@@ -60,6 +61,7 @@ class UserModel {
     this.subscriptionDescription1 = 'Full access to this user\'s content',
     this.subscriptionDescription2 = 'Full access to this user\'s content',
     this.subscriptionDescription3 = 'Full access to this user\'s content',
+    this.location,
   }) ;
  
 
@@ -108,6 +110,7 @@ class UserModel {
       subscriptionDescription1: data['subscriptionDescription1'] ?? 'Full access to this user\'s content',
       subscriptionDescription2: data['subscriptionDescription2'] ?? 'Full access to this user\'s content',
       subscriptionDescription3: data['subscriptionDescription3'] ?? 'Full access to this user\'s content',
+      location: data['location'],
     );
   }
 
@@ -142,6 +145,7 @@ class UserModel {
       'subscriptionDescription1': subscriptionDescription1,
       'subscriptionDescription2': subscriptionDescription2,
       'subscriptionDescription3': subscriptionDescription3,
+      'location': location,
     };
   }
 }
