@@ -1,3 +1,4 @@
+import 'package:Just_Learn/widgets/progress_bar.dart';
 import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
@@ -798,6 +799,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget>
 Widget build(BuildContext context) {
   return Stack(
     children: [
+      YoutubePlayer(controller: _controller),
+      
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: CustomProgressBar(
+          progress: _progress,
+        ),
+      ),
+      
       YoutubePlayerBuilder(
         player: YoutubePlayer(
           controller: _controller,

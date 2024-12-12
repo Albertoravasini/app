@@ -66,6 +66,8 @@ class _ShortsScreenState extends State<ShortsScreen> {
   int currentStepIndex = 0;
   Course? currentCourse;
   
+  final int _preloadDistance = 1; // Precarica solo 1 video prima e dopo
+  
   @override
   void initState() {
     super.initState();
@@ -345,9 +347,9 @@ Future<void> _saveProgress(String sectionTitle, int stepIndex) async {
 }
 
 void _cleanupControllers(int currentIndex) {
-  // Mantieni solo i controller necessari (corrente e adiacenti)
+  // Mantieni solo i controller nell'intervallo di preload
   for (int i = 0; i < _youtubeControllers.length; i++) {
-    if (i < currentIndex - 1 || i > currentIndex + 1) {
+    if (i < currentIndex - _preloadDistance || i > currentIndex + _preloadDistance) {
       if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
         _youtubeControllers[i].dispose();
         _youtubeControllers[i] = YoutubePlayerController(
@@ -355,6 +357,8 @@ void _cleanupControllers(int currentIndex) {
           flags: const YoutubePlayerFlags(
             autoPlay: false,
             mute: true,
+            hideThumbnail: true,
+            disableDragSeek: true,
           ),
         );
       }
@@ -745,47 +749,15 @@ void dispose() {
           : PageView.builder(
               controller: _pageController,
               scrollDirection: Axis.vertical,
-              physics: const PageScrollPhysics(),
+              physics: const TikTokScrollPhysics(),
               itemCount: allShortSteps.length,
               onPageChanged: (index) {
                 _onVideoChanged(index);
+                _cleanupControllers(index); // Pulisci i controller non necessari
               },
               itemBuilder: (context, index) {
-                _preloadAdjacentPages(index);
-                
-                final showQuestion = allShortSteps[index]['showQuestion'] ?? false;
-                return Container(
-                  key: ValueKey('page_${index}_${showQuestion}'),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onHorizontalDragStart: (_) => hasSwiped = false,
-                    onHorizontalDragUpdate: (details) {
-                      if (showQuestion) {
-                        // Disabilita lo swipe quando viene mostrata una domanda
-                        return;
-                      }
-                      if (details.delta.dx.abs() > details.delta.dy.abs()) {
-                        if (!showQuestion) {
-                          if (details.delta.dx > 10 && !hasSwiped) {
-                            setState(() {}); 
-                            hasSwiped = true;
-                          }
-                        } else {
-                          if (details.delta.dx > 10 && !hasSwiped) {
-                            _onPreviousPressed(index);
-                            hasSwiped = true;
-                          } else if (details.delta.dx < -10 && !hasSwiped) {
-                            _onContinuePressed(index);
-                            hasSwiped = true;
-                          }
-                        }
-                      }
-                    },
-                    onHorizontalDragEnd: (_) => hasSwiped = false,
-                    child: showQuestion
-                        ? _buildQuestionCard(allShortSteps[index]['step'], allShortSteps[index]['level'])
-                        : _buildVideoPlayer(index),
-                  ),
+                return RepaintBoundary( // Aggiungi RepaintBoundary per ottimizzare il rendering
+                  child: _buildPageContent(index),
                 );
               },
             ),
@@ -793,32 +765,31 @@ void dispose() {
   }
 
   void _preloadAdjacentPages(int currentIndex) {
-    // Pre-carica il video successivo
+    // Precarica solo i video immediatamente adiacenti
     if (currentIndex < allShortSteps.length - 1) {
       final nextStep = allShortSteps[currentIndex + 1]['step'] as LevelStep;
       if (nextStep.type == 'video') {
-        _ensureControllerExists(currentIndex + 1);
+        _ensureControllerExists(currentIndex + 1, mute: true);
       }
     }
     
-    // Pre-carica il video precedente
     if (currentIndex > 0) {
       final prevStep = allShortSteps[currentIndex - 1]['step'] as LevelStep;
       if (prevStep.type == 'video') {
-        _ensureControllerExists(currentIndex - 1);
+        _ensureControllerExists(currentIndex - 1, mute: true);
       }
     }
   }
 
-  void _ensureControllerExists(int index) {
+  void _ensureControllerExists(int index, {bool mute = false}) {
     if (index >= _youtubeControllers.length) {
       final videoId = (allShortSteps[index]['step'] as LevelStep).content;
       _youtubeControllers.add(
         YoutubePlayerController(
           initialVideoId: videoId,
-          flags: const YoutubePlayerFlags(
+          flags: YoutubePlayerFlags(
             autoPlay: false,
-            mute: true,
+            mute: mute,
             disableDragSeek: true,
             hideControls: true,
             hideThumbnail: true,
@@ -827,5 +798,44 @@ void dispose() {
         ),
       );
     }
+  }
+
+  Widget _buildPageContent(int index) {
+    final currentStep = allShortSteps[index]['step'] as LevelStep;
+    
+    if (currentStep.type == 'transition') {
+      return _buildTransitionScreen(currentStep);
+    }
+    
+    if (currentStep.type == 'question' && allShortSteps[index]['showQuestion']) {
+      return _buildQuestionCard(currentStep, allShortSteps[index]['level']);
+    }
+    
+    return _buildVideoPlayer(index);
+  }
+
+  Widget _buildTransitionScreen(LevelStep step) {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle_outline, color: Colors.white, size: 64),
+            const SizedBox(height: 24),
+            Text(
+              step.content,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontFamily: 'Montserrat',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
