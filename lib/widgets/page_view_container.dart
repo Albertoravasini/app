@@ -8,6 +8,8 @@ import '../screens/notes_screen.dart';
 import '../widgets/video_player_widget.dart';
 import '../models/level.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import '../widgets/course_video/course_info_overlay.dart';
+import '../screens/comments_screen.dart';
 
 class PageViewContainer extends StatefulWidget {
   final String videoId;
@@ -65,23 +67,21 @@ class _PageViewContainerState extends State<PageViewContainer> {
         ),
         VideoPlayerWidget(
           videoId: widget.videoId,
+          course: widget.course,
+          onShowArticles: (_) => _pageController.animateToPage(0, duration: Duration(milliseconds: 300), curve: Curves.easeInOut),
+          onShowNotes: (_) => _pageController.animateToPage(2, duration: Duration(milliseconds: 300), curve: Curves.easeInOut),
+          openComments: (_) => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(25.0))
+            ),
+            builder: (context) => CommentsScreen(videoId: widget.videoId),
+          ),
+          isInCourse: widget.isInCourse,
+          onStartCourse: widget.onStartCourse,
           onCoinsUpdate: widget.onCoinsUpdate,
           topic: widget.topic,
-          onShowQuestion: () {},
-          questionStep: widget.questionStep,
-          onShowArticles: () => _pageController.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          ),
-          onShowNotes: () => _pageController.animateToPage(
-            2,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-          ),
-          course: widget.course,
-          onStartCourse: widget.onStartCourse,
-          isInCourse: widget.isInCourse,
           currentSection: widget.currentSection,
         ),
         NotesScreen(),

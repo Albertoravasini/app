@@ -67,6 +67,7 @@ class _ShortsScreenState extends State<ShortsScreen> {
   Course? currentCourse;
   
   final int _preloadDistance = 1; // Precarica solo 1 video prima e dopo
+  final int _cacheExtent = 1; // Mantiene in memoria solo 1 pagina prima e dopo
   
   @override
   void initState() {
@@ -278,30 +279,21 @@ void _onVideoChanged(int index) {
 }
 
 void _manageAdjacentControllers(int currentIndex) {
-  // Gestisci solo i controller necessari (corrente e adiacenti)
+  // Mantieni solo 3 controller attivi alla volta (precedente, corrente, successivo)
+  final keepIndices = {currentIndex - 1, currentIndex, currentIndex + 1};
+  
   for (int i = 0; i < _youtubeControllers.length; i++) {
-    if (i == currentIndex) {
-      // Video corrente: riproduci
-      _youtubeControllers[i].play();
-    } else if (i == currentIndex + 1) {
-      // Prossimo video: precarica in muto
-      _youtubeControllers[i].mute();
-      _youtubeControllers[i].pause();
-    } else if (i == currentIndex - 1) {
-      // Video precedente: pausa
-      _youtubeControllers[i].pause();
-    } else {
-      // Altri video: disponi
-      if (_youtubeControllers[i].initialVideoId.isNotEmpty) {
-        _youtubeControllers[i].dispose();
-        _youtubeControllers[i] = YoutubePlayerController(
-          initialVideoId: '',
-          flags: const YoutubePlayerFlags(
-            autoPlay: false,
-            mute: true,
-          ),
-        );
-      }
+    if (!keepIndices.contains(i)) {
+      _youtubeControllers[i].dispose();
+      _youtubeControllers[i] = YoutubePlayerController(
+        initialVideoId: '',
+        flags: const YoutubePlayerFlags(
+          autoPlay: false,
+          mute: true,
+          hideThumbnail: true,
+          disableDragSeek: true,
+        ),
+      );
     }
   }
 }
@@ -746,20 +738,26 @@ void dispose() {
     return Scaffold(
       body: allShortSteps.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : PageView.builder(
+          : PageView.custom(
               controller: _pageController,
               scrollDirection: Axis.vertical,
               physics: const TikTokScrollPhysics(),
-              itemCount: allShortSteps.length,
-              onPageChanged: (index) {
-                _onVideoChanged(index);
-                _cleanupControllers(index); // Pulisci i controller non necessari
-              },
-              itemBuilder: (context, index) {
-                return RepaintBoundary( // Aggiungi RepaintBoundary per ottimizzare il rendering
-                  child: _buildPageContent(index),
-                );
-              },
+              childrenDelegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index < 0 || index >= allShortSteps.length) return null;
+                  return RepaintBoundary(
+                    child: _buildPageContent(index),
+                  );
+                },
+                childCount: allShortSteps.length,
+                findChildIndexCallback: (Key key) {
+                  if (key is ValueKey<String>) {
+                    // Implementa la logica per trovare l'indice del video
+                    return int.tryParse(key.value.split('_')[1]);
+                  }
+                  return null;
+                },
+              ),
             ),
     );
   }
