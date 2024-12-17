@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class AboutTab extends StatefulWidget {
   final UserModel profileUser;
@@ -247,7 +248,7 @@ class _AboutTabState extends State<AboutTab> {
         children: [
           const _SectionTitle(
             icon: Icons.link,
-            title: 'Social e Contatti',
+            title: 'Socials and Contacts',
           ),
           const SizedBox(height: 16),
           FutureBuilder<List<SocialContact>>(
@@ -1165,7 +1166,9 @@ class _ReviewItem extends StatelessWidget {
                     : null,
                 child: userImage == null
                     ? Text(
-                        userName[0].toUpperCase(),
+                        userName.isNotEmpty 
+                            ? userName[0].toUpperCase()
+                            : '?',  // Fallback per username vuoto
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1238,15 +1241,23 @@ class _SocialContactItem extends StatelessWidget {
   });
 
   IconData get _getIcon {
-    switch (type) {
-      case 'LinkedIn': return Icons.code;
-      case 'GitHub': return Icons.code;
-      case 'Twitter': return Icons.code;
-      case 'Instagram': return Icons.photo_camera;
-      case 'Website': return Icons.language;
-      case 'Email': return Icons.email;
-      case 'Phone': return Icons.phone;
-      default: return Icons.link;
+    switch (type.toLowerCase()) {
+      case 'linkedin':
+        return FontAwesomeIcons.linkedin;
+      case 'github':
+        return FontAwesomeIcons.github;
+      case 'twitter':
+        return FontAwesomeIcons.twitter;
+      case 'instagram':
+        return FontAwesomeIcons.instagram;
+      case 'website':
+        return Icons.language;
+      case 'email':
+        return Icons.email;
+      case 'phone':
+        return Icons.phone;
+      default:
+        return Icons.link;
     }
   }
 

@@ -81,6 +81,18 @@ class UserModel {
     var notificationsFromData = data['notifications'] as List<dynamic>? ?? [];
     List<Notification> notifications = notificationsFromData.map((notificationData) => Notification.fromMap(notificationData)).toList();
 
+    Map<String, int> currentStepsMap = {};
+    final currentStepsData = data['currentSteps'] as Map<String, dynamic>? ?? {};
+    currentStepsData.forEach((key, value) {
+      if (value is int) {
+        currentStepsMap[key] = value;
+      } else if (value is num) {
+        currentStepsMap[key] = value.toInt();
+      } else {
+        currentStepsMap[key] = 0; // valore di default
+      }
+    });
+
     return UserModel(
       uid: data['uid'] ?? '',
       email: data['email'] ?? '',
@@ -88,7 +100,7 @@ class UserModel {
       topics: List<String>.from(data['topics'] ?? []),
       WatchedVideos: WatchedVideos,
       answeredQuestions: answeredQuestions,
-      currentSteps: Map<String, int>.from(data['currentSteps'] ?? {}), // Carica lo step corrente
+      currentSteps: currentStepsMap,
       completedSections: List<String>.from(data['completedSections'] ?? []), // Carica le sezioni completate
       consecutiveDays: data['consecutiveDays'] ?? 0,
       lastAccess: data['lastAccess'] != null ? DateTime.parse(data['lastAccess']) : DateTime.now(),

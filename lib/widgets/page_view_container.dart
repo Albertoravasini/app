@@ -7,12 +7,12 @@ import '../screens/Articles_screen.dart';
 import '../screens/notes_screen.dart';
 import '../widgets/video_player_widget.dart';
 import '../models/level.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import '../widgets/course_video/course_info_overlay.dart';
 import '../screens/comments_screen.dart';
 
 class PageViewContainer extends StatefulWidget {
   final String videoId;
+  final String videoUrl;
   final Function(int) onCoinsUpdate;
   final String topic;
   final LevelStep? questionStep;
@@ -26,6 +26,7 @@ class PageViewContainer extends StatefulWidget {
   const PageViewContainer({
     Key? key,
     required this.videoId,
+    required this.videoUrl,
     required this.onCoinsUpdate,
     required this.topic,
     required this.videoTitle,
@@ -66,7 +67,7 @@ class _PageViewContainerState extends State<PageViewContainer> {
           levelId: widget.videoId,
         ),
         VideoPlayerWidget(
-          videoId: widget.videoId,
+          videoUrl: widget.videoUrl,
           course: widget.course,
           onShowArticles: (_) => _pageController.animateToPage(0, duration: Duration(milliseconds: 300), curve: Curves.easeInOut),
           onShowNotes: (_) => _pageController.animateToPage(2, duration: Duration(milliseconds: 300), curve: Curves.easeInOut),
@@ -83,6 +84,7 @@ class _PageViewContainerState extends State<PageViewContainer> {
           onCoinsUpdate: widget.onCoinsUpdate,
           topic: widget.topic,
           currentSection: widget.currentSection,
+          videoTitle: widget.videoTitle,
         ),
         NotesScreen(),
       ],

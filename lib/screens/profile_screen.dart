@@ -4,6 +4,7 @@ import 'package:Just_Learn/models/review.dart';
 import 'package:Just_Learn/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -57,6 +58,41 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     _loadUserCourses();
     _checkFollowStatus();
     _checkSubscriptionStatus();
+    
+    // Traccia l'arrivo nella schermata profilo
+    Posthog().screen(
+      screenName: 'profile_screen',
+      properties: {
+        'profile_user_id': widget.currentUser.uid,
+        'is_own_profile': widget.currentUser.uid == FirebaseAuth.instance.currentUser?.uid,
+      },
+    );
+
+    // Ascolta i cambi di tab
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        String tabName = '';
+        switch (_tabController.index) {
+          case 0:
+            tabName = 'feed';
+            break;
+          case 1:
+            tabName = 'about';
+            break;
+          case 2:
+            tabName = 'chat';
+            break;
+        }
+
+        Posthog().capture(
+          eventName: 'profile_tab_selected',
+          properties: {
+            'tab_name': tabName,
+            'profile_user_id': widget.currentUser.uid,
+          },
+        );
+      }
+    });
   }
 
   Future<void> _loadUserCourses() async {
@@ -389,37 +425,85 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       final currentUser = FirebaseAuth.instance.currentUser;
                       if (currentUser == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Devi effettuare l\'accesso per iscriverti')),
+                          const SnackBar(content: Text('You must be logged in to subscribe')),
                         );
                         return;
                       }
 
                       try {
-                        // Implementa la logica di sottoscrizione
-                        await _subscriptionController.subscribe(
-                          subscriberId: currentUser.uid,
-                          creatorId: widget.currentUser.uid,
-                        );
-                        
-                        // Aggiorna lo stato di iscrizione nel database
-                        await FirebaseFirestore.instance
-                            .collection('users')
-                            .doc(currentUser.uid)
-                            .update({
-                          'subscriptions': FieldValue.arrayUnion([widget.currentUser.uid]),
-                        });
+                        if (_isSubscribed) {
+                          // Logica di disiscrizione
+                          await _subscriptionController.unsubscribe(
+                            subscriberId: currentUser.uid,
+                            creatorId: widget.currentUser.uid,
+                          );
+                          
+                          // Rimuovi la subscription dal database
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(currentUser.uid)
+                              .update({
+                            'subscriptions': FieldValue.arrayRemove([widget.currentUser.uid]),
+                          });
 
-                        setState(() {
-                          _isSubscribed = true;
-                        });
+                          // Traccia la cancellazione con PostHog
+                          Posthog().capture(
+                            eventName: 'subscription_cancelled',
+                            properties: {
+                              'creator_id': widget.currentUser.uid,
+                              'subscriber_id': currentUser.uid,
+                              'subscription_price': widget.currentUser.subscriptionPrice,
+                            },
+                          );
 
-                        Navigator.pop(context); // Chiudi il modal
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Iscrizione effettuata con successo!')),
-                        );
+                          setState(() {
+                            _isSubscribed = false;
+                          });
+
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Subscription cancelled')),
+                          );
+                        } else {
+                          // Logica di iscrizione esistente
+                          await _subscriptionController.subscribe(
+                            subscriberId: currentUser.uid,
+                            creatorId: widget.currentUser.uid,
+                          );
+                          
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(currentUser.uid)
+                              .update({
+                            'subscriptions': FieldValue.arrayUnion([widget.currentUser.uid]),
+                          });
+
+                          Posthog().capture(
+                            eventName: 'subscription_created',
+                            properties: {
+                              'creator_id': widget.currentUser.uid,
+                              'subscriber_id': currentUser.uid,
+                              'subscription_price': widget.currentUser.subscriptionPrice,
+                              'subscription_benefits': [
+                                widget.currentUser.subscriptionDescription1,
+                                widget.currentUser.subscriptionDescription2,
+                                widget.currentUser.subscriptionDescription3,
+                              ],
+                            },
+                          );
+
+                          setState(() {
+                            _isSubscribed = true;
+                          });
+
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Subscription successful!')),
+                          );
+                        }
                       } catch (e) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Errore durante l\'iscrizione: $e')),
+                          SnackBar(content: Text('Error: $e')),
                         );
                       }
                     },

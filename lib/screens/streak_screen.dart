@@ -326,7 +326,7 @@ class _StreakScreenState extends State<StreakScreen> with TickerProviderStateMix
           const SizedBox(width: 8),
           // Testo con stile coerente
           Text(
-            'Top 10% degli utenti',
+            'Top 10% of users',
             style: TextStyle(
               color: Colors.yellowAccent.withOpacity(0.9),
               fontSize: 14,
@@ -530,14 +530,14 @@ class _StreakScreenState extends State<StreakScreen> with TickerProviderStateMix
                         ),
                         if (bonusCoins > 0)
                           Text(
-                            'Include bonus traguardo: +$bonusCoins',
+                            'Includes milestone bonus: +$bonusCoins',
                             style: TextStyle(
                               color: Colors.yellowAccent.withOpacity(0.7),
                               fontSize: 14,
                             ),
                           ),
                         Text(
-                          'Bonus streak x${widget.consecutiveDays}',
+                          'Streak bonus x${widget.consecutiveDays}',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 14,
@@ -610,7 +610,7 @@ class _StreakScreenState extends State<StreakScreen> with TickerProviderStateMix
                               Icon(Icons.celebration_rounded, size: 24),
                               SizedBox(width: 8),
                               Text(
-                                'Raccogli',
+                                'Collect',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -687,7 +687,7 @@ Widget _buildMilestonesSection() {
       children: [
         const SizedBox(height: 32),
         const Text(
-          'Prossimi Traguardi',
+          'Next Milestones',
           style: TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -786,7 +786,7 @@ Widget _buildMilestoneRow({
               ),
               const SizedBox(width: 12),
               Text(
-                '$days giorni',
+                '$days days',
                 style: TextStyle(
                   color: isCompleted ? Colors.yellowAccent : Colors.white,
                   fontSize: 16,
@@ -860,7 +860,7 @@ Widget _buildMilestoneRow({
           if (isActive && daysLeft > 0) ...[
             const SizedBox(width: 12),
             Text(
-              '$daysLeft giorni',
+              '$daysLeft days',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.5),
                 fontSize: 12,
@@ -884,14 +884,14 @@ Widget _buildMilestoneRow({
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildStatItem('Miglior Streak', '15 giorni', Icons.emoji_events_rounded),
+          _buildStatItem('Best Streak', '15 days', Icons.emoji_events_rounded),
           Container(
             height: 24,
             width: 1,
             margin: EdgeInsets.symmetric(horizontal: 16),
             color: Colors.white.withOpacity(0.1),
           ),
-          _buildStatItem('Coins Totali', '${widget.coins}', Icons.monetization_on_rounded),
+          _buildStatItem('Total Coins', '${widget.coins}', Icons.monetization_on_rounded),
         ],
       ),
     );

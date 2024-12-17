@@ -144,7 +144,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
       setState(() {
         _courseState.value = CourseState.unlocked;
       });
-      _showSuccess('Corso disponibile con la tua subscription');
+      _showSuccess('Course available with your subscription');
       return;
     }
 

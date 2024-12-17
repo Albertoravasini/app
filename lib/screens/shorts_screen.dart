@@ -69,6 +69,8 @@ class _ShortsScreenState extends State<ShortsScreen> {
   final int _preloadDistance = 1; // Precarica solo 1 video prima e dopo
   final int _cacheExtent = 1; // Mantiene in memoria solo 1 pagina prima e dopo
   
+  int scrollCount = 0;
+  
   @override
   void initState() {
     super.initState();
@@ -304,16 +306,7 @@ void _handleVideoAnalytics(int index) {
   final user = FirebaseAuth.instance.currentUser;
   
   if (user != null) {
-    Posthog().capture(
-      eventName: 'video_play',
-      properties: {
-        'video_id': videoId,
-        'video_title': videoTitle,
-        'topic': widget.selectedTopic ?? 'General',
-        'user_id': user.uid,
-        'timestamp': DateTime.now().toIso8601String(),
-      },
-    );
+    
   }
 
   // Gestisci il progresso del corso se necessario
@@ -470,6 +463,7 @@ void dispose() {
     return PageViewContainer(
       key: ValueKey('video_$index'),
       videoId: videoId,
+      videoUrl: (allShortSteps[index]['step'] as LevelStep).videoUrl ?? '',
       onCoinsUpdate: widget.onCoinsUpdate,
       topic: level.topic,
       questionStep: null,
@@ -758,6 +752,18 @@ void dispose() {
                   return null;
                 },
               ),
+              onPageChanged: (index) {
+                scrollCount++;
+                
+                Posthog().capture(
+                  eventName: 'short_scroll',
+                  properties: {
+                    'scroll_count': scrollCount,
+                    'course_id': currentCourse?.id ?? 'no_course',
+                    'video_index': index,
+                  },
+                );
+              },
             ),
     );
   }

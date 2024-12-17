@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 class PrivateChatTab extends StatefulWidget {
   final UserModel profileUser;
   final User currentUser;
@@ -97,18 +99,25 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.message_outlined,
-                  size: 64,
-                  color: Colors.white.withOpacity(0.3),
+                SvgPicture.asset(
+                  'assets/empty_chat.svg',
+                  width: 200,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Non hai ancora messaggi',
+                  'No messages yet',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 16,
-                    fontFamily: 'Montserrat',
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Start a conversation!',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 14,
                   ),
                 ),
               ],
@@ -525,15 +534,11 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                 Expanded(
                   child: TextField(
                     controller: _messageController,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Montserrat',
-                    ),
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Scrivi un messaggio...',
+                      hintText: 'Type a message...',
                       hintStyle: TextStyle(
                         color: Colors.white.withOpacity(0.5),
-                        fontFamily: 'Montserrat',
                       ),
                       filled: true,
                       fillColor: const Color(0xFF282828),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/experience.dart';
+import 'package:intl/intl.dart';
 
 class ExperienceManager extends StatefulWidget {
   final String userId;
@@ -59,54 +60,125 @@ class _ExperienceManagerState extends State<ExperienceManager> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF282828),
-        title: const Text('Aggiungi Esperienza', style: TextStyle(color: Colors.white)),
-        content: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(labelText: 'Titolo'),
-                style: const TextStyle(color: Colors.white),
-                validator: (v) => v?.isEmpty ?? true ? 'Richiesto' : null,
-              ),
-              TextFormField(
-                controller: _companyController,
-                decoration: const InputDecoration(labelText: 'Azienda'),
-                style: const TextStyle(color: Colors.white),
-                validator: (v) => v?.isEmpty ?? true ? 'Richiesto' : null,
-              ),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(labelText: 'Descrizione'),
-                style: const TextStyle(color: Colors.white),
-                maxLines: 3,
-              ),
-              // Date pickers...
-            ],
+        title: const Text('Add Experience', style: TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                  style: const TextStyle(color: Colors.white),
+                  validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                ),
+                TextFormField(
+                  controller: _companyController,
+                  decoration: const InputDecoration(labelText: 'Company'),
+                  style: const TextStyle(color: Colors.white),
+                  validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                ),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 16),
+                // Start Date Picker
+                ListTile(
+                  title: Text(
+                    'Start Date: ${_startDate != null ? DateFormat('MMM yyyy').format(_startDate!) : 'Select date'}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  trailing: const Icon(Icons.calendar_today, color: Colors.white),
+                  onTap: () => _selectDate(context, true),
+                ),
+                // End Date Picker
+                ListTile(
+                  title: Text(
+                    'End Date: ${_endDate != null ? DateFormat('MMM yyyy').format(_endDate!) : 'Present'}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  trailing: const Icon(Icons.calendar_today, color: Colors.white),
+                  onTap: () => _selectDate(context, false),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Annulla'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: _saveExperience,
-            child: const Text('Salva'),
+            child: const Text('Save'),
           ),
         ],
       ),
     );
   }
 
+  Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: isStartDate ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now()),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.yellowAccent,
+              onPrimary: Colors.black,
+              surface: Color(0xFF282828),
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: const Color(0xFF282828),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        if (isStartDate) {
+          _startDate = picked;
+          // Reset end date if it's before start date
+          if (_endDate != null && _endDate!.isBefore(_startDate!)) {
+            _endDate = null;
+          }
+        } else {
+          // Only allow end date after start date
+          if (_startDate != null && picked.isAfter(_startDate!)) {
+            _endDate = picked;
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('End date must be after start date')),
+            );
+          }
+        }
+      });
+    }
+  }
+
   void _saveExperience() async {
     if (_formKey.currentState?.validate() ?? false) {
+      if (_startDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a start date')),
+        );
+        return;
+      }
+
       final experience = Experience(
         title: _titleController.text,
         company: _companyController.text,
-        startDate: _startDate ?? DateTime.now(),
+        startDate: _startDate!,
         endDate: _endDate,
         description: _descriptionController.text,
       );

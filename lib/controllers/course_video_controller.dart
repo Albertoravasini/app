@@ -75,20 +75,17 @@ class CourseVideoController {
       
     } on InsufficientCoinsException {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Non hai abbastanza coins'))
+        const SnackBar(content: Text('You dont have enough coins'))
       );
     } catch (e) {
       print('Error unlocking course: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Si è verificato un errore'))
+        const SnackBar(content: Text('An error occurred'))
       );
     }
   }
 
-  Future<void> handleSubscribe(BuildContext context) async {
-    videoManager.pauseCurrentVideo();
-    // ... implementazione della navigazione al profilo
-  }
+
 
   bool get showUnlockOptions => onUnlockOptionsChanged(true);
 
@@ -115,7 +112,6 @@ class CourseVideoController {
       ),
     );
 
-    videoManager.playCurrentVideo();
   }
 
   Future<bool> hasSubscription(String authorId) async {

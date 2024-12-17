@@ -442,9 +442,6 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showDeleteAccountDialog(BuildContext context) {
-    final TextEditingController emailController = TextEditingController();
-    final TextEditingController passwordController = TextEditingController();
-
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -468,45 +465,12 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'This action cannot be undone. Please enter your credentials to confirm.',
+                  'Are you sure you want to delete your account? This action cannot be undone.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey,
                   ),
                   textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: emailController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Email',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF2A2A2A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon: const Icon(Icons.email, color: Colors.grey),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Password',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF2A2A2A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    prefixIcon: const Icon(Icons.lock, color: Colors.grey),
-                  ),
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -526,31 +490,21 @@ class SettingsScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () async {
                           try {
-                            // Riautenticare l'utente
                             User? user = FirebaseAuth.instance.currentUser;
-                            AuthCredential credential = EmailAuthProvider.credential(
-                              email: emailController.text.trim(),
-                              password: passwordController.text.trim(),
-                            );
-                            await user?.reauthenticateWithCredential(credential);
                             
-                            // Eliminare l'account
+                            // Elimina l'account e i dati
                             await user?.delete();
-                            
-                            // Eliminare i dati dell'utente da Firestore
                             await FirebaseFirestore.instance
                                 .collection('users')
                                 .doc(user?.uid)
                                 .delete();
                             
-                            // Reindirizzare alla schermata di login
                             Navigator.pushAndRemoveUntil(
                               context,
                               MaterialPageRoute(builder: (context) => const LoginScreen()),
                               (Route<dynamic> route) => false,
                             );
                           } catch (e) {
-                            // Mostrare un messaggio di errore
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(

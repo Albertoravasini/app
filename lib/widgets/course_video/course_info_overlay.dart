@@ -7,6 +7,8 @@ import 'package:Just_Learn/models/course.dart';
 import 'package:Just_Learn/controllers/course_video_controller.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:Just_Learn/screens/profile_screen.dart';
 
 class CourseInfoOverlay extends StatefulWidget {
   final Course? course;
@@ -187,6 +189,16 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
                 if (userData.unlockedCourses.contains(widget.course!.id)) {
                   widget.controller.onStartCourse(widget.course, null);
                 } else {
+                  Posthog().capture(
+                    eventName: 'initial_subscribe_click',
+                    properties: {
+                      'course_id': widget.course!.id,
+                      'course_title': widget.course!.title,
+                      'author_id': widget.course!.authorId,
+                      'author_name': widget.course!.authorName,
+                      'video_title': widget.videoTitle,
+                    },
+                  );
                   setState(() {
                     _showUnlockOptions = true;
                   });
@@ -199,8 +211,36 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
     }
   }
 
-  void _handleSubscribe() {
-    widget.controller.navigateToAuthorProfile(context);
+  Future<void> _handleSubscribe() async {
+    print('DEBUG: Tentativo di mettere in pausa il video prima della navigazione');
+    
+    try {
+      widget.controller.videoManager.pauseCurrentVideo();
+      print('DEBUG: Video messo in pausa con successo');
+    } catch (e) {
+      print('ERROR: Errore durante la pausa del video: $e');
+    }
+    
+    print('DEBUG: Recupero dati utente da Firestore');
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.course?.authorId)
+        .get();
+
+    if (!userDoc.exists || !mounted) {
+      print('DEBUG: Documento utente non trovato o widget non mounted');
+      return;
+    }
+
+    final author = UserModel.fromMap(userDoc.data()!);
+    print('DEBUG: Navigazione verso ProfileScreen');
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(currentUser: author),
+      ),
+    );
   }
 
   Future<void> _handleUnlockCourse() async {
@@ -213,6 +253,20 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
         final userData = UserModel.fromMap(doc.data()!);
         
         if (userData.coins >= widget.course!.cost) {
+          Posthog().capture(
+            eventName: 'unlock_with_coins_click',
+            properties: {
+              'course_id': widget.course!.id,
+              'course_title': widget.course!.title,
+              'author_id': widget.course!.authorId,
+              'author_name': widget.course!.authorName,
+              'video_title': widget.videoTitle,
+              'unlock_option': 'coins',
+              'coins_cost': widget.course!.cost,
+              'user_coins_before': userData.coins,
+            },
+          );
+
           await docRef.update({
             'coins': userData.coins - widget.course!.cost,
             'unlockedCourses': [...userData.unlockedCourses, widget.course!.id],
@@ -234,6 +288,38 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
     }
   }
 
+  Future<void> _handleAuthorTap() async {
+    print('DEBUG: Tentativo di mettere in pausa il video (tap autore)');
+    
+    try {
+      widget.controller.videoManager.pauseCurrentVideo();
+      print('DEBUG: Video messo in pausa con successo (tap autore)');
+    } catch (e) {
+      print('ERROR: Errore durante la pausa del video (tap autore): $e');
+    }
+    
+    print('DEBUG: Recupero dati utente da Firestore (tap autore)');
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.course?.authorId)
+        .get();
+
+    if (!userDoc.exists || !mounted) {
+      print('DEBUG: Documento utente non trovato o widget non mounted (tap autore)');
+      return;
+    }
+
+    final author = UserModel.fromMap(userDoc.data()!);
+    print('DEBUG: Navigazione verso ProfileScreen (tap autore)');
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(currentUser: author),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -252,6 +338,8 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
                 child: Text(
                   widget.videoTitle,
                   textAlign: TextAlign.left,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -281,14 +369,11 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
                           ),
                         );
                       } else {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => TopicSelectionSheet(
-                            allTopics: widget.allTopics,
-                            selectedTopic: widget.topic,
-                            onSelectTopic: widget.onTopicChanged!,
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Start a course first to select a section'),
+                            duration: Duration(seconds: 2),
+                            backgroundColor: Colors.white
                           ),
                         );
                       }
@@ -385,7 +470,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               GestureDetector(
-                onTap: () => widget.controller.navigateToAuthorProfile(context),
+                onTap: () => _handleAuthorTap(),
                 child: Row(
                   children: [
                     Container(
