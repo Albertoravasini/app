@@ -124,7 +124,7 @@ class NotificationService {
       print('Aggiornamento ultimo accesso per uid: $uid');
       print('Token FCM: ${fcmToken.substring(0, 10)}...'); // Mostra solo i primi 10 caratteri per sicurezza
       
-      final url = Uri.parse('http://167.99.131.91:3000/update_last_access');  // Usa l'IP corretto del tuo server
+      final url = Uri.parse('http://localhost:3000/update_last_access');  // Usa l'IP corretto del tuo server
       
       final requestBody = {
         'uid': uid,
