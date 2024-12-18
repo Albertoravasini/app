@@ -10,29 +10,52 @@ const admin = require('firebase-admin');
 const { getNextNotificationDelay } = require('./utils/notification_utils');
 
 class NotificationService {
+  constructor() {
+    this.TIME_ZONE = 'America/New_York';
+    this.TIME_FORMAT = {
+      timeZone: 'America/New_York',
+      hour12: true,
+      hour: 'numeric',
+      minute: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric'
+    };
+  }
+
   async scheduleNotification(token, title, body, delay) {
     try {
-      // Calcola l'orario effettivo di invio
-      const scheduledTime = new Date(Date.now() + delay);
-      console.log(`Programmazione notifica:
-      - Orario attuale: ${new Date().toLocaleString('it-IT')}
-      - Delay: ${delay / (1000 * 60 * 60)} ore
-      - Orario previsto: ${scheduledTime.toLocaleString('it-IT')}`);
+      const EST_OFFSET = -5; // Fuso orario EST (New York)
+      
+      const currentTimeEST = new Date(Date.now() + (EST_OFFSET * 60 * 60 * 1000));
+      const scheduledTimeEST = new Date(Date.now() + delay + (EST_OFFSET * 60 * 60 * 1000));
+      
+      console.log(`Current time:
+      - EST: ${currentTimeEST.toLocaleString('en-US', this.TIME_FORMAT)}`);
 
-      // Usa l'ora del server come base e aggiungi 1 ora (assumendo Italia)
-      const userTime = new Date(scheduledTime.getTime() + (1 * 60 * 60 * 1000)); // UTC+1 per Italia
-      const userHours = userTime.getHours();
-
-      // Evita le notifiche tra le 22:00 e le 08:00
-      if (userHours >= 22 || userHours < 8) {
-        const nextMorning = new Date(userTime);
+      // Controlla se l'orario programmato è tra le 10:00 PM e le 8:00 AM EST
+      const scheduledHour = scheduledTimeEST.getHours();
+      
+      if (scheduledHour >= 22 || scheduledHour < 8) {
+        // Calcola le 8:00 AM EST del giorno appropriato
+        const nextMorning = new Date(scheduledTimeEST);
         nextMorning.setHours(8, 0, 0, 0);
-        if (userHours >= 22) {
+        
+        if (scheduledHour >= 22) {
           nextMorning.setDate(nextMorning.getDate() + 1);
         }
-        delay = nextMorning.getTime() - Date.now();
-        console.log(`Orario aggiustato per evitare la notte: ${new Date(Date.now() + delay).toLocaleString('it-IT')}`);
+        
+        // Calcola il nuovo delay per arrivare alle 8:00 AM EST
+        delay = nextMorning.getTime() - currentTimeEST.getTime();
+        
+        console.log(`Notification rescheduled:
+        - Original time (EST): ${scheduledTimeEST.toLocaleString('en-US', this.TIME_FORMAT)}
+        - New time (EST): ${nextMorning.toLocaleString('en-US', this.TIME_FORMAT)}`);
       }
+
+      console.log(`Notification scheduled for:
+      - EST: ${new Date(Date.now() + delay).toLocaleString('en-US', this.TIME_FORMAT)}
+      - Delay: ${delay / (1000 * 60 * 60)} hours`);
 
       setTimeout(async () => {
         try {
@@ -53,48 +76,49 @@ class NotificationService {
               }
             }
           });
-          console.log(`Notifica inviata con successo a ${token.substring(0, 10)}...`);
+          console.log(`Notification sent successfully to ${token.substring(0, 10)}...
+          EST time of sending: ${new Date().toLocaleString('en-US', this.TIME_FORMAT)}`);
         } catch (error) {
-          console.error('Errore nell\'invio della notifica:', error);
+          console.error('Error sending notification:', error);
         }
       }, delay);
 
     } catch (error) {
-      console.error('Errore nella programmazione della notifica:', error);
+      console.error('Error scheduling notification:', error);
     }
   }
 
   async schedulePushNotification(uid, token, db, redisClient) {
     try {
-      console.log('Inizio schedulazione notifica per uid:', uid);
+      console.log('Starting notification scheduling for uid:', uid);
       
-      // RESET FORZATO - Rimuovi dopo il test
+      // Force reset - Remove after testing
       await redisClient.del(`user_last_notification_delay_${uid}`);
-      console.log('Reset forzato del delay precedente');
+      console.log('Forced reset of previous delay');
       
-      // Controlla l'ultimo delay utilizzato
+      // Check last delay used
       let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
-      console.log('Ultimo delay:', lastNotificationDelay ? `${parseInt(lastNotificationDelay)/3600000} ore` : 'nessuno');
+      console.log('Last delay:', lastNotificationDelay ? `${parseInt(lastNotificationDelay)/3600000} hours` : 'none');
 
-      // Calcola il prossimo delay
+      // Calculate next delay
       const nextNotificationDelay = this.getNextNotificationDelay(lastNotificationDelay ? parseInt(lastNotificationDelay) : null);
-      console.log('Prossimo delay calcolato:', nextNotificationDelay/3600000, 'ore');
+      console.log('Next delay calculated:', nextNotificationDelay/3600000, 'hours');
 
-      // Scegli il messaggio appropriato
+      // Choose appropriate message
       const hoursDelay = nextNotificationDelay / (1000 * 60 * 60);
       const messageKey = hoursDelay <= 6 ? 6 : hoursDelay <= 12 ? 12 : 24;
       const messages = this.getNotificationMessages(messageKey);
       const randomMessage = messages[Math.floor(Math.random() * messages.length)];
 
-      // Programma la notifica
+      // Schedule notification
       await this.scheduleNotification(token, randomMessage.title, randomMessage.body, nextNotificationDelay);
       
-      // Salva il nuovo delay
+      // Save new delay
       await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay.toString());
-      console.log('Nuovo delay salvato in Redis:', nextNotificationDelay/3600000, 'ore');
+      console.log('New delay saved in Redis:', nextNotificationDelay/3600000, 'hours');
 
     } catch (error) {
-      console.error('Errore nella programmazione della notifica:', error);
+      console.error('Error scheduling notification:', error);
     }
   }
 
@@ -131,26 +155,25 @@ class NotificationService {
           body: 'Get your daily dose of smart scrolling. New content waiting for you.'
         }
       ]
-    
     };
     return messages[hours] || messages[24];
   }
 
   getNextNotificationDelay(lastDelay) {
-    console.log('Calcolo prossimo delay. Ultimo delay:', lastDelay ? `${lastDelay/3600000} ore` : 'nessuno');
+    console.log('Calculating next delay. Last delay:', lastDelay ? `${lastDelay/3600000} hours` : 'none');
     
     if (!lastDelay) {
-      console.log('Primo accesso, imposto 6 ore');
-      return 6 * 60 * 60 * 1000; // 6 ore
+      console.log('First access, setting 6 hours');
+      return 6 * 60 * 60 * 1000; // 6 hours
     }
     
     if (lastDelay < 24 * 60 * 60 * 1000) {
       const newDelay = lastDelay * 2;
-      console.log(`Raddoppio il delay da ${lastDelay/3600000} a ${newDelay/3600000} ore`);
+      console.log(`Doubling delay from ${lastDelay/3600000} to ${newDelay/3600000} hours`);
       return newDelay;
     }
     
-    console.log('Delay massimo raggiunto, mantengo 24 ore');
+    console.log('Maximum delay reached, keeping 24 hours');
     return 24 * 60 * 60 * 1000;
   }
 }
