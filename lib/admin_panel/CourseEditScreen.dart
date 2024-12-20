@@ -9,6 +9,8 @@ import '../models/course.dart';
 import '../models/level.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 
 class CourseEditScreen extends StatefulWidget {
   final Course? course;
@@ -21,6 +23,8 @@ class CourseEditScreen extends StatefulWidget {
 
 class _CourseEditScreenState extends State<CourseEditScreen> {
   final _formKey = GlobalKey<FormState>();
+  int _currentStep = 0;
+  Section? _selectedSection;
   String? _selectedTopic;
   String? _courseTitle;
   String? _courseDescription;
@@ -37,6 +41,546 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   List<String> _recommendedPodcasts = [];
   List<String> _recommendedWebsites = [];
 
+  final List<String> _stepTitles = ['Base', 'Contenuti', 'Risorse', 'Riepilogo'];
+
+  int? _expandedStepIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF181819),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header compatto
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Color(0xFF282828),
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: BoxConstraints(),
+                    icon: Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      height: 3,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(1.5),
+                        child: LinearProgressIndicator(
+                          value: (_currentStep + 1) / _stepTitles.length,
+                          backgroundColor: Colors.grey[800],
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    '${_currentStep + 1}/${_stepTitles.length}',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontFamily: 'Montserrat',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Contenuto principale
+            Expanded(
+              child: _currentStep == 0
+                  ? _buildBasicInfoStep()
+                  : _currentStep == 1
+                      ? _buildContentStep()
+                      : _currentStep == 2
+                          ? _buildResourcesStep()
+                          : _buildSummaryStep(),
+            ),
+            
+            // Pulsanti di navigazione compatti
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Color(0xFF282828),
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (_currentStep > 0)
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints(),
+                      icon: Icon(Icons.arrow_back, color: Colors.white70, size: 20),
+                      onPressed: () => _handleStepChange(_currentStep - 1),
+                    ),
+                  Spacer(),
+                  TextButton(
+                    onPressed: () {
+                      if (_currentStep < _stepTitles.length - 1) {
+                        _handleStepChange(_currentStep + 1);
+                      } else {
+                        _saveCourse();
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      backgroundColor: Colors.yellowAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _currentStep == _stepTitles.length - 1 ? 'Salva' : 'Avanti',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (_currentStep < _stepTitles.length - 1)
+                          Icon(Icons.arrow_forward, color: Colors.black, size: 16),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBasicInfoStep() {
+    return Column(
+      children: [
+        Card(
+          color: const Color(0xFF282828),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: Colors.yellowAccent.withOpacity(0.3),
+              width: 1,
+              style: BorderStyle.solid,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header con icona
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.school_outlined,
+                        color: Colors.yellowAccent,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Dettagli del Corso',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                
+                // Form fields
+                DropdownButtonFormField<String>(
+                  value: _selectedTopic,
+                  decoration: _inputDecoration('Topic'),
+                  dropdownColor: const Color(0xFF282828),
+                  items: _topics.map((topic) => DropdownMenuItem(
+                    value: topic,
+                    child: Text(
+                      topic,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Montserrat',
+                      ),
+                    ),
+                  )).toList(),
+                  onChanged: (value) => setState(() => _selectedTopic = value),
+                ),
+                const SizedBox(height: 16),
+                
+                TextFormField(
+                  initialValue: _courseTitle,
+                  decoration: _inputDecoration('Titolo del Corso'),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Montserrat',
+                  ),
+                  onChanged: (value) => _courseTitle = value,
+                ),
+                const SizedBox(height: 16),
+                
+                TextFormField(
+                  initialValue: _courseDescription,
+                  decoration: _inputDecoration('Descrizione'),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Montserrat',
+                  ),
+                  maxLines: 3,
+                  onChanged: (value) => _courseDescription = value,
+                ),
+                const SizedBox(height: 16),
+                
+                TextFormField(
+                  initialValue: _courseCost?.toString(),
+                  decoration: _inputDecoration('Costo (coins)'),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Montserrat',
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) => _courseCost = int.tryParse(value),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContentStep() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 120,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            children: [
+              _buildAddChapterCard(),
+              ..._sections.map((section) => _buildChapterCard(section)).toList(),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: Colors.white.withOpacity(0.1)),
+        Expanded(
+          child: _selectedSection == null
+              ? Center(
+                  child: Text(
+                    'Seleziona un capitolo',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                )
+              : ReorderableListView.builder(
+                  padding: EdgeInsets.all(16),
+                  itemCount: _selectedSection!.steps.length + 1,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (oldIndex < _selectedSection!.steps.length) {
+                        if (newIndex > _selectedSection!.steps.length) {
+                          newIndex = _selectedSection!.steps.length;
+                        }
+                        final item = _selectedSection!.steps.removeAt(oldIndex);
+                        _selectedSection!.steps.insert(
+                          newIndex > oldIndex ? newIndex - 1 : newIndex, 
+                          item
+                        );
+                      }
+                    });
+                  },
+                  proxyDecorator: (child, index, animation) => Material(
+                    color: Colors.transparent,
+                    elevation: 0,
+                    child: child,
+                  ),
+                  itemBuilder: (context, index) {
+                    if (index == _selectedSection!.steps.length) {
+                      return _buildAddStepButton();
+                    }
+                    return _buildCompactStepCard(
+                      _selectedSection!.steps[index], 
+                      index,
+                      key: ValueKey(_selectedSection!.steps[index]),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompactStepCard(LevelStep step, int index, {Key? key}) {
+    bool isExpanded = _expandedStepIndex == index;
+    
+    return Card(
+      key: key,
+      margin: EdgeInsets.only(bottom: 8),
+      color: Color(0xFF282828),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _expandedStepIndex = isExpanded ? null : index;
+          });
+        },
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 300),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header sempre visibile
+              Padding(
+                padding: EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.drag_handle,
+                      color: Colors.white54,
+                      size: 20,
+                    ),
+                    SizedBox(width: 12),
+                    Icon(
+                      step.type == 'video' ? Icons.play_circle_outline : Icons.quiz_outlined,
+                      color: Colors.yellowAccent,
+                      size: 20,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        step.content,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints(),
+                      icon: Icon(Icons.edit, color: Colors.white54, size: 18),
+                      onPressed: () => _editStepDialog(
+                        _selectedSection!, 
+                        _sections.indexOf(_selectedSection!), 
+                        step, 
+                        index
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(
+                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: Colors.white54,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Contenuto espanso
+              if (isExpanded) ...[
+                Divider(color: Colors.white.withOpacity(0.1)),
+                Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (step.type == 'video') ...[
+                        if (step.videoUrl != null)
+                          GestureDetector(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => VideoPlayerDialog(videoUrl: step.videoUrl!),
+                              );
+                            },
+                            child: Container(
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Color(0xFF1E1E1E),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 16),
+                                  Icon(
+                                    Icons.play_circle_outline,
+                                    color: Colors.yellowAccent,
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'Riproduci video',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        if (step.duration != null)
+                                          Text(
+                                            'Durata: ${step.duration}s',
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ] else if (step.type == 'question') ...[
+                        Text(
+                          'Domanda:',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        ...?step.choices?.map((choice) => 
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  choice == step.correctAnswer 
+                                    ? Icons.check_circle 
+                                    : Icons.radio_button_unchecked,
+                                  color: choice == step.correctAnswer 
+                                    ? Colors.green 
+                                    : Colors.white54,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  choice,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => _editStepDialog(
+                              _selectedSection!, 
+                              _sections.indexOf(_selectedSection!), 
+                              step, 
+                              index
+                            ),
+                            icon: Icon(Icons.edit, size: 16),
+                            label: Text('Modifica'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.yellowAccent,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddStepButton() {
+    return Card(
+      key: ValueKey('add_step'),
+      margin: EdgeInsets.only(bottom: 8),
+      color: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: Colors.yellowAccent.withOpacity(0.3),
+          width: 1,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _addStepDialog(_selectedSection!, _sections.indexOf(_selectedSection!)),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add, color: Colors.yellowAccent, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Aggiungi Step',
+                style: TextStyle(
+                  color: Colors.yellowAccent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,13 +594,16 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
       _courseCost = widget.course!.cost;
       _sections = widget.course!.sections;
       _coverImageUrl = widget.course!.coverImageUrl;
+      _selectedSection = _sections.isNotEmpty ? _sections[0] : null;
 
-      // Inizializza i nuovi campi
       _sources = List.from(widget.course!.sources);
       _acknowledgments = List.from(widget.course!.acknowledgments);
       _recommendedBooks = List.from(widget.course!.recommendedBooks);
       _recommendedPodcasts = List.from(widget.course!.recommendedPodcasts);
       _recommendedWebsites = List.from(widget.course!.recommendedWebsites);
+    } else {
+      _sections = [];
+      _selectedSection = null;
     }
   }
 
@@ -860,492 +1407,149 @@ void _saveCourse() {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black, // Sfondo nero
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Modifica Corso' : 'Crea Corso'),
-        backgroundColor: Colors.grey[900],
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(
+        color: Colors.white70,
+        fontFamily: 'Montserrat',
+        fontWeight: FontWeight.w500,
       ),
-      body: SingleChildScrollView( // Aggiunto per evitare overflow
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: Colors.white24,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(
+          color: Colors.yellowAccent,
+        ),
+      ),
+      filled: true,
+      fillColor: const Color(0xFF1E1E1E),
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    );
+  }
+
+  Widget _buildResourcesStep() {
+    return Column(
+      children: [
+        Card(
+          color: Colors.grey[850],
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: const Text('Fonti', style: TextStyle(color: Colors.white)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: () => _addItemDialog('Fonte', (item) {
+                      setState(() => _sources.add(item));
+                    }),
+                )),
+                ListTile(
+                  title: const Text('Libri Consigliati', style: TextStyle(color: Colors.white)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: () => _addItemDialog('Libro', (item) {
+                      setState(() => _recommendedBooks.add(item));
+                    }),
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Podcast Consigliati', style: TextStyle(color: Colors.white)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    onPressed: () => _addItemDialog('Podcast', (item) {
+                      setState(() => _recommendedPodcasts.add(item));
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryStep() {
+    return Card(
+      color: Colors.grey[850],
+      child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Riepilogo del Corso', 
+                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            ListTile(
+              title: Text('Titolo: $_courseTitle', style: TextStyle(color: Colors.white)),
+              subtitle: Text('Topic: $_selectedTopic', style: TextStyle(color: Colors.white70)),
+            ),
+            ListTile(
+              title: Text('Capitoli: ${_sections.length}', style: TextStyle(color: Colors.white)),
+              subtitle: Text('Costo: $_courseCost coins', style: TextStyle(color: Colors.white70)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleStepChange(int step) {
+    setState(() {
+      _currentStep = step;
+      if (step == 1 && _sections.isNotEmpty && _selectedSection == null) {
+        _selectedSection = _sections[0];
+      }
+    });
+  }
+
+  Widget _buildAddChapterCard() {
+    return Container(
+      width: 100,
+      height: 100,
+      margin: EdgeInsets.only(right: 8),
+      child: Card(
+        color: Color(0xFF282828),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: Colors.yellowAccent.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: _addSection,
+          borderRadius: BorderRadius.circular(8),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              DropdownButtonFormField<String>(
-                value: _selectedTopic,
-                hint: const Text(
-                  'Seleziona un topic',
-                  style: TextStyle(color: Colors.white),
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                decoration: InputDecoration(
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                items: _topics.map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(
-                      value,
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _selectedTopic = newValue;
-                  });
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Per favore seleziona un topic';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                initialValue: _courseTitle,
-                decoration: const InputDecoration(
-                  labelText: 'Titolo Corso',
-                  labelStyle: TextStyle(color: Colors.white),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent),
-                  ),
-                ),
-                style: TextStyle(color: Colors.white),
-                onSaved: (value) {
-                  _courseTitle = value;
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Inserisci un titolo';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                initialValue: _courseDescription,
-                decoration: const InputDecoration(
-                  labelText: 'Descrizione Corso',
-                  labelStyle: TextStyle(color: Colors.white),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent),
-                  ),
-                ),
-                style: TextStyle(color: Colors.white),
-                maxLines: 3,
-                onSaved: (value) {
-                  _courseDescription = value;
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Inserisci una descrizione';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                initialValue: _courseCost != null ? _courseCost.toString() : null,
-                decoration: const InputDecoration(
-                  labelText: 'Costo in coins',
-                  labelStyle: TextStyle(color: Colors.white),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(color: Colors.white),
-                onSaved: (value) {
-                  _courseCost = int.tryParse(value!);
-                },
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Inserisci un costo';
-                  }
-                  if (int.tryParse(value) == null) {
-                    return 'Inserisci un numero valido';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                initialValue: _coverImageUrl,
-                decoration: const InputDecoration(
-                  labelText: 'URL Immagine di Copertina (opzionale)',
-                  labelStyle: TextStyle(color: Colors.white),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white54),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.blueAccent),
-                  ),
-                ),
-                style: TextStyle(color: Colors.white),
-                onSaved: (value) {
-                  _coverImageUrl = value;
-                },
-              ),
-              SizedBox(height: 20),
-
-              // Sezione per Fonti
-              Text(
-                'Fonti',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Column(
-                children: _sources.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  String source = entry.value;
-                  return ListTile(
-                    title: Text(source, style: TextStyle(color: Colors.white)),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.redAccent),
-                      onPressed: () => _removeItem(_sources, index),
-                    ),
-                  );
-                }).toList(),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal[600], // Verde acqua
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => _addItemDialog('Aggiungi Fonte', (value) {
-                  setState(() {
-                    _sources.add(value);
-                  });
-                }),
-                child: const Text(
-                  'Aggiungi Fonte',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-
-              // Sezione per Ringraziamenti
-              Text(
-                'Ringraziamenti',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-              Column(
-                children: _acknowledgments.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  String acknowledgment = entry.value;
-                  return ListTile(
-                    title: Text(acknowledgment, style: TextStyle(color: Colors.white)),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.redAccent),
-                      onPressed: () => _removeItem(_acknowledgments, index),
-                    ),
-                  );
-                }).toList(),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal[600], // Verde acqua
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => _addItemDialog('Aggiungi Ringraziamento', (value) {
-                  setState(() {
-                    _acknowledgments.add(value);
-                  });
-                }),
-                child: const Text(
-                  'Aggiungi Ringraziamento',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-
-              // Sezione per Approfondimenti
-              Text(
-                'Approfondimenti',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 8),
-
-              // Libri
-              Text(
-                'Libri Consigliati',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              Column(
-                children: _recommendedBooks.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  String book = entry.value;
-                  return ListTile(
-                    title: Text(book, style: TextStyle(color: Colors.white)),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.redAccent),
-                      onPressed: () => _removeItem(_recommendedBooks, index),
-                    ),
-                  );
-                }).toList(),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal[600], // Verde acqua
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => _addItemDialog('Aggiungi Libro', (value) {
-                  setState(() {
-                    _recommendedBooks.add(value);
-                  });
-                }),
-                child: const Text(
-                  'Aggiungi Libro',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Icon(
+                  Icons.add,
+                  color: Colors.yellowAccent,
+                  size: 20,
                 ),
               ),
               SizedBox(height: 8),
-
-              // Podcast
               Text(
-                'Podcast Consigliati',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              Column(
-                children: _recommendedPodcasts.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  String podcast = entry.value;
-                  return ListTile(
-                    title: Text(podcast, style: TextStyle(color: Colors.white)),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.redAccent),
-                      onPressed: () => _removeItem(_recommendedPodcasts, index),
-                    ),
-                  );
-                }).toList(),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal[600], // Verde acqua
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => _addItemDialog('Aggiungi Podcast', (value) {
-                  setState(() {
-                    _recommendedPodcasts.add(value);
-                  });
-                }),
-                child: const Text(
-                  'Aggiungi Podcast',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              SizedBox(height: 8),
-
-              // Siti Web
-              Text(
-                'Siti Web Consigliati',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              Column(
-                children: _recommendedWebsites.asMap().entries.map((entry) {
-                  int index = entry.key;
-                  String website = entry.value;
-                  return ListTile(
-                    title: Text(website, style: TextStyle(color: Colors.white)),
-                    trailing: IconButton(
-                      icon: Icon(Icons.delete, color: Colors.redAccent),
-                      onPressed: () => _removeItem(_recommendedWebsites, index),
-                    ),
-                  );
-                }).toList(),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal[600], // Verde acqua
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => _addItemDialog('Aggiungi Sito Web', (value) {
-                  setState(() {
-                    _recommendedWebsites.add(value);
-                  });
-                }),
-                child: const Text(
-                  'Aggiungi Sito Web',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-
-              // Sezione per Capitoli (esistente)
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700], // Blu scuro
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _addSection,
-                child: const Text(
-                  'Aggiungi Capitolo',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: _sections.length,
-                itemBuilder: (context, index) {
-                  final section = _sections[index];
-                  return ExpansionTile(
-                    backgroundColor: Colors.grey[850],
-                    title: Text(
-                      section.title,
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    trailing: IconButton(
-                      icon: Icon(Icons.edit, color: Colors.white),
-                      onPressed: () {
-                        _editSection(section, index);
-                      },
-                    ),
-                    children: [
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.indigo[600], // Indigo
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () => _addStepDialog(section, index),
-                        child: const Text(
-                          'Aggiungi Step',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      ReorderableListView.builder(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        itemCount: section.steps.length,
-                        itemBuilder: (context, stepIndex) {
-                          final step = section.steps[stepIndex];
-                          return ListTile(
-                            key: Key('step_$stepIndex'),
-                            leading: Icon(
-                              step.type == 'video' ? Icons.play_circle : Icons.question_mark,
-                              color: Colors.white70,
-                            ),
-                            title: Text(
-                              step.type == 'video' ? step.content : 'Domanda: ${step.content}',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                            trailing: Icon(Icons.drag_handle, color: Colors.white54),
-                            onTap: () => _editStepDialog(section, index, step, stepIndex),
-                          );
-                        },
-                        onReorder: (oldIndex, newIndex) {
-                          setState(() {
-                            if (oldIndex < newIndex) {
-                              newIndex -= 1;
-                            }
-                            final item = section.steps.removeAt(oldIndex);
-                            section.steps.insert(newIndex, item);
-                          });
-                        },
-                      ),
-                    ],
-                  );
-                },
-              ),
-              SizedBox(height: 16),
-              Center(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple[600], // Viola scuro
-                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _saveCourse,
-                  child: Text(
-                    _isEditing ? 'Salva Modifiche' : 'Crea Corso',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                'Nuovo',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -1355,6 +1559,171 @@ void _saveCourse() {
     );
   }
 
+  Widget _buildChapterCard(Section section) {
+    bool isSelected = _selectedSection?.title == section.title;
+    
+    return Container(
+      width: 140,
+      height: 100,
+      margin: EdgeInsets.only(right: 8),
+      child: Card(
+        color: isSelected ? Colors.yellowAccent.withOpacity(0.1) : Color(0xFF282828),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: isSelected ? Colors.yellowAccent : Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => setState(() => _selectedSection = section),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: EdgeInsets.all(8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Cap. ${section.sectionNumber}',
+                      style: TextStyle(
+                        color: Colors.yellowAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _editSection(section, _sections.indexOf(section)),
+                      child: Icon(Icons.edit, color: Colors.white70, size: 16),
+                    ),
+                  ],
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4),
+                    child: Text(
+                      section.title,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(Icons.list, size: 14, color: Colors.white54),
+                    SizedBox(width: 4),
+                    Text(
+                      '${section.steps.length} step',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
+class VideoPlayerDialog extends StatefulWidget {
+  final String videoUrl;
 
+  const VideoPlayerDialog({required this.videoUrl});
+
+  @override
+  _VideoPlayerDialogState createState() => _VideoPlayerDialogState();
+}
+
+class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+
+  @override
+  void initState() {
+    super.initState();
+    initializePlayer();
+  }
+
+  Future<void> initializePlayer() async {
+    _videoPlayerController = VideoPlayerController.network(widget.videoUrl);
+    await _videoPlayerController.initialize();
+    
+    _chewieController = ChewieController(
+      videoPlayerController: _videoPlayerController,
+      aspectRatio: 9/16,
+      autoPlay: true,
+      looping: false,
+      allowFullScreen: true,
+      allowMuting: true,
+      showControls: true,
+      placeholder: Center(
+        child: CircularProgressIndicator(
+          color: Colors.yellowAccent,
+        ),
+      ),
+      materialProgressColors: ChewieProgressColors(
+        playedColor: Colors.yellowAccent,
+        handleColor: Colors.yellowAccent,
+        backgroundColor: Colors.grey,
+        bufferedColor: Colors.white,
+      ),
+    );
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 9/16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.yellowAccent,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          SizedBox(height: 8),
+          IconButton(
+            icon: Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
 }
