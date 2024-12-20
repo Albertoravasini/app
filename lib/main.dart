@@ -24,6 +24,8 @@ import 'screens/settings_screen.dart';
 import 'screens/bottom_navigation_bar_custom.dart'; // Importa la barra di navigazione personalizzata
 import 'screens/support_screen.dart'; // Importa la schermata di supporto
 import 'screens/profile_screen.dart'; // Importa la schermata del profilo insegnante
+import 'web/screens/web_home_screen.dart';
+import 'screens/NotificationsScreen.dart';
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -159,7 +161,7 @@ class MyApp extends StatelessWidget {
           ),
           initialRoute: '/',
           routes: {
-            '/': (context) => const SplashScreen(),
+            '/': (context) => isWeb ? WebHomeScreen() : SplashScreen(),
             '/home': (context) => const HomeScreen(),
             '/login': (context) => const LoginScreen(),
             '/register': (context) => const RegisterScreen(),
@@ -193,68 +195,68 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.initialIndex; // Usa l'indice iniziale passato
+    _selectedIndex = widget.initialIndex == 1 ? 2 : widget.initialIndex;
   }
 
   void _onItemTapped(int index) {
     setState(() {
-      _selectedIndex = index;  // Cambia l'indice selezionato
-      _checkDailyReset();  // Chiama il controllo del reset giornaliero
+      _selectedIndex = index;
+      _checkDailyReset();
     });
   }
-  
-void _checkDailyReset() async {
-  DateTime now = DateTime.now();
-  
-  // Imposta la data corrente e l'ultimo accesso a mezzanotte per il confronto
-  DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
-  DateTime lastAccessAtMidnight = DateTime(
-    widget.userModel.lastAccess.year,
-    widget.userModel.lastAccess.month,
-    widget.userModel.lastAccess.day,
-  );
-
-  // Se la data di oggi a mezzanotte è successiva all'ultimo accesso
-  if (todayAtMidnight.isAfter(lastAccessAtMidnight)) {
-    // Effettua il reset giornaliero
-    widget.userModel.dailyVideosCompleted = 0;
-    widget.userModel.dailyQuizFreeUses = 0;
-
-    // Aggiorna lastAccess a oggi, rappresentato da oggi a mezzanotte
-    widget.userModel.lastAccess = todayAtMidnight;
-
-    // Salva su Firestore solo i campi modificati
-    await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
-      'dailyVideosCompleted': 0,
-      'dailyQuizFreeUses': 0,
-      'lastAccess': todayAtMidnight.toIso8601String(),
-    });
-  } else {
-    // Aggiorna solo lastAccess per indicare l'accesso senza reset
-    await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
-      'lastAccess': now.toIso8601String(),
-    });
-  }
-}
 
   @override
   Widget build(BuildContext context) {
-    // Inizializziamo _screens qui, dove è possibile accedere a widget
     final List<Widget> _screens = [
       const CourseScreen(),
-      const HomeScreen(),
       const QuizScreen(),
-      SettingsScreen(currentUser: widget.userModel),  // Qui ora puoi accedere a widget.userModel
+      const HomeScreen(),
+      const NotificationsScreen(),
+      SettingsScreen(currentUser: widget.userModel),
     ];
 
     return Scaffold(
-      body: _screens[_selectedIndex],  // Mostra la schermata selezionata
+      body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBarCustom(
         currentUser: widget.userModel,
         selectedIndex: _selectedIndex,
-        onItemTapped: _onItemTapped,  // Callback per cambiare schermata
+        onItemTapped: _onItemTapped,
       ),
     );
+  }
+
+  void _checkDailyReset() async {
+    DateTime now = DateTime.now();
+    
+    // Imposta la data corrente e l'ultimo accesso a mezzanotte per il confronto
+    DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
+    DateTime lastAccessAtMidnight = DateTime(
+      widget.userModel.lastAccess.year,
+      widget.userModel.lastAccess.month,
+      widget.userModel.lastAccess.day,
+    );
+
+    // Se la data di oggi a mezzanotte è successiva all'ultimo accesso
+    if (todayAtMidnight.isAfter(lastAccessAtMidnight)) {
+      // Effettua il reset giornaliero
+      widget.userModel.dailyVideosCompleted = 0;
+      widget.userModel.dailyQuizFreeUses = 0;
+
+      // Aggiorna lastAccess a oggi, rappresentato da oggi a mezzanotte
+      widget.userModel.lastAccess = todayAtMidnight;
+
+      // Salva su Firestore solo i campi modificati
+      await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+        'dailyVideosCompleted': 0,
+        'dailyQuizFreeUses': 0,
+        'lastAccess': todayAtMidnight.toIso8601String(),
+      });
+    } else {
+      // Aggiorna solo lastAccess per indicare l'accesso senza reset
+      await FirebaseFirestore.instance.collection('users').doc(widget.userModel.uid).update({
+        'lastAccess': now.toIso8601String(),
+      });
+    }
   }
 }
 

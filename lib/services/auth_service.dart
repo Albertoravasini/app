@@ -1,11 +1,14 @@
 // lib/services/auth_service.dart
 
+import 'package:Just_Learn/web/screens/web_home_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:math';
 import 'notification_service.dart';
+import 'package:flutter/material.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -187,6 +190,22 @@ class AuthService {
     } catch (e) {
       print('Errore durante il login con Google: $e');
       return null;
+    }
+  }
+
+  Future<void> handleWebAuthentication(BuildContext context) async {
+    final User? currentUser = _auth.currentUser;
+    
+    if (kIsWeb) {
+      if (currentUser != null) {
+       
+      } else {
+        // Utente non autenticato, mostra la splash screen web
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => WebHomeScreen()),
+        );
+      }
     }
   }
 }

@@ -405,7 +405,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           keyboardType: TextInputType.numberWithOptions(decimal: true),
                         )
                       : Text(
-                          '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
+                          widget.currentUser.subscriptionPrice == 0 
+                            ? 'FREE' 
+                            : '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -1110,7 +1112,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                         ),
                                       ),
                                       child: Text(
-                                        '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
+                                        widget.currentUser.subscriptionPrice == 0 
+                                          ? 'FREE' 
+                                          : '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 14,
@@ -1316,6 +1320,48 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           icon: Icon(_isFollowing ? Icons.check : Icons.add),
           label: Text(
             _isFollowing ? 'Following' : 'Follow',
+            style: const TextStyle(
+              fontSize: 14,
+              fontFamily: 'Montserrat',
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubscriptionButton() {
+    // Se il prezzo è 0, mostra "FREE" invece di "€0.00"
+    String priceText = widget.currentUser.subscriptionPrice == 0 
+        ? 'FREE' 
+        : '€${widget.currentUser.subscriptionPrice.toStringAsFixed(2)}';
+
+    return Hero(
+      tag: 'subscriptionButton${widget.currentUser.uid}',
+      child: SizedBox(
+        height: 45,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            _toggleSubscription();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _isSubscribed ? Colors.yellowAccent : const Color(0xFF282828),
+            foregroundColor: _isSubscribed ? Colors.black : Colors.yellowAccent,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            minimumSize: const Size(120, 45),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Colors.yellowAccent.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+          ),
+          icon: Icon(_isSubscribed ? Icons.check : Icons.add),
+          label: Text(
+            _isSubscribed ? 'Subscribed' : priceText, // Usa priceText qui
             style: const TextStyle(
               fontSize: 14,
               fontFamily: 'Montserrat',

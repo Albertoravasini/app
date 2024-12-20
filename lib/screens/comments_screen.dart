@@ -31,6 +31,9 @@ class _CommentsScreenState extends State<CommentsScreen> {
   // Aggiungi una chiave globale per accedere allo stato del widget AI chat
   final GlobalKey<AIChatWidgetState> _aiChatKey = GlobalKey<AIChatWidgetState>();
 
+  String? _replyingTo; // Nuovo: tiene traccia del commento a cui stiamo rispondendo
+  String? _replyingToUsername; // Nuovo: tiene traccia dell'username
+
   @override
   void initState() {
     super.initState();
@@ -261,14 +264,7 @@ class _CommentsScreenState extends State<CommentsScreen> {
                   children: [
                     // Reply
                     GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _commentController.text = '@$username ';
-                          _commentController.selection = TextSelection.fromPosition(
-                            TextPosition(offset: _commentController.text.length),
-                          );
-                        });
-                      },
+                      onTap: () => _handleReply(comment.commentId, username),
                       child: Row(
                         children: const [
                           Icon(
@@ -450,39 +446,76 @@ class _CommentsScreenState extends State<CommentsScreen> {
           width: 1,
         ),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _commentController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: _showAiChat ? 'Ask the AI...' : 'Add a comment...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+          // Mostra l'indicatore di risposta
+          if (_replyingTo != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Text(
+                    'Replying to @$_replyingToUsername',
+                    style: const TextStyle(
+                      color: Colors.yellowAccent,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _replyingTo = null;
+                        _replyingToUsername = null;
+                        _commentController.clear();
+                      });
+                    },
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white54,
+                      size: 16,
+                    ),
+                  ),
+                ],
               ),
-              maxLines: null,
-              keyboardType: TextInputType.multiline,
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.send),
-            color: Colors.yellowAccent,
-            onPressed: () {
-              final message = _commentController.text.trim();
-              if (message.isEmpty) return;
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: _replyingTo != null ? 'Write a reply...' : 'Add a comment...',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  ),
+                  maxLines: null,
+                  keyboardType: TextInputType.multiline,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.send),
+                color: Colors.yellowAccent,
+                onPressed: () async {
+                  final message = _commentController.text.trim();
+                  if (message.isEmpty) return;
 
-              // Salva il messaggio e pulisci l'input prima di inviare
-              final messageToSend = message;
-              _commentController.clear();
-
-              if (_showAiChat && _aiChatKey.currentState != null) {
-                _aiChatKey.currentState!.handleMessage(messageToSend);
-              } else if (!_showAiChat) {
-                _addComment(messageToSend);
-              }
-            },
+                  if (_replyingTo != null) {
+                    await _commentService.addReply(_replyingTo!, message);
+                    setState(() {
+                      _replyingTo = null;
+                      _replyingToUsername = null;
+                    });
+                  } else {
+                    await _addComment(message);
+                  }
+                  _commentController.clear();
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -684,5 +717,14 @@ class _CommentsScreenState extends State<CommentsScreen> {
       final int weeks = (difference.inDays / 7).floor();
       return '$weeks weeks ago';
     }
+  }
+
+  // Modifica la funzione che gestisce il tap sul pulsante reply
+  void _handleReply(String commentId, String username) {
+    setState(() {
+      _replyingTo = commentId;
+      _replyingToUsername = username;
+      FocusScope.of(context).requestFocus(FocusNode()); // Apre la tastiera
+    });
   }
 }

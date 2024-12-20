@@ -25,12 +25,14 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
       return const SizedBox.shrink();
     }
 
-    // Controlla se il quiz è gratuito
-    int requiredVideosForNextFreeUnlock = 3 + (widget.currentUser!.dailyQuizFreeUses * 5);
-    bool isQuizFree = widget.currentUser!.dailyVideosCompleted >= requiredVideosForNextFreeUnlock;
+    bool isQuizFree = widget.currentUser!.dailyVideosCompleted >= 
+        (3 + (widget.currentUser!.dailyQuizFreeUses * 5));
+    bool showQuizDot = isQuizFree && widget.currentUser!.dailyVideosCompleted >= 3;
 
-    // Determina se mostrare il pallino solo quando il quiz è gratuito
-    bool showDot = isQuizFree && widget.currentUser!.dailyVideosCompleted >= 3;
+    // Controlla se ci sono notifiche non lette
+    bool hasUnreadNotifications = widget.currentUser!.notifications
+        .where((notification) => !notification.isRead)
+        .isNotEmpty;
 
     return Container(
       width: double.infinity,
@@ -38,39 +40,28 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
       color: const Color(0xFF121212),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom / 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Icona per la schermata corsi
+          // Icona Corsi
           GestureDetector(
             onTap: () => widget.onItemTapped(0),
             child: _buildNavItem(
-              'assets/fluent_hat-graduation-sparkle-24-filled.svg',  // Icona Corsi
+              'assets/fluent_hat-graduation-sparkle-24-filled.svg',
               widget.selectedIndex == 0,
             ),
           ),
-          const SizedBox(width: 59),  // Spaziatura tra le icone
 
-          // Icona per la schermata Home
+          // Icona Quiz
           GestureDetector(
             onTap: () => widget.onItemTapped(1),
-            child: _buildNavItem(
-              'assets/ph_castle-turret-fill.svg',  // Icona Home
-              widget.selectedIndex == 1,
-            ),
-          ),
-          const SizedBox(width: 59),  // Spaziatura tra le icone
-
-          // Icona per la schermata Quiz con pallino
-          GestureDetector(
-            onTap: () => widget.onItemTapped(2),  // Schermata Quiz
             child: Stack(
               children: [
                 _buildNavItem(
-                  'assets/ic_round-quiz.svg',  // Icona per la schermata Quiz (puoi cambiare l'icona)
-                  widget.selectedIndex == 2,
+                  'assets/ic_round-quiz.svg',
+                  widget.selectedIndex == 1,
                 ),
-                if (showDot)
+                if (showQuizDot)
                   Positioned(
                     top: 0,
                     right: 0,
@@ -86,14 +77,48 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
               ],
             ),
           ),
-          const SizedBox(width: 59),  // Spaziatura tra le icone
 
-          // Icona per la schermata Impostazioni
+          // Icona Home (centro)
           GestureDetector(
-            onTap: () => widget.onItemTapped(3),  // Schermata Impostazioni
+            onTap: () => widget.onItemTapped(2),
             child: _buildNavItem(
-              'assets/iconamoon_profile-fill.svg',  // Icona Impostazioni
-              widget.selectedIndex == 3,
+              'assets/ph_castle-turret-fill.svg',
+              widget.selectedIndex == 2,
+            ),
+          ),
+
+          // Icona Messaggi
+          GestureDetector(
+            onTap: () => widget.onItemTapped(3),
+            child: Stack(
+              children: [
+                _buildNavItem(
+                  'assets/ic_round-quiz.svg', // Assicurati di avere questa icona
+                  widget.selectedIndex == 3,
+                ),
+                if (hasUnreadNotifications)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Icona Profilo
+          GestureDetector(
+            onTap: () => widget.onItemTapped(4),
+            child: _buildNavItem(
+              'assets/iconamoon_profile-fill.svg',
+              widget.selectedIndex == 4,
             ),
           ),
         ],

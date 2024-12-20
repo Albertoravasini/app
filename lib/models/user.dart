@@ -166,27 +166,28 @@ class UserModel {
 class Notification {
   final String id;
   final String message;
-  bool isRead;
   final DateTime timestamp;
+  final bool isRead;
   final String? videoId;
+  final bool isFromTeacher;
 
   Notification({
     required this.id,
     required this.message,
-    this.isRead = false,
     required this.timestamp,
+    this.isRead = false,
     this.videoId,
+    this.isFromTeacher = false,
   });
 
-  factory Notification.fromMap(Map<String, dynamic> data) {
+  factory Notification.fromMap(Map<String, dynamic> map) {
     return Notification(
-      id: data['id'] ?? '',
-      message: data['message'] ?? '',
-      isRead: data['isRead'] ?? false,
-      timestamp: data['timestamp'] is Timestamp
-          ? (data['timestamp'] as Timestamp).toDate()
-          : DateTime.parse(data['timestamp']),
-      videoId: data['videoId'],
+      id: map['id'] ?? '',
+      message: map['message'] ?? '',
+      timestamp: map['timestamp']?.toDate() ?? DateTime.now(),
+      isRead: map['isRead'] ?? false,
+      videoId: map['videoId'],
+      isFromTeacher: map['isFromTeacher'] ?? false,
     );
   }
 
@@ -194,15 +195,11 @@ class Notification {
     return {
       'id': id,
       'message': message,
+      'timestamp': timestamp,
       'isRead': isRead,
-      'timestamp': timestamp.toIso8601String(),
       'videoId': videoId,
+      'isFromTeacher': isFromTeacher,
     };
-  }
-
-  @override
-  String toString() {
-    return 'Notification{id: $id, message: $message, isRead: $isRead, timestamp: $timestamp, videoId: $videoId}';
   }
 }
 

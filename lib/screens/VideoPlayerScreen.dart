@@ -18,6 +18,7 @@ class VideoPlayerScreen extends StatefulWidget {
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late YoutubePlayerController _controller;
+  bool _isCommentsVisible = false;
 
   @override
   void initState() {
@@ -32,89 +33,115 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     if (widget.autoOpenComments) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _openComments(context);
+        _showComments();
       });
     }
+  }
+
+  void _showComments() {
+    setState(() => _isCommentsVisible = true);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) => WillPopScope(
+        onWillPop: () async {
+          setState(() => _isCommentsVisible = false);
+          return true;
+        },
+        child: CommentsScreen(videoId: widget.videoId),
+      ),
+    ).then((_) => setState(() => _isCommentsVisible = false));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF121212),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              AspectRatio(
+                aspectRatio: 9 / 16,
+                child: YoutubePlayer(
+                  controller: _controller,
+                  showVideoProgressIndicator: true,
+                  progressIndicatorColor: Colors.yellowAccent,
+                  progressColors: const ProgressBarColors(
+                    playedColor: Colors.yellowAccent,
+                    handleColor: Colors.yellowAccent,
+                  ),
+                ),
+              ),
+              if (!_isCommentsVisible && !widget.autoOpenComments)
+                Expanded(
+                  child: Center(
+                    child: ElevatedButton(
+                      onPressed: _showComments,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.yellowAccent,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.comment),
+                          SizedBox(width: 8),
+                          Text(
+                            'Visualizza commenti',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (widget.autoOpenComments && !_isCommentsVisible)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: _showComments,
+                backgroundColor: Colors.yellowAccent,
+                child: const Icon(
+                  Icons.comment,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  void _openComments(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (context) => CommentsScreen(videoId: widget.videoId, ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 0, 0, 0), // Sfondo bianco
-      appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0), // AppBar bianca
-        elevation: 0, // Rimuove l'ombra per un design piatto
-        title: const Text(
-          '',
-          style: TextStyle(
-            color: Color.fromARGB(221, 255, 255, 255), // Testo nero/grigio scuro per contrasto
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0), // Padding orizzontale per centrare
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AspectRatio(
-              aspectRatio: 9 / 16, // Mantiene il rapporto 9:16
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(25), // Bordi arrotondati
-                child: Container(
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: YoutubePlayer(
-                    controller: _controller,
-                    showVideoProgressIndicator: true,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20), // Spazio tra il video e il pulsante
-            SizedBox(
-              width: MediaQuery.of(context).size.width * 1, // Larghezza del pulsante pari al 70% della larghezza dello schermo
-              child: ElevatedButton(
-                onPressed: () => _openComments(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(221, 255, 255, 255), // Colore di sfondo del pulsante
-                  foregroundColor: const Color.fromARGB(255, 0, 0, 0), // Colore del testo del pulsante
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25), // Bordi arrotondati
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-                child: const Text('Open Comments'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

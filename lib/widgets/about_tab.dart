@@ -862,12 +862,17 @@ class _AboutTabState extends State<AboutTab> {
     required String value,
     required String label,
   }) {
+    // Se il label è 'Sub Price' e il valore è '0' o '0.0', mostra 'FREE'
+    String displayValue = label == 'Sub Price' && (value == '0' || value == '0.0') 
+        ? 'FREE' 
+        : value;
+
     return Column(
       children: [
         Icon(icon, color: Colors.yellowAccent, size: 24),
         const SizedBox(height: 8),
         Text(
-          value,
+          displayValue,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 18,

@@ -127,40 +127,32 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 23),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: ShapeDecoration(
-                color: const Color(0xFF1E1E1E),
-                shape: RoundedRectangleBorder(
-                  side: BorderSide(
-                    width: 1,
-                    color: Colors.white.withOpacity(0.10),
+            if (currentUser?.role != 'teacher')
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: ShapeDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(
+                      width: 1,
+                      color: Colors.white.withOpacity(0.10),
+                    ),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
-              child: InkWell(
-                onTap: () async {
-                  if (currentUser == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Errore: Utente non trovato'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
+                child: InkWell(
+                  onTap: () async {
+                    if (currentUser == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Errore: Utente non trovato'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
 
-                  if (currentUser?.role == 'teacher') {
-                    // Se l'utente è già un insegnante, naviga al suo profilo
-                    Navigator.pushNamed(
-                      context,
-                      '/profile',
-                      arguments: currentUser,
-                    );
-                  } else {
-                    // Se l'utente non è un insegnante, apri il link Calendly
                     final Uri url = Uri.parse('https://calendly.com/ravasini-aziendale/become-a-teacher-on-justlearn');
                     if (await canLaunchUrl(url)) {
                       await launchUrl(url);
@@ -172,21 +164,20 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       );
                     }
-                  }
-                },
-                child: const Text(
-                  'Become a teacher',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.84,
+                  },
+                  child: const Text(
+                    'Become a teacher',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontFamily: 'Montserrat',
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.84,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -399,14 +390,6 @@ class SettingsScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildPreferenceItem(
-          context,
-          icon: Icons.notifications,
-          title: 'Notifications',
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const NotificationsScreen()));
-          },
-        ),
         _buildPreferenceItem(
           context,
           icon: Icons.privacy_tip,

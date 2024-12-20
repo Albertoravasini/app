@@ -8,90 +8,61 @@ class CommentService {
 
   // Aggiungi una risposta a un commento
   Future<void> addReply(String parentCommentId, String content) async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    final username = userDoc.data()?['name'] ?? 'Anonimo';
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        // 1. Ottieni i dati dell'utente che sta rispondendo
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        final username = userDoc.data()?['name'] ?? 'Anonimo';
 
-    final reply = Comment(
-      commentId: commentCollection.doc().id,
-      userId: user.uid,
-      username: username,
-      videoId: '', // Il videoId viene ereditato dal commento principale
-      content: content,
-      timestamp: DateTime.now(),
-    );
+        // 2. Ottieni il commento padre
+        final commentDoc = await commentCollection.doc(parentCommentId).get();
+        final parentComment = commentDoc.data() as Map<String, dynamic>;
+        final parentUserId = parentComment['userId'] as String;
 
-    try {
-      final commentDoc = await commentCollection.doc(parentCommentId).get();
-      if (commentDoc.exists) {
-        final parentComment = Comment.fromMap(commentDoc.data() as Map<String, dynamic>);
-        String? mentionedUserId;
-        String? mentionedUsername;
+        // 3. Crea la risposta
+        final reply = Comment(
+          commentId: commentCollection.doc().id,
+          userId: user.uid,
+          username: username,
+          videoId: parentComment['videoId'],
+          content: content,
+          timestamp: DateTime.now(),
+        );
 
-        // Verifica se ci sono menzioni nel contenuto
-        final mentionRegex = RegExp(r'@(\w+)');
-        final matches = mentionRegex.allMatches(content);
-
-        if (matches.isNotEmpty) {
-          // Recupera il primo nome utente menzionato
-          final firstMention = matches.first;
-          final mentionedUsernameInContent = firstMention.group(1);
-
-          if (mentionedUsernameInContent != null) {
-            // Cerca l'utente menzionato nel database
-            final mentionedUserQuery = await FirebaseFirestore.instance
-                .collection('users')
-                .where('name', isEqualTo: mentionedUsernameInContent)
-                .get();
-
-            if (mentionedUserQuery.docs.isNotEmpty) {
-              final mentionedUserDoc = mentionedUserQuery.docs.first;
-              mentionedUserId = mentionedUserDoc.id;
-              mentionedUsername = mentionedUserDoc['name'];
-            }
-          }
-        }
-
-        // Aggiungi la risposta al commento principale
+        // 4. Aggiungi la risposta al commento padre
         await commentDoc.reference.update({
           'replies': FieldValue.arrayUnion([reply.toMap()]),
         });
 
-        // Determina i destinatari delle notifiche
-        final List<String> recipientUserIds = [];
-        if (mentionedUserId != null) {
-          recipientUserIds.add(mentionedUserId); // Aggiungi utente menzionato
-        }
-        if (parentComment.userId != user.uid && !recipientUserIds.contains(parentComment.userId)) {
-          recipientUserIds.add(parentComment.userId); // Aggiungi autore del commento, se diverso dall'autore della risposta
-        }
-
-        // Invia le notifiche a tutti i destinatari
-        for (final recipientUserId in recipientUserIds) {
+        // 5. Crea e salva la notifica per l'autore del commento originale
+        if (parentUserId != user.uid) { // Non inviare notifica a se stessi
           final notification = Notification(
             id: FirebaseFirestore.instance.collection('notifications').doc().id,
-            message: '$username ha risposto: "${content.length > 20 ? content.substring(0, 20) + '...' : content}"',
+            message: '@$username ha risposto al tuo commento: "${content.length > 50 ? content.substring(0, 47) + '...' : content}"',
             timestamp: DateTime.now(),
             isRead: false,
-            videoId: parentComment.videoId, // Associa la notifica al video
+            videoId: parentComment['videoId'],
+            isFromTeacher: false,
           );
 
+          // Aggiungi la notifica all'utente che ha scritto il commento originale
           await FirebaseFirestore.instance
               .collection('users')
-              .doc(recipientUserId)
+              .doc(parentUserId)
               .update({
             'notifications': FieldValue.arrayUnion([notification.toMap()]),
           });
         }
+      } catch (e) {
+        print('Errore durante l\'aggiunta della risposta: $e');
+        rethrow;
       }
-    } catch (e) {
-      print('Errore durante l\'aggiunta della risposta: $e');
     }
-  } else {
-    print('Utente non autenticato, impossibile aggiungere risposte');
   }
-}
 
   // Recupera tutti i commenti con i relativi nomi utente
   Stream<List<Map<String, dynamic>>> getCommentsWithUsernames(String videoId) async* {
