@@ -1,3 +1,4 @@
+import 'package:Just_Learn/admin_panel/course_management_screen.dart';
 import 'package:Just_Learn/models/certification.dart';
 import 'package:Just_Learn/models/experience.dart';
 import 'package:Just_Learn/models/review.dart';
@@ -1262,6 +1263,24 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                       onTap: () {
                                         Navigator.pop(context);
                                         _showSocialManager();
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: Icon(Icons.add_box_outlined, color: Colors.white),
+                                      title: Text(
+                                        'Crea Nuovo Corso',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context); // Chiude il bottom sheet
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => CourseManagementScreen(
+                                              userId: widget.currentUser.uid,
+                                            ),
+                                          ),
+                                        );
                                       },
                                     ),
                                   ],
