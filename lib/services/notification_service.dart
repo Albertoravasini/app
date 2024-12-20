@@ -183,4 +183,48 @@ class NotificationService {
       print('Errore invio notifica test: $e');
     }
   }
+
+  Future<void> sendSpecificNotification(String token, String type, String senderName) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://167.99.131.91:3000/send_test_notification'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'token': token,
+          'title': _getNotificationTitle(type),
+          'body': _getNotificationBody(type, senderName)
+        }),
+      );
+
+      print('Risposta notifica: ${response.statusCode}');
+    } catch (e) {
+      print('Errore invio notifica: $e');
+    }
+  }
+
+  String _getNotificationTitle(String type) {
+    switch (type) {
+      case 'teacher_message':
+        return '📚 New message from teacher';
+      case 'student_message':
+        return '👨‍🎓 New message from student';
+      case 'comment_reply':
+        return '💬 New comment';
+      default:
+        return 'New notification';
+    }
+  }
+
+  String _getNotificationBody(String type, String senderName) {
+    switch (type) {
+      case 'teacher_message':
+        return '$senderName sent you a message';
+      case 'student_message':
+        return '$senderName sent you a message';
+      case 'comment_reply':
+        return '$senderName replied to your comment';
+      default:
+        return 'You received a new notification';
+    }
+  }
 }

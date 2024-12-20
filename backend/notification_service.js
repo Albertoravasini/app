@@ -180,6 +180,48 @@ class NotificationService {
     console.log('Maximum delay reached, keeping 24 hours');
     return 24 * 60 * 60 * 1000;
   }
+
+  async sendSpecificNotification(token, type, senderName) {
+    let title, body;
+    
+    switch(type) {
+      case 'teacher_message':
+        title = '📚 Nuovo messaggio dal docente';
+        body = `${senderName} ti ha inviato un messaggio`;
+        break;
+      case 'comment_reply':
+        title = '💬 Nuovo commento';
+        body = `${senderName} ha risposto al tuo commento`;
+        break;
+      default:
+        return;
+    }
+
+    try {
+      await admin.messaging().send({
+        token: token,
+        notification: {
+          title: title,
+          body: body
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'social_interactions'
+          }
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default'
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error sending specific notification:', error);
+    }
+  }
 }
 
 module.exports = NotificationService;

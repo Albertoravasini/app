@@ -1,9 +1,11 @@
+import 'package:Just_Learn/models/message.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:Just_Learn/services/notification_service.dart';
 
 class PrivateChatTab extends StatefulWidget {
   final UserModel profileUser;
@@ -20,6 +22,10 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String? selectedChatUserId;
+  String _getChatId(String currentUserId, String otherUserId) {
+    final List<String> ids = [currentUserId, otherUserId]..sort();
+    return '${ids[0]}_${ids[1]}';
+  }
   @override
   void initState() {
     super.initState();
@@ -34,32 +40,66 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
     _scrollController.dispose();
     super.dispose();
   }
-  String _getChatId(String otherUserId) {
-    final List<String> ids = [widget.currentUser.uid, otherUserId]..sort();
-    return '${ids[0]}_${ids[1]}';
-  }
   Future<void> _sendMessage(String message) async {
-    if (message.trim().isEmpty || selectedChatUserId == null) return;
-    final chatId = _getChatId(selectedChatUserId!);
-    
-    await FirebaseFirestore.instance.collection('chats').doc(chatId).set({
-      'participants': [widget.currentUser.uid, selectedChatUserId],
-      'lastMessage': message,
-      'lastMessageTime': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    await FirebaseFirestore.instance
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .add({
-      'senderId': widget.currentUser.uid,
-      'receiverId': selectedChatUserId,
-      'message': message,
-      'timestamp': FieldValue.serverTimestamp(),
-      'isRead': false,
-    });
-    _messageController.clear();
-    _scrollToBottom();
+    if (message.trim().isEmpty) return;
+
+    try {
+      // Ottieni i dati del mittente
+      final senderDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUser.uid)
+          .get();
+      final senderRole = senderDoc.data()?['role'];
+
+      final chatId = _getChatId(widget.currentUser.uid, selectedChatUserId!);
+      final messageDoc = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc();
+
+      final newMessage = Message(
+        id: messageDoc.id,
+        senderId: widget.currentUser.uid,
+        receiverId: selectedChatUserId!,
+        message: message,
+        timestamp: DateTime.now(),
+      );
+
+      await messageDoc.set(newMessage.toMap());
+
+      // Ottieni il ruolo e il token FCM del destinatario
+      final receiverDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(selectedChatUserId)
+          .get();
+
+      if (receiverDoc.exists) {
+        final fcmToken = receiverDoc.data()?['fcmToken'];
+        final receiverRole = receiverDoc.data()?['role'];
+        
+        if (fcmToken != null) {
+          final notificationService = NotificationService();
+          if (senderRole == 'teacher') {
+            await notificationService.sendSpecificNotification(
+              fcmToken,
+              'teacher_message',
+              widget.currentUser.displayName ?? 'Docente'
+            );
+          } else if (receiverRole == 'teacher') {
+            await notificationService.sendSpecificNotification(
+              fcmToken,
+              'student_message',
+              widget.currentUser.displayName ?? 'Studente'
+            );
+          }
+        }
+      }
+
+      _messageController.clear();
+    } catch (e) {
+      print('Errore nell\'invio del messaggio: $e');
+    }
   }
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
@@ -401,7 +441,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('chats')
-                  .doc(_getChatId(chatUserId))
+                  .doc(_getChatId(widget.currentUser.uid, chatUserId))
                   .collection('messages')
                   .orderBy('timestamp', descending: false)
                   .snapshots(),

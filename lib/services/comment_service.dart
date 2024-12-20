@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user.dart';
+import '../services/notification_service.dart';
 
 class CommentService {
   final CollectionReference commentCollection =
@@ -38,27 +39,25 @@ class CommentService {
           'replies': FieldValue.arrayUnion([reply.toMap()]),
         });
 
-        // 5. Crea e salva la notifica per l'autore del commento originale
-        if (parentUserId != user.uid) { // Non inviare notifica a se stessi
-          final notification = Notification(
-            id: FirebaseFirestore.instance.collection('notifications').doc().id,
-            message: '@$username ha risposto al tuo commento: "${content.length > 50 ? content.substring(0, 47) + '...' : content}"',
-            timestamp: DateTime.now(),
-            isRead: false,
-            videoId: parentComment['videoId'],
-            isFromTeacher: false,
-          );
-
-          // Aggiungi la notifica all'utente che ha scritto il commento originale
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(parentUserId)
-              .update({
-            'notifications': FieldValue.arrayUnion([notification.toMap()]),
-          });
+        // Invia notifica all'autore del commento originale
+        final parentUserDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(parentUserId)
+            .get();
+        
+        if (parentUserDoc.exists) {
+          final fcmToken = parentUserDoc.data()?['fcmToken'];
+          if (fcmToken != null) {
+            final notificationService = NotificationService();
+            await notificationService.sendSpecificNotification(
+              fcmToken, 
+              'comment_reply',
+              username
+            );
+          }
         }
       } catch (e) {
-        print('Errore durante l\'aggiunta della risposta: $e');
+        print('Errore nell\'aggiunta della risposta: $e');
         rethrow;
       }
     }
