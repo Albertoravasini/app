@@ -30,26 +30,6 @@ class NotificationService {
       const currentTimeEST = new Date(Date.now() + (EST_OFFSET * 60 * 60 * 1000));
       const scheduledTimeEST = new Date(Date.now() + delay + (EST_OFFSET * 60 * 60 * 1000));
       
-      // Modifica: Usa un ID più specifico che includa title e body
-      const notificationId = `${token}_${title}_${body}_${scheduledTimeEST.getTime()}`;
-      
-      // Verifica più rigorosa per le notifiche duplicate
-      const existingNotification = await redisClient.get(notificationId);
-      if (existingNotification) {
-        console.log('Notifica duplicata rilevata, annullamento invio...');
-        return false; // Aggiungi un return false per indicare che la notifica non è stata programmata
-      }
-      
-      // Salva l'ID della notifica con più dettagli
-      await redisClient.set(notificationId, JSON.stringify({
-        token,
-        title,
-        body,
-        scheduledTime: scheduledTimeEST.getTime()
-      }), {
-        EX: 24 * 60 * 60
-      });
-
       console.log(`Current time:
       - EST: ${currentTimeEST.toLocaleString('en-US', this.TIME_FORMAT)}`);
 
@@ -103,10 +83,8 @@ class NotificationService {
         }
       }, delay);
 
-      return true; // Aggiungi un return true per indicare che la notifica è stata programmata con successo
     } catch (error) {
       console.error('Error scheduling notification:', error);
-      return false;
     }
   }
 
@@ -114,20 +92,10 @@ class NotificationService {
     try {
       console.log('Starting notification scheduling for uid:', uid);
       
-      // Aggiungi un controllo per l'ultima notifica inviata
-      const lastNotificationTime = await redisClient.get(`user_last_notification_sent_${uid}`);
-      const now = Date.now();
+      // Force reset - Remove after testing
+      await redisClient.del(`user_last_notification_delay_${uid}`);
+      console.log('Forced reset of previous delay');
       
-      if (lastNotificationTime) {
-        const timeSinceLastNotification = now - parseInt(lastNotificationTime);
-        const minimumInterval = 4 * 60 * 60 * 1000; // 4 ore minime tra le notifiche
-        
-        if (timeSinceLastNotification < minimumInterval) {
-          console.log('Troppo presto per una nuova notifica. Uscita...');
-          return;
-        }
-      }
-
       // Check last delay used
       let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
       console.log('Last delay:', lastNotificationDelay ? `${parseInt(lastNotificationDelay)/3600000} hours` : 'none');
@@ -140,19 +108,18 @@ class NotificationService {
       const hoursDelay = nextNotificationDelay / (1000 * 60 * 60);
       const messageKey = hoursDelay <= 6 ? 6 : hoursDelay <= 12 ? 12 : 24;
       const messages = this.getNotificationMessages(messageKey);
-      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
-
-      // Modifica: Verifica il risultato della programmazione
-      const notificationScheduled = await this.scheduleNotification(token, randomMessage.title, randomMessage.body, nextNotificationDelay);
       
-      if (notificationScheduled) {
-        // Salva il nuovo delay e il timestamp solo se la notifica è stata effettivamente programmata
-        await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay.toString());
-        await redisClient.set(`user_last_notification_sent_${uid}`, now.toString());
-        console.log('Notifica programmata con successo');
-      } else {
-        console.log('Notifica non programmata a causa di una possibile duplicazione');
-      }
+      // Assicuriamoci di selezionare un solo messaggio casuale
+      const randomIndex = Math.floor(Math.random() * messages.length);
+      const selectedMessage = messages[randomIndex];
+      console.log('Selected message index:', randomIndex);
+
+      // Schedule notification with the single selected message
+      await this.scheduleNotification(token, selectedMessage.title, selectedMessage.body, nextNotificationDelay);
+      
+      // Save new delay
+      await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay.toString());
+      console.log('New delay saved in Redis:', nextNotificationDelay/3600000, 'hours');
 
     } catch (error) {
       console.error('Error scheduling notification:', error);
