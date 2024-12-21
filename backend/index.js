@@ -172,18 +172,41 @@ app.post('/update_last_access', async (req, res) => {
   console.log('Ricevuta richiesta update_last_access:', { uid, lastAccessTime });
 
   try {
-    // Salva l'ultimo accesso
-    await redisClient.set(`user_last_access_${uid}`, lastAccessTime);
-    await admin.firestore().collection('users').doc(uid).update({
-      lastAccess: lastAccessTime,
-      fcmToken: fcmToken
-    });
+    // Prima controlla se è un nuovo giorno
+    const lastAccess = await redisClient.get(`user_last_access_${uid}`);
+    const lastAccessDate = lastAccess ? new Date(lastAccess) : null;
+    const newAccessDate = new Date(lastAccessTime);
+    
+    // Confronta solo le date (ignorando l'ora)
+    const isNewDay = !lastAccess || 
+      new Date(lastAccessDate.setHours(0,0,0,0)).getTime() < 
+      new Date(newAccessDate.setHours(0,0,0,0)).getTime();
 
-    // Programma la notifica
-    console.log('Programmazione notifica per token:', fcmToken.substring(0, 10) + '...');
-    await notificationService.schedulePushNotification(uid, fcmToken, admin.firestore(), redisClient);
+    console.log('Last access:', lastAccess);
+    console.log('New access:', lastAccessTime);
+    console.log('Is new day:', isNewDay);
 
-    res.status(200).json({ success: true });
+    if (isNewDay) {
+      // Aggiorna l'ultimo accesso solo se è un nuovo giorno
+      await redisClient.set(`user_last_access_${uid}`, lastAccessTime);
+      await admin.firestore().collection('users').doc(uid).update({
+        lastAccess: lastAccessTime,
+        fcmToken: fcmToken
+      });
+    } else {
+      // Aggiorna solo il token FCM se non è un nuovo giorno
+      await admin.firestore().collection('users').doc(uid).update({
+        fcmToken: fcmToken
+      });
+    }
+
+    // Programma la notifica solo se necessario
+    if (isNewDay) {
+      console.log('Programmazione notifica per token:', fcmToken.substring(0, 10) + '...');
+      await notificationService.schedulePushNotification(uid, fcmToken, admin.firestore(), redisClient);
+    }
+
+    res.status(200).json({ success: true, isNewDay });
   } catch (error) {
     console.error('Errore:', error);
     res.status(500).json({ success: false, error: error.message });

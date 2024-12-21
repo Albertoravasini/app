@@ -27,58 +27,47 @@ class _SplashScreenState extends State<SplashScreen> {
 
 Future<void> _navigateToNextScreen() async {
   try {
-    // Inizia a caricare l'utente contemporaneamente al delay
     Future<UserModel?> userModelFuture = _loadUserData();
-
-    // Simula il tempo di caricamento (1 secondo)
     await Future.delayed(const Duration(seconds: 1));
-
-    // Una volta che il caricamento simulato è finito, controlla i dati dell'utente
     UserModel? userModel = await userModelFuture;
 
     if (userModel != null) {
-      // Aggiorna il token e l'ultimo accesso
       final notificationService = NotificationService();
-      await notificationService.getAndUpdateToken();  // Rimosso underscore
 
-      // Controlla se `consecutiveDays` è aumentato rispetto all'ultimo accesso
-      final now = DateTime.now();
-      final lastAccess = userModel.lastAccess;
-
-      // Confrontiamo solo le date, ignorando l'ora
+      final now = DateTime.now().toLocal();
+      final lastAccess = userModel.lastAccess.toLocal();
+      
       final lastAccessDate = DateTime(lastAccess.year, lastAccess.month, lastAccess.day);
       final todayDate = DateTime(now.year, now.month, now.day);
+      
+      print('DEBUG: Now: $now');
+      print('DEBUG: Last Access: $lastAccess');
+      print('DEBUG: Last Access Date: $lastAccessDate');
+      print('DEBUG: Today Date: $todayDate');
+      print('DEBUG: Is Before?: ${lastAccessDate.isBefore(todayDate)}');
+      print('DEBUG: Consecutive Days: ${userModel.consecutiveDays}');
 
-      final difference = todayDate.difference(lastAccessDate).inDays;
-
-      if (difference >= 1) { 
-        // Se è passata almeno una giornata
-        if (difference == 1) {
-          // Incrementa consecutiveDays solo se è passato un solo giorno
-          userModel.consecutiveDays += 1;
-        } else {
-          // Se è passato più di un giorno, resetta il conteggio a 0
-          userModel.consecutiveDays = 0;
-        }
-
-        // Aggiorna lastAccess e consecutiveDays nel database
+      if (lastAccessDate.isBefore(todayDate)) {
+        print('DEBUG: Showing streak screen');
+        userModel.consecutiveDays += 1;
+        
         await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
           'consecutiveDays': userModel.consecutiveDays,
           'lastAccess': now.toIso8601String(),
         });
 
-        if (difference == 1) {
-          // Mostra la schermata di streak solo se la serie è incrementata
+        await notificationService.getAndUpdateToken();
+
+        if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => StreakScreen(
                 consecutiveDays: userModel.consecutiveDays,
                 coins: userModel.coins,
-                userModel: userModel, // Passa l'UserModel
+                userModel: userModel,
                 onCollectCoins: () async {
-                  print('onCollectCoins called'); // Debugging
-
+                  print('DEBUG: Collecting coins');
                   // Aumenta i coins quando l'utente raccoglie la ricompensa
                   try {
                     await FirebaseFirestore.instance.collection('users').doc(userModel.uid).update({
@@ -95,21 +84,23 @@ Future<void> _navigateToNextScreen() async {
               ),
             ),
           );
-          return; // Interrompi l'esecuzione per evitare la navigazione immediata
+          return;
         }
+      } else {
+        print('DEBUG: Skipping streak screen, same day');
+        await notificationService.getAndUpdateToken();
       }
-
-      // Se difference >=1 ma !=1, oppure difference <1
+      
       _navigateToMainScreen(userModel);
     } else {
-      // Se non c'è un utente loggato o non esiste l'utente, mostra l'OnboardingScreen
+      print('DEBUG: No user model found');
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
       );
     }
   } catch (e) {
-    print('Errore in _navigateToNextScreen: $e');
+    print('DEBUG: Error in _navigateToNextScreen: $e');
   }
 }
 
