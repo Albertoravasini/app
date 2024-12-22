@@ -191,7 +191,7 @@ class NotificationService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'token': token,
-          'title': _getNotificationTitle(type),
+          'title': _getNotificationTitle(type, senderName),
           'body': _getNotificationBody(type, senderName)
         }),
       );
@@ -202,14 +202,14 @@ class NotificationService {
     }
   }
 
-  String _getNotificationTitle(String type) {
+  String _getNotificationTitle(String type, String senderName) {
     switch (type) {
       case 'teacher_message':
-        return '📚 New message from teacher';
+        return '📚 $senderName';
       case 'student_message':
-        return '👨‍🎓 New message from student';
+        return '👨‍🎓 $senderName';
       case 'comment_reply':
-        return '💬 New comment';
+        return '💬 $senderName';
       default:
         return 'New notification';
     }

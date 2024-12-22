@@ -78,52 +78,95 @@ class ProfileFeedTab extends StatelessWidget {
         final course = userCourses[index];
         return Hero(
           tag: 'course_${course.id}',
-          child: Card(
-            color: const Color(0xFF282828),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 4,
+          child: Container(
             margin: const EdgeInsets.only(bottom: 16),
-            child: InkWell(
+            decoration: BoxDecoration(
+              color: const Color(0xFF282828),
               borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                HapticFeedback.lightImpact();
-                _showCoursePreview(context, course);
-              },
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Stack per l'immagine di copertina e il badge del prezzo
-                  Stack(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: course.coverImageUrl != null
+                    ? Image.network(
+                        course.coverImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _buildErrorContainer(),
+                      )
+                    : _buildPlaceholderContainer(),
+                ),
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.8),
+                          Colors.black.withOpacity(0.95),
+                        ],
+                        stops: const [0.3, 0.7, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: _buildPriceBadge(course.cost, course.id),
+                ),
+                InkWell(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _showCoursePreview(context, course);
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildCoverImage(course),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: _buildPriceBadge(course.cost, course.id),
+                      const SizedBox(height: 160),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              course.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              course.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildCourseStats(course),
+                            const SizedBox(height: 16),
+                            _buildSectionsProgress(course),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                  // Contenuto del corso
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Titolo e descrizione
-                        _buildTitleAndDescription(course),
-                        const SizedBox(height: 16),
-                        // Statistiche del corso
-                        _buildCourseStats(course),
-                        const SizedBox(height: 16),
-                        // Sezioni e progresso
-                        _buildSectionsProgress(course),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -131,56 +174,37 @@ class ProfileFeedTab extends StatelessWidget {
     );
   }
 
-  Widget _buildCoverImage(Course course) {
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      child: Container(
-        height: 180,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.black.withOpacity(0.3),
-              Colors.black.withOpacity(0.7),
-            ],
+  Widget _buildErrorContainer() {
+    return Container(
+      color: Colors.grey[800],
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.image_not_supported,
+            color: Colors.white.withOpacity(0.3),
+            size: 40,
           ),
-        ),
-        child: course.coverImageUrl != null
-            ? Image.network(
-                course.coverImageUrl!,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: Colors.grey[800],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.image_not_supported,
-                        color: Colors.white.withOpacity(0.3),
-                        size: 40,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Image not available',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : Container(
-                color: Colors.grey[800],
-                child: Icon(
-                  Icons.school,
-                  color: Colors.white.withOpacity(0.3),
-                  size: 48,
-                ),
-              ),
+          const SizedBox(height: 8),
+          Text(
+            'Image not available',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderContainer() {
+    return Container(
+      color: Colors.grey[800],
+      child: Icon(
+        Icons.school,
+        color: Colors.white.withOpacity(0.3),
+        size: 48,
       ),
     );
   }
@@ -226,34 +250,6 @@ class ProfileFeedTab extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildTitleAndDescription(Course course) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          course.title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          course.description,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 14,
-            height: 1.4,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
     );
   }
 

@@ -64,7 +64,12 @@ class Course {
       cost: data['cost'] ?? 0,
       visible: data['visible'] ?? true,
       sections: List<Section>.from(
-        data['sections']?.map((section) => Section.fromMap(section)) ?? [],
+        (data['sections'] ?? []).asMap().entries.map((entry) {
+          // Aggiungiamo l'indice + 1 come sectionNumber
+          var sectionData = entry.value as Map<String, dynamic>;
+          sectionData['sectionNumber'] = entry.key + 1;
+          return Section.fromMap(sectionData);
+        }),
       ),
       topic: data['topic'] ?? '',
       subtopic: data['subtopic'] ?? '',
@@ -126,7 +131,7 @@ class Section {
       title: data['title'] ?? '',
       steps: List<LevelStep>.from(data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []),
       imageUrl: data['imageUrl'],
-      sectionNumber: data['sectionNumber'] ?? 1,
+      sectionNumber: data['sectionNumber'] ?? 1, // Usa il numero fornito o 1 come default
     );
   }
 

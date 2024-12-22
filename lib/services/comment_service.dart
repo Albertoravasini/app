@@ -22,7 +22,25 @@ class CommentService {
         // 2. Get parent comment
         final commentDoc = await commentCollection.doc(parentCommentId).get();
         final parentComment = commentDoc.data() as Map<String, dynamic>;
-        final parentUserId = parentComment['userId'] as String;
+        
+        // Controlla se stiamo rispondendo a una risposta esistente
+        String? replyToUserId;
+        if (content.startsWith('@')) {
+          // Estrai il nome utente menzionato
+          final mentionedUsername = content.split(' ')[0].substring(1);
+          
+          // Cerca tra le risposte esistenti
+          final replies = List<Map<String, dynamic>>.from(parentComment['replies'] ?? []);
+          final replyTo = replies.firstWhere(
+            (reply) => reply['username'] == mentionedUsername,
+            orElse: () => {},
+          );
+          
+          // Se troviamo la risposta, usa l'ID dell'utente di quella risposta
+          if (replyTo.isNotEmpty) {
+            replyToUserId = replyTo['userId'];
+          }
+        }
 
         // 3. Create reply
         final reply = Comment(
@@ -34,11 +52,12 @@ class CommentService {
           timestamp: DateTime.now(),
         );
 
-        // 4. Add notification for original comment user
-        if (parentUserId != user.uid) { // Don't send notification if user replies to their own comment
+        // 4. Add notification
+        final notificationUserId = replyToUserId ?? parentComment['userId'];
+        if (notificationUserId != user.uid) { // Non inviare notifica a se stessi
           final notification = {
             'id': DateTime.now().millisecondsSinceEpoch.toString(),
-            'message': '@$username replied to your comment',
+            'message': content,
             'timestamp': DateTime.now().toIso8601String(),
             'isRead': false,
             'videoId': parentComment['videoId'],
@@ -48,10 +67,28 @@ class CommentService {
 
           await FirebaseFirestore.instance
               .collection('users')
-              .doc(parentUserId)
+              .doc(notificationUserId)
               .update({
             'notifications': FieldValue.arrayUnion([notification])
           });
+
+          // Send push notification
+          final recipientDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(notificationUserId)
+              .get();
+          
+          if (recipientDoc.exists) {
+            final fcmToken = recipientDoc.data()?['fcmToken'];
+            if (fcmToken != null) {
+              final notificationService = NotificationService();
+              await notificationService.sendSpecificNotification(
+                fcmToken, 
+                'comment_reply',
+                username
+              );
+            }
+          }
         }
 
         // 5. Update comment with reply
@@ -59,23 +96,6 @@ class CommentService {
           'replies': FieldValue.arrayUnion([reply.toMap()])
         });
 
-        // Send push notification to original comment author
-        final parentUserDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(parentUserId)
-            .get();
-        
-        if (parentUserDoc.exists) {
-          final fcmToken = parentUserDoc.data()?['fcmToken'];
-          if (fcmToken != null) {
-            final notificationService = NotificationService();
-            await notificationService.sendSpecificNotification(
-              fcmToken, 
-              'comment_reply',
-              username
-            );
-          }
-        }
       } catch (e) {
         print('Error adding reply: $e');
         rethrow;
@@ -201,15 +221,49 @@ class CommentService {
     }
   }
 
-  // Elimina un commento
+  // Elimina un commento e tutte le sue risposte
   Future<void> deleteComment(String commentId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        // Elimina il commento dal database
+        // 1. Ottieni il commento prima di eliminarlo per avere accesso alle risposte
+        final commentDoc = await commentCollection.doc(commentId).get();
+        if (!commentDoc.exists) return;
+
+        final commentData = commentDoc.data() as Map<String, dynamic>;
+        final replies = List<Map<String, dynamic>>.from(commentData['replies'] ?? []);
+
+        // 2. Elimina il commento principale
         await commentCollection.doc(commentId).delete();
+
+        // 3. Opzionalmente, puoi anche rimuovere le notifiche correlate a questo commento
+        // e alle sue risposte da tutti gli utenti coinvolti
+        final uniqueUserIds = <String>{
+          commentData['userId'], // Autore del commento principale
+          ...replies.map((reply) => reply['userId'] as String), // Autori delle risposte
+        };
+
+        // 4. Rimuovi le notifiche per tutti gli utenti coinvolti
+        for (final userId in uniqueUserIds) {
+          final userRef = FirebaseFirestore.instance.collection('users').doc(userId);
+          final userDoc = await userRef.get();
+          if (userDoc.exists) {
+            final notifications = List<dynamic>.from(userDoc.data()?['notifications'] ?? []);
+            
+            // Rimuovi le notifiche relative a questo commento
+            notifications.removeWhere((notification) => 
+              notification['videoId'] == commentData['videoId'] && 
+              (notification['message'] == commentData['content'] || 
+               replies.any((reply) => reply['content'] == notification['message']))
+            );
+
+            await userRef.update({'notifications': notifications});
+          }
+        }
+
       } catch (e) {
-        print('Errore durante l\'eliminazione del commento: $e');
+        print('Errore durante l\'eliminazione del commento e delle risposte: $e');
+        rethrow;
       }
     }
   }

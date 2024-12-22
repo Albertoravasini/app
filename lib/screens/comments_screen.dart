@@ -83,36 +83,74 @@ class _CommentsScreenState extends State<CommentsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Linea estetica e pulsante AI
-              Row(
-                children: [
-                  const SizedBox(width: 40),
-                  Expanded(
-                    child: Center(
-                      child: Container(
-                        width: 50,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: Colors.yellowAccent,
-                          borderRadius: BorderRadius.circular(2.5),
-                        ),
+              // Sostituisci la parte superiore con questo nuovo design
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  children: [
+                    // Lineetta decorativa in alto
+                    Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      _showAiChat ? Icons.chat : Icons.smart_toy,
-                      color: Colors.yellowAccent,
+                    const SizedBox(height: 16),
+                    // Toggle centrato con larghezza fissa
+                    SizedBox(
+                      width: 200,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _showAiChat = false),
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 15),
+                                child: Text(
+                                  'Comments',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    color: !_showAiChat ? Colors.yellowAccent : Colors.white60,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Container(
+                            height: 12,
+                            width: 1,
+                            color: Colors.white24,
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _showAiChat = true),
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 15),
+                                child: Text(
+                                  'AI Chat',
+                                  textAlign: TextAlign.left,
+                                  style: TextStyle(
+                                    color: _showAiChat ? Colors.yellowAccent : Colors.white60,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _showAiChat = !_showAiChat;
-                      });
-                    },
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
-              const SizedBox(height: 0),
               
               // Contenuto principale
               Expanded(
@@ -141,8 +179,13 @@ class _CommentsScreenState extends State<CommentsScreen> {
                           if (comments.isEmpty) {
                             return const Center(
                               child: Text(
-                                'No comments found',
-                                style: TextStyle(color: Colors.white),
+                                'Be the first to comment',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  fontFamily: 'Montserrat',
+                                ),
                               ),
                             );
                           }

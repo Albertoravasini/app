@@ -27,7 +27,7 @@ class _CourseScreenState extends State<CourseScreen> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('profileImageUrl', isNull: false)
+          .where('role', isEqualTo: 'teacher')
           .limit(50)
           .get();
 

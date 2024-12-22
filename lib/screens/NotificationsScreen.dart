@@ -255,12 +255,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     if (currentUser == null) return;
 
     final userRef = FirebaseFirestore.instance.collection('users').doc(currentUser!.uid);
-    await userRef.update({
-      'notifications': FieldValue.arrayRemove([
-        {'id': notificationId}
-      ])
-    });
+    final userDoc = await userRef.get();
+    
+    // Ottieni l'array corrente delle notifiche
+    final notifications = List<dynamic>.from(userDoc.data()?['notifications'] ?? []);
+    
+    // Trova e rimuovi la notifica completa
+    notifications.removeWhere((n) => n['id'] == notificationId);
+    
+    // Aggiorna il documento con il nuovo array
+    await userRef.update({'notifications': notifications});
 
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Notification removed'),

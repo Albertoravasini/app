@@ -446,19 +446,17 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
         children: [
           // Header elegante
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 16,
             ),
-            child: Row(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E1E1E),
+            ),
+            child: Stack(
+              alignment: Alignment.centerLeft,
               children: [
                 if (widget.currentUser.uid == widget.profileUser.uid)
                   IconButton(
@@ -470,50 +468,59 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                       });
                     },
                   ),
-                Hero(
-                  tag: 'avatar_$chatUserId',
-                  child: CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.yellowAccent,
-                    child: CircleAvatar(
-                      radius: 22,
-                      backgroundImage: NetworkImage(
-                        widget.profileUser.profileImageUrl ?? 'https://via.placeholder.com/40',
-                      ),
-                    ),
+                Padding(
+                  padding: EdgeInsets.only(
+                    left: widget.currentUser.uid == widget.profileUser.uid ? 48.0 : 0,
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        widget.profileUser.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Montserrat',
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: const [
-                          CircleAvatar(
-                            radius: 4,
-                            backgroundColor: Color(0xFF51B152),
-                          ),
-                          SizedBox(width: 6),
-                          Text(
-                            'Online',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontFamily: 'Montserrat',
+                      Hero(
+                        tag: 'avatar_$chatUserId',
+                        child: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Colors.yellowAccent,
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundImage: NetworkImage(
+                              widget.profileUser.profileImageUrl ?? 'https://via.placeholder.com/40',
                             ),
                           ),
-                        ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.profileUser.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Montserrat',
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: const [
+                                CircleAvatar(
+                                  radius: 4,
+                                  backgroundColor: Color(0xFF51B152),
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Online',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                    fontFamily: 'Montserrat',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -538,11 +545,26 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                     ),
                   );
                 }
+                
                 final messages = snapshot.data!.docs;
+                
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients && messages.isNotEmpty) {
+                    _scrollController.jumpTo(
+                      _scrollController.position.maxScrollExtent + 100
+                    );
+                  }
+                });
+
                 return ListView.builder(
                   controller: _scrollController,
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: 22,
+                  ),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final message = messages[index].data() as Map<String, dynamic>;
@@ -560,7 +582,9 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                           userImage = userData?['profileImageUrl'] as String?;
                         }
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.only(
+                            bottom: index == messages.length - 1 ? 12 : 12,
+                          ),
                           child: Row(
                             mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -640,72 +664,71 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
               },
             ),
           ),
-          // Input area migliorata
+          // Input area con padding bottom minimo
           Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
-                ),
-              ],
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E1E1E),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFF282828),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(25),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                    onSubmitted: (value) => _sendMessage(value),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    _sendMessage(_messageController.text);
-                  },
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.yellowAccent,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 8,
+                bottom: 8 + (MediaQuery.of(context).padding.bottom / 2) + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.send_rounded,
-                      color: Colors.black,
+                        filled: true,
+                        fillColor: const Color(0xFF282828),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (value) => _sendMessage(value),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      _sendMessage(_messageController.text);
+                    },
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

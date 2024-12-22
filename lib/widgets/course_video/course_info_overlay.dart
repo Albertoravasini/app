@@ -208,7 +208,23 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
     if (widget.course != null) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        widget.controller.hasSubscription(widget.course!.authorId).then((hasSubscription) {
+        widget.controller.hasSubscription(widget.course!.authorId).then((hasSubscription) async {
+          // Controlla se l'utente ha già iniziato il corso
+          final hasProgress = await _hasCourseProgress();
+          
+          // Traccia l'evento con PostHog
+          Posthog().capture(
+            eventName: hasProgress ? 'continue_course' : 'start_course',
+            properties: {
+              'course_id': widget.course!.id,
+              'course_title': widget.course!.title,
+              'author_id': widget.course!.authorId,
+              'author_name': widget.course!.authorName,
+              'video_title': widget.videoTitle,
+              'has_subscription': hasSubscription,
+            },
+          );
+
           if (hasSubscription) {
             widget.controller.onStartCourse(widget.course, null);
           } else {
@@ -437,7 +453,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
                           Flexible(
                             child: Text(
                               widget.isInCourse 
-                                  ? widget.currentSection?.title ?? "Section 1"
+                                  ? "Section ${widget.currentSection?.sectionNumber ?? 1}: ${widget.currentSection?.title ?? 'Section 1'}"
                                   : widget.topic,
                               style: const TextStyle(
                                 color: Colors.white,
@@ -564,6 +580,12 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
                         fontFamily: 'Montserrat',
                         fontWeight: FontWeight.w700,
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.verified,
+                      color: Colors.white,
+                      size: 16,
                     ),
                   ],
                 ),
