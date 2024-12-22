@@ -11,6 +11,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 
 class CourseEditScreen extends StatefulWidget {
   final Course? course;
@@ -49,124 +50,127 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF181819),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header compatto
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Color(0xFF282828),
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: BoxConstraints(),
-                    icon: Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      height: 3,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(1.5),
-                        child: LinearProgressIndicator(
-                          value: (_currentStep + 1) / _stepTitles.length,
-                          backgroundColor: Colors.grey[800],
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
-                        ),
-                      ),
+      body: Form(
+        key: _formKey,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header compatto
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Color(0xFF282828),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
                     ),
                   ),
-                  SizedBox(width: 8),
-                  Text(
-                    '${_currentStep + 1}/${_stepTitles.length}',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontFamily: 'Montserrat',
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Contenuto principale
-            Expanded(
-              child: _currentStep == 0
-                  ? _buildBasicInfoStep()
-                  : _currentStep == 1
-                      ? _buildContentStep()
-                      : _currentStep == 2
-                          ? _buildResourcesStep()
-                          : _buildSummaryStep(),
-            ),
-            
-            // Pulsanti di navigazione compatti
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Color(0xFF282828),
-                border: Border(
-                  top: BorderSide(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 1,
-                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  if (_currentStep > 0)
+                child: Row(
+                  children: [
                     IconButton(
                       padding: EdgeInsets.zero,
                       constraints: BoxConstraints(),
-                      icon: Icon(Icons.arrow_back, color: Colors.white70, size: 20),
-                      onPressed: () => _handleStepChange(_currentStep - 1),
+                      icon: Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      if (_currentStep < _stepTitles.length - 1) {
-                        _handleStepChange(_currentStep + 1);
-                      } else {
-                        _saveCourse();
-                      }
-                    },
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      backgroundColor: Colors.yellowAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _currentStep == _stepTitles.length - 1 ? 'Salva' : 'Avanti',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        height: 3,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(1.5),
+                          child: LinearProgressIndicator(
+                            value: (_currentStep + 1) / _stepTitles.length,
+                            backgroundColor: Colors.grey[800],
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
                           ),
                         ),
-                        if (_currentStep < _stepTitles.length - 1)
-                          Icon(Icons.arrow_forward, color: Colors.black, size: 16),
-                      ],
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      '${_currentStep + 1}/${_stepTitles.length}',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontFamily: 'Montserrat',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Contenuto principale
+              Expanded(
+                child: _currentStep == 0
+                    ? _buildBasicInfoStep()
+                    : _currentStep == 1
+                        ? _buildContentStep()
+                        : _currentStep == 2
+                            ? _buildResourcesStep()
+                            : _buildSummaryStep(),
+              ),
+              
+              // Pulsanti di navigazione compatti
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Color(0xFF282828),
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
                     ),
                   ),
-                ],
+                ),
+                child: Row(
+                  children: [
+                    if (_currentStep > 0)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: BoxConstraints(),
+                        icon: Icon(Icons.arrow_back, color: Colors.white70, size: 20),
+                        onPressed: () => _handleStepChange(_currentStep - 1),
+                      ),
+                    Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        if (_currentStep < _stepTitles.length - 1) {
+                          _handleStepChange(_currentStep + 1);
+                        } else {
+                          _saveCourse();
+                        }
+                      },
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        backgroundColor: Colors.yellowAccent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _currentStep == _stepTitles.length - 1 ? 'Salva' : 'Avanti',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          if (_currentStep < _stepTitles.length - 1)
+                            Icon(Icons.arrow_forward, color: Colors.black, size: 16),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -978,58 +982,55 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                   onPressed: isUploading
                       ? null
                       : () async {
-                          if (stepType == 'video' && 
-                              videoFile != null && 
-                              videoTitle != null && 
-                              videoTitle!.isNotEmpty) {
+                          if (stepType == 'video' && videoFile != null && videoTitle != null && videoTitle!.isNotEmpty) {
                             try {
                               setDialogState(() {
                                 isUploading = true;
                               });
 
-                              // Upload del video su Firebase Storage
-                              final videoRef = FirebaseStorage.instance
-                                  .ref()
-                                  .child('course_videos')
-                                  .child('${DateTime.now().millisecondsSinceEpoch}.mp4');
-
-                              final uploadTask = videoRef.putFile(videoFile!);
-
-                              // Monitora il progresso dell'upload
-                              uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-                                double progress = snapshot.bytesTransferred / snapshot.totalBytes;
-                                print('Progresso upload: ${(progress * 100).toStringAsFixed(2)}%');
-                              });
-
-                              final snapshot = await uploadTask.whenComplete(() {});
-                              final videoUrl = await snapshot.ref.getDownloadURL();
-                              print('URL del video caricato: $videoUrl');
-
-                              // Aggiungi lo step alla sezione
-                              if (mounted) {
-                                setState(() {
-                                  section.steps.add(LevelStep(
-                                    type: 'video',
-                                    content: videoTitle!,
-                                    videoUrl: videoUrl,
-                                    thumbnailUrl: thumbnailUrl,
-                                    isShort: false,
-                                    topic: widget.course?.topic ?? '',
-                                  ));
-                                });
+                              // Verifica che il file esista e sia accessibile
+                              if (!await videoFile!.exists()) {
+                                throw Exception('Il file video non esiste o non è accessibile');
                               }
 
-                              // Mostra un messaggio di successo
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Video caricato con successo!')),
-                              );
+                              // Verifica la dimensione del file
+                              final fileSize = await videoFile!.length();
+                              print('Dimensione file: ${fileSize / (1024 * 1024)} MB');
 
-                              Navigator.pop(dialogContext);
+                              await _uploadVideo(
+                                videoFile!,
+                                (String videoUrl) {
+                                  if (mounted) {
+                                    setState(() {
+                                      section.steps.add(LevelStep(
+                                        type: 'video',
+                                        content: videoTitle!,
+                                        videoUrl: videoUrl,
+                                        thumbnailUrl: thumbnailUrl,
+                                        isShort: false,
+                                        topic: widget.course?.topic ?? '',
+                                      ));
+                                    });
+                                  }
+                                  Navigator.pop(dialogContext);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Video caricato con successo!')),
+                                  );
+                                },
+                                (String error) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Errore: $error'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                },
+                              );
                             } catch (e) {
                               print('Errore durante l\'upload: $e');
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Errore durante il caricamento del video'),
+                                  content: Text('Errore durante l\'upload: $e'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
@@ -1247,6 +1248,8 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   }
 
   void _deleteStep(int sectionIndex, int stepIndex) {
+    final step = _sections[sectionIndex].steps[stepIndex];
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1268,14 +1271,38 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
             ),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _sections[sectionIndex].steps.removeAt(stepIndex);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Step eliminato con successo')),
-              );
+            onPressed: () async {
+              try {
+                // Se è un video, elimina prima il file dallo storage
+                if (step.type == 'video' && step.videoUrl != null) {
+                  // Ottieni il riferimento al file dallo storage usando l'URL
+                  final videoRef = firebase_storage.FirebaseStorage.instance
+                      .refFromURL(step.videoUrl!);
+                  
+                  // Elimina il file
+                  await videoRef.delete();
+                  print('Video eliminato dallo storage: ${step.videoUrl}');
+                }
+
+                // Elimina lo step dalla sezione
+                setState(() {
+                  _sections[sectionIndex].steps.removeAt(stepIndex);
+                });
+                
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Step eliminato con successo')),
+                );
+              } catch (e) {
+                print('Errore durante l\'eliminazione: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Errore durante l\'eliminazione: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                Navigator.pop(context);
+              }
             },
             child: Text(
               'Elimina',
@@ -1287,86 +1314,67 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     );
   }
 
-void _saveCourse() {
-    if (_formKey.currentState!.validate()) {
+void _saveCourse() async {
+    if (_formKey.currentState != null && _formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      
+      final course = Course(
+        id: widget.course?.id ?? '', // Mantieni l'ID esistente se è un aggiornamento
+        title: _courseTitle ?? '',
+        description: _courseDescription ?? '',
+        cost: _courseCost ?? 0,
+        visible: true,
+        sections: _sections,
+        topic: _selectedTopic ?? '',
+        subtopic: '',
+        thumbnailUrl: widget.course?.thumbnailUrl ?? '',
+        coverImageUrl: _coverImageUrl ?? widget.course?.coverImageUrl ?? '',
+        sources: widget.course?.sources ?? [],
+        acknowledgments: widget.course?.acknowledgments ?? [],
+        recommendedBooks: widget.course?.recommendedBooks ?? [],
+        recommendedPodcasts: widget.course?.recommendedPodcasts ?? [],
+        recommendedWebsites: widget.course?.recommendedWebsites ?? [],
+        rating: widget.course?.rating ?? 0.0,
+        totalRatings: widget.course?.totalRatings ?? 0,
+        authorId: widget.course?.authorId ?? FirebaseAuth.instance.currentUser!.uid,
+        authorName: widget.course?.authorName ?? '', 
+        authorProfileUrl: widget.course?.authorProfileUrl ?? '',
+      );
 
-      // Ottieni l'utente corrente
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Devi essere autenticato per salvare un corso')),
-        );
-        return;
-      }
-
-      // Ottieni i dati dell'utente da Firestore
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get()
-          .then((userDoc) {
-        if (!userDoc.exists) {
-          throw Exception('User document not found');
-        }
-
-        final userData = userDoc.data()!;
-        final courseData = {
-          'title': _courseTitle!,
-          'description': _courseDescription!,
-          'cost': _courseCost!,
-          'topic': _selectedTopic!,
-          'visible': widget.course?.visible ?? true,
-          'sections': _sections.map((section) => section.toMap()).toList(),
-          'coverImageUrl': _coverImageUrl,
-          'sources': _sources,
-          'acknowledgments': _acknowledgments,
-          'recommendedBooks': _recommendedBooks,
-          'recommendedPodcasts': _recommendedPodcasts,
-          'recommendedWebsites': _recommendedWebsites,
-          // Aggiungi i campi dell'autore
-          'authorId': user.uid,
-          'authorName': userData['name'] ?? 'Unknown Author',
-          'authorProfileUrl': userData['profileImageUrl'] ?? '',
-        };
-
-        if (_isEditing) {
-          FirebaseFirestore.instance
+      try {
+        if (widget.course != null) {
+          // Aggiorna il corso esistente
+          await FirebaseFirestore.instance
               .collection('courses')
               .doc(widget.course!.id)
-              .update(courseData)
-              .then((_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Corso aggiornato con successo')),
-            );
-            Navigator.pop(context, true);
-          }).catchError((error) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Errore nell\'aggiornare il corso: $error')),
-            );
-          });
+              .update(course.toMap());
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Corso aggiornato con successo')),
+          );
         } else {
-          FirebaseFirestore.instance
+          // Crea un nuovo corso
+          await FirebaseFirestore.instance
               .collection('courses')
-              .add(courseData)
-              .then((_) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Corso creato con successo')),
-            );
-            Navigator.pop(context, true);
-          }).catchError((error) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Errore nella creazione del corso: $error')),
-            );
-          });
+              .add(course.toMap());
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nuovo corso creato con successo')),
+          );
         }
-      }).catchError((error) {
+        
+        Navigator.pop(context);
+      } catch (e) {
+        print('Errore durante il salvataggio: $e'); // Per debug
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Errore nel recuperare i dati dell\'utente: $error')),
+          SnackBar(
+            content: Text('Errore durante il salvataggio: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
-      });
+      }
     }
-  }
+}
 
   // Aggiungi questa funzione per migrare i corsi esistenti
   Future<void> migrateExistingCourses() async {
@@ -1458,8 +1466,7 @@ void _saveCourse() {
                     onPressed: () => _addItemDialog('Libro', (item) {
                       setState(() => _recommendedBooks.add(item));
                     }),
-                  ),
-                ),
+                )),
                 ListTile(
                   title: const Text('Podcast Consigliati', style: TextStyle(color: Colors.white)),
                   trailing: IconButton(
@@ -1467,9 +1474,8 @@ void _saveCourse() {
                     onPressed: () => _addItemDialog('Podcast', (item) {
                       setState(() => _recommendedPodcasts.add(item));
                     }),
-                  ),
                 ),
-              ],
+            )],
             ),
           ),
         ),
@@ -1635,6 +1641,50 @@ void _saveCourse() {
         ),
       ),
     );
+  }
+
+  Future<void> _uploadVideo(File videoFile, Function(String) onSuccess, Function(String) onError) async {
+    try {
+      final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final videoRef = firebase_storage.FirebaseStorage.instance
+          .ref()
+          .child('course_videos')
+          .child(fileName);
+
+      // Leggi il file come bytes
+      final bytes = await videoFile.readAsBytes();
+      
+      // Crea un upload task senza metadata
+      final uploadTask = videoRef.putData(
+        bytes,
+        firebase_storage.SettableMetadata(contentType: 'video/mp4')
+      );
+
+      // Monitora il progresso
+      uploadTask.snapshotEvents.listen(
+        (snapshot) {
+          if (snapshot.totalBytes > 0) {
+            final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+            print('Progresso upload: ${(progress * 100).toStringAsFixed(2)}%');
+          }
+        },
+        onError: (error) {
+          print('Errore durante il monitoraggio dell\'upload: $error');
+        },
+        cancelOnError: false,
+      );
+
+      // Attendi il completamento
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      print('Upload completato. URL: $downloadUrl');
+      onSuccess(downloadUrl);
+      
+    } catch (e) {
+      print('Errore dettagliato durante l\'upload: $e');
+      onError(e.toString());
+    }
   }
 }
 

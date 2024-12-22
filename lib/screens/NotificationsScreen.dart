@@ -1,8 +1,10 @@
+import 'package:Just_Learn/screens/profile_screen.dart';
+import 'package:Just_Learn/widgets/private_chat_tab.dart';
 import 'package:flutter/material.dart' hide Notification;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import '../models/user.dart' show UserModel, Notification;
+import '../models/user.dart' show UserModel, Notification, NotificationType;
 import 'VideoPlayerScreen.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -50,7 +52,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         elevation: 0,
         centerTitle: false,
         title: const Text(
-          'Attività',
+          'Activity',
           style: TextStyle(
             color: Colors.white,
             fontSize: 24,
@@ -79,8 +81,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
                 fontSize: 14,
               ),
               tabs: const [
-                Tab(text: 'INSEGNANTI'),
-                Tab(text: 'COMMENTI'),
+                Tab(text: 'TEACHERS'),
+                Tab(text: 'COMMENTS'),
               ],
             ),
           ),
@@ -112,10 +114,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
         final userData = snapshot.data!.data() as Map<String, dynamic>?;
         if (userData == null) return const SizedBox();
 
+        // Filtra le notifiche in base al tipo
         final notifications = (userData['notifications'] as List<dynamic>? ?? [])
             .map((n) => Notification.fromMap(n))
-            .where((n) => type == 'teacher' ? n.isFromTeacher : !n.isFromTeacher)
+            .where((n) {
+              if (type == 'teacher') {
+                // Nella tab TEACHERS mostra:
+                // - Per gli insegnanti: i messaggi degli studenti
+                // - Per gli studenti: i messaggi degli insegnanti
+                return n.type == NotificationType.teacherMessage || 
+                       n.type == NotificationType.studentMessage;
+              } else {
+                // Nella tab COMMENTS mostra solo le risposte ai commenti
+                return n.type == NotificationType.commentReply;
+              }
+            })
             .toList();
+
+        // Ordina per timestamp più recente
+        notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
         if (notifications.isEmpty) {
           return Center(
@@ -130,8 +147,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
                 const SizedBox(height: 16),
                 Text(
                   type == 'teacher' 
-                      ? 'Nessuna notifica dagli insegnanti'
-                      : 'Nessuna notifica dai commenti',
+                      ? 'No notifications from teachers'
+                      : 'No comment notifications',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 16,
@@ -162,17 +179,50 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     // Segna come letta
     await _markAsRead(notification.id);
 
-    // Naviga alla schermata appropriata
-    if (notification.videoId != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VideoPlayerScreen(
-            videoId: notification.videoId!,
-            autoOpenComments: true,
-          ),
-        ),
-      );
+    // Naviga al profilo se c'è un senderId
+    if (notification.senderId != null && context.mounted) {
+      try {
+        // Recupera i dati completi dell'utente da Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(notification.senderId)
+            .get();
+
+        if (userDoc.exists && context.mounted) {
+          // Crea un UserModel completo con tutti i dati
+          final userData = userDoc.data()!;
+          final profileUser = UserModel.fromMap(userData);
+
+          // Naviga al profilo con i dati completi
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProfileScreen(
+                currentUser: profileUser,
+              ),
+            ),
+          );
+        } else {
+          // Gestione errore: utente non trovato
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Utente non trovato'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        // Gestione errore: problema di rete o altro
+        print('Errore nel recupero dati utente: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Errore nel caricamento del profilo'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -202,7 +252,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Notifica rimossa'),
+        content: Text('Notification removed'),
         backgroundColor: Colors.yellowAccent,
         behavior: SnackBarBehavior.floating,
       ),
@@ -243,8 +293,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: notification.isRead
                       ? Colors.grey.withOpacity(0.1)
@@ -252,11 +302,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  notification.isFromTeacher ? Icons.school : Icons.chat_bubble_outline,
+                  _getNotificationIcon(notification),
                   color: notification.isRead
                       ? Colors.grey
                       : Colors.yellowAccent,
-                  size: 22,
+                  size: 24,
                 ),
               ),
               const SizedBox(width: 12),
@@ -264,23 +314,46 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FutureBuilder<String>(
+                            future: _getNotificationTitle(notification),
+                            builder: (context, snapshot) {
+                              return Text(
+                                snapshot.data ?? 'Caricamento...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: notification.isRead 
+                                      ? FontWeight.normal 
+                                      : FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        Text(
+                          _formatTimestamp(notification.timestamp),
+                          style: const TextStyle(
+                            color: Colors.white38,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       notification.message,
                       style: TextStyle(
                         color: notification.isRead
-                            ? Colors.white70
-                            : Colors.white,
-                        fontSize: 15,
+                            ? Colors.white54
+                            : Colors.white70,
+                        fontSize: 14,
                         height: 1.4,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatTimestamp(notification.timestamp),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 13,
-                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -302,20 +375,117 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     );
   }
 
+  IconData _getNotificationIcon(Notification notification) {
+    switch (notification.type) {
+      case NotificationType.teacherMessage:
+        return Icons.school;
+      case NotificationType.studentMessage:
+        return Icons.person_outline;
+      case NotificationType.commentReply:
+        return Icons.chat_bubble_outline;
+      default:
+        return Icons.notifications_none;
+    }
+  }
+
+  Future<String> _getNotificationTitle(Notification notification) async {
+    if (notification.senderId != null) {
+      try {
+        final senderDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(notification.senderId)
+            .get();
+        
+        if (senderDoc.exists) {
+          return senderDoc.data()?['name'] ?? 'Utente';
+        }
+      } catch (e) {
+        print('Errore nel recupero del nome: $e');
+      }
+    }
+    
+    switch (notification.type) {
+      case NotificationType.teacherMessage:
+        return 'Insegnante';
+      case NotificationType.studentMessage:
+        return 'Studente';
+      case NotificationType.commentReply:
+        return 'Nuovo commento';
+      default:
+        return 'Notifica';
+    }
+  }
+
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
 
     if (difference.inMinutes < 1) {
-      return 'Ora';
+      return 'Now';
     } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m fa';
+      return '${difference.inMinutes}m ago';
     } else if (difference.inDays < 1) {
-      return '${difference.inHours}h fa';
+      return '${difference.inHours}h ago';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays}g fa';
+      return '${difference.inDays}d ago';
     } else {
       return DateFormat('d MMM').format(timestamp);
     }
+  }
+
+  Widget _buildNotificationItem(Notification notification) {
+    IconData icon;
+    String title;
+    VoidCallback? onTap;
+
+    switch (notification.type) {
+      case 'message':
+        icon = Icons.message;
+        title = notification.isFromTeacher ? 'Messaggio dal docente' : 'Messaggio dallo studente';
+        onTap = notification.senderId != null ? () async {
+          // Prima ottieni i dati dell'utente
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(notification.senderId)
+              .get();
+          
+          if (userDoc.exists && context.mounted) {
+            final userData = userDoc.data()!;
+            final profileUser = UserModel.fromMap(userData);
+            
+            // Naviga alla chat con il mittente
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PrivateChatTab(
+                  profileUser: profileUser,
+                  currentUser: FirebaseAuth.instance.currentUser!,
+                ),
+              ),
+            );
+          }
+        } : null;
+        break;
+      default:
+        icon = notification.isFromTeacher ? Icons.school : Icons.comment;
+        title = notification.message;
+        onTap = notification.videoId != null ? () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoPlayerScreen(videoId: notification.videoId!),
+            ),
+          );
+        } : null;
+    }
+
+    return _NotificationCard(
+      notification: notification,
+      onTap: () {
+        _markAsRead(notification.id);
+        if (onTap != null) onTap();
+      },
+      onDismiss: () => _dismissNotification(notification.id),
+    );
   }
 }

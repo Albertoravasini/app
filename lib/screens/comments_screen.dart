@@ -191,12 +191,11 @@ class _CommentsScreenState extends State<CommentsScreen> {
           },
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12.0),
-            margin: const EdgeInsets.symmetric(vertical: 8.0),
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+            margin: const EdgeInsets.symmetric(vertical: 4.0),
             decoration: BoxDecoration(
-              color: Color(0xFF1E1E1E), // Manteniamo il colore scuro
+              color: const Color(0xFF1A1A1A),
               borderRadius: BorderRadius.circular(12),
-              // Rimuoviamo la shadow e aggiungiamo un sottile bordo per definire meglio il commento
               border: Border.all(
                 color: Colors.white.withOpacity(0.05),
                 width: 1,
@@ -205,110 +204,108 @@ class _CommentsScreenState extends State<CommentsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header del commento con avatar e nome utente
+                // Header più compatto
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     CircleAvatar(
-                      radius: 20,
+                      radius: 16,
                       backgroundImage: AssetImage('assets/images/default_avatar.png'),
                       backgroundColor: Colors.grey[800],
                     ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          username,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _formatTimestamp(comment.timestamp),
-                          style: const TextStyle(
-                            color: Color(0xFFB3B3B3),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Spacer(),
-                    // Opzione per eliminare il commento se l'utente è l'autore
-                    if (comment.userId == user?.uid)
-                      IconButton(
-                        icon: const Icon(Icons.more_vert, color: Colors.white70),
-                        onPressed: () {
-                          _showDeleteDialog(comment.commentId);
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                // Testo del commento
-                Text(
-                  comment.content.length > 200
-                      ? '${comment.content.substring(0, 197)}...'
-                      : comment.content,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Azioni: Reply
-                Row(
-                  children: [
-                    // Reply
-                    GestureDetector(
-                      onTap: () => _handleReply(comment.commentId, username),
+                    const SizedBox(width: 8),
+                    // Username e timestamp sulla stessa riga
+                    Expanded(
                       child: Row(
-                        children: const [
-                          Icon(
-                            Icons.reply,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                          SizedBox(width: 4),
+                        children: [
                           Text(
-                            'Reply',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
+                            username,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _formatTimestamp(comment.timestamp),
+                            style: const TextStyle(
+                              color: Color(0xFFB3B3B3),
+                              fontSize: 12,
                             ),
                           ),
                         ],
                       ),
                     ),
+                    // Menu opzioni più compatto
+                    if (comment.userId == user?.uid)
+                      IconButton(
+                        icon: const Icon(Icons.more_vert, color: Colors.white70, size: 18),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () => _showDeleteDialog(comment.commentId),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Testo del commento
+                Text(
+                  comment.content,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Azioni più compatte
+                Row(
+                  children: [
+                    // Reply text only
+                    TextButton(
+                      onPressed: () => _handleReply(comment.commentId, username),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Reply',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                     const Spacer(),
-                    // Visualizza/Nascondi Risposte
                     if (hasReplies)
-                      GestureDetector(
-                        onTap: () {
+                      TextButton(
+                        onPressed: () {
                           setState(() {
                             _showReplies[comment.commentId] = !(_showReplies[comment.commentId] ?? false);
                           });
                         },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: Text(
                           _showReplies[comment.commentId] ?? false
                               ? 'Hide replies'
-                              : 'Show more replies',
+                              : 'Show replies',
                           style: const TextStyle(
                             color: Colors.yellowAccent,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
                           ),
                         ),
                       ),
                   ],
                 ),
-                // Risposte
+                // Risposte con padding ridotto
                 if (_showReplies[comment.commentId] ?? false)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12.0, left: 40.0),
+                    padding: const EdgeInsets.only(top: 4.0, left: 32.0),
                     child: Column(
                       children: comment.replies
                           .map((reply) => _buildReplyTile(reply, comment.commentId))
@@ -329,109 +326,117 @@ class _CommentsScreenState extends State<CommentsScreen> {
       future: _commentService.isCommentLiked(reply.commentId),
       builder: (context, snapshot) {
         final isLiked = snapshot.data ?? false;
-        return GestureDetector(
-          onLongPress: () {
-            if (reply.userId == user?.uid) {
-              _showDeleteDialog(reply.commentId, isReply: true);
-            }
-          },
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(10.0),
-            margin: const EdgeInsets.symmetric(vertical: 6.0),
-            decoration: BoxDecoration(
-              color: Color(0xFF2C2C2C),
-              borderRadius: BorderRadius.circular(12),
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+          margin: const EdgeInsets.only(top: 4.0, bottom: 4.0),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.05),
+              width: 1,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header della risposta con avatar e nome utente
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundImage: AssetImage('assets/sad.png'),
-                      backgroundColor: Colors.grey[800],
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      reply.username,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Opzione per eliminare la risposta se l'utente è l'autore
-                    if (reply.userId == user?.uid)
-                      IconButton(
-                        icon: const Icon(Icons.more_vert, color: Colors.white70, size: 18),
-                        onPressed: () {
-                          _showDeleteDialog(reply.commentId, isReply: true);
-                        },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                // Testo della risposta
-                Text(
-                  reply.content.length > 150
-                      ? '${reply.content.substring(0, 147)}...'
-                      : reply.content,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    height: 1.3,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14, // Ancora più piccolo per le risposte
+                    backgroundColor: Colors.grey[800],
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          reply.username,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatTimestamp(reply.timestamp),
+                          style: const TextStyle(
+                            color: Color(0xFFB3B3B3),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (reply.userId == user?.uid)
+                    IconButton(
+                      icon: const Icon(Icons.more_vert, color: Colors.white70, size: 16),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => _showDeleteDialog(reply.commentId, isReply: true),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                reply.content,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  height: 1.3,
                 ),
-                const SizedBox(height: 8),
-                // Azioni: Like
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () async {
-                        if (isLiked) {
-                          await _commentService.unlikeComment(reply.commentId);
-                        } else {
-                          await _commentService.likeComment(reply.commentId);
-                        }
-                        setState(() {});
-                      },
-                      child: Row(
-                        children: [
-                          Icon(
-                            isLiked ? Icons.favorite : Icons.favorite_border,
-                            color: isLiked ? Colors.redAccent : Colors.white70,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${reply.likeCount}',
-                            style: TextStyle(
-                              color: isLiked ? Colors.redAccent : Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () => _handleReply(parentCommentId, reply.username),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Reply',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
                       ),
                     ),
-                    const Spacer(),
-                    Text(
-                      _formatTimestamp(reply.timestamp),
-                      style: const TextStyle(
-                        color: Color(0xFFB3B3B3),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -504,7 +509,9 @@ class _CommentsScreenState extends State<CommentsScreen> {
                   if (message.isEmpty) return;
 
                   if (_replyingTo != null) {
-                    await _commentService.addReply(_replyingTo!, message);
+                    // Aggiungi la menzione dell'utente all'inizio della risposta
+                    final replyWithMention = '@$_replyingToUsername $message';
+                    await _commentService.addReply(_replyingTo!, replyWithMention);
                     setState(() {
                       _replyingTo = null;
                       _replyingToUsername = null;

@@ -148,27 +148,60 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
   }
 
   Widget _buildDefaultStartButton() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: const [
-        Padding(
-          padding: EdgeInsets.only(left: 16),
-          child: Text(
-            'Start Course',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 14,
-              fontFamily: 'Montserrat',
-              fontWeight: FontWeight.w700,
+    return FutureBuilder<bool>(
+      future: _hasCourseProgress(),
+      builder: (context, snapshot) {
+        final hasProgress = snapshot.data ?? false;
+        
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Padding(
+              padding: EdgeInsets.only(left: 16),
+              child: Text(
+                hasProgress ? 'Continue' : 'Start Course',
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 14,
+                  fontFamily: 'Montserrat',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.only(right: 12),
-          child: Icon(Icons.arrow_forward, color: Colors.black),
-        ),
-      ],
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.black),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  Future<bool> _hasCourseProgress() async {
+    if (widget.course == null) return false;
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) return false;
+
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final currentSteps = Map<String, dynamic>.from(userData['currentSteps'] ?? {});
+    
+    // Controlla se c'è progresso in qualsiasi sezione del corso
+    for (var section in widget.course!.sections) {
+      if (currentSteps.containsKey(section.title)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void _handleStartCourse() {

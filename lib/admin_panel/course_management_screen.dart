@@ -4,6 +4,7 @@ import 'package:Just_Learn/admin_panel/CourseEditScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/course.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class CourseManagementScreen extends StatefulWidget {
   final String? userId;
@@ -96,14 +97,51 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseFirestore.instance.collection('courses').doc(course.id).delete();
-              setState(() {
-                _courses.remove(course);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Course successfully deleted')),
-              );
+              try {
+                // Prima elimina tutti i video del corso dallo storage
+                for (var section in course.sections) {
+                  for (var step in section.steps) {
+                    if (step.type == 'video' && step.videoUrl != null) {
+                      try {
+                        // Ottieni il riferimento al file dallo storage usando l'URL
+                        final videoRef = FirebaseStorage.instance
+                            .refFromURL(step.videoUrl!);
+                        
+                        // Elimina il file
+                        await videoRef.delete();
+                        print('Video eliminato dallo storage: ${step.videoUrl}');
+                      } catch (e) {
+                        print('Errore durante l\'eliminazione del video: $e');
+                        // Continua con gli altri video anche se uno fallisce
+                      }
+                    }
+                  }
+                }
+
+                // Poi elimina il documento del corso
+                await FirebaseFirestore.instance
+                    .collection('courses')
+                    .doc(course.id)
+                    .delete();
+
+                setState(() {
+                  _courses.remove(course);
+                });
+                
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Course and associated videos successfully deleted')),
+                );
+              } catch (e) {
+                print('Errore durante l\'eliminazione del corso: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error deleting course: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                Navigator.pop(context);
+              }
             },
             child: Text(
               'Delete',

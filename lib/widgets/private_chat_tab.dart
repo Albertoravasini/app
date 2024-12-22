@@ -50,53 +50,68 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
           .doc(widget.currentUser.uid)
           .get();
       final senderRole = senderDoc.data()?['role'];
+      final senderName = senderDoc.data()?['name'] ?? 'Unknown';
+      final isTeacher = senderRole == 'teacher';
 
-      final chatId = _getChatId(widget.currentUser.uid, selectedChatUserId!);
+      // Determina il destinatario corretto
+      final receiverId = selectedChatUserId!;
+
+      // Salva il messaggio nella chat
+      final chatId = _getChatId(widget.currentUser.uid, receiverId);
       final messageDoc = FirebaseFirestore.instance
           .collection('chats')
           .doc(chatId)
           .collection('messages')
           .doc();
 
-      final newMessage = Message(
-        id: messageDoc.id,
-        senderId: widget.currentUser.uid,
-        receiverId: selectedChatUserId!,
-        message: message,
-        timestamp: DateTime.now(),
-      );
+      final newMessage = {
+        'id': messageDoc.id,
+        'message': message,
+        'timestamp': FieldValue.serverTimestamp(),
+        'senderId': widget.currentUser.uid,
+        'receiverId': receiverId,
+      };
 
-      await messageDoc.set(newMessage.toMap());
+      // Salva il messaggio
+      await messageDoc.set(newMessage);
 
-      // Ottieni il ruolo e il token FCM del destinatario
+      // Crea la notifica
+      final notification = {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'message': message,
+        'timestamp': DateTime.now().toIso8601String(),
+        'isRead': false,
+        'isFromTeacher': isTeacher,
+        'senderId': widget.currentUser.uid,
+        'type': isTeacher ? 'teacherMessage' : 'studentMessage'
+      };
+
+      // Aggiorna le notifiche del destinatario
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(receiverId)
+          .update({
+        'notifications': FieldValue.arrayUnion([notification])
+      });
+
+      // Invia notifica push
       final receiverDoc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(selectedChatUserId)
+          .doc(receiverId)
           .get();
-
-      if (receiverDoc.exists) {
-        final fcmToken = receiverDoc.data()?['fcmToken'];
-        final receiverRole = receiverDoc.data()?['role'];
-        
-        if (fcmToken != null) {
-          final notificationService = NotificationService();
-          if (senderRole == 'teacher') {
-            await notificationService.sendSpecificNotification(
-              fcmToken,
-              'teacher_message',
-              widget.currentUser.displayName ?? 'Docente'
-            );
-          } else if (receiverRole == 'teacher') {
-            await notificationService.sendSpecificNotification(
-              fcmToken,
-              'student_message',
-              widget.currentUser.displayName ?? 'Studente'
-            );
-          }
-        }
+      
+      final fcmToken = receiverDoc.data()?['fcmToken'];
+      if (fcmToken != null) {
+        final notificationService = NotificationService();
+        await notificationService.sendSpecificNotification(
+          fcmToken,
+          isTeacher ? 'teacher_message' : 'student_message',
+          senderName
+        );
       }
 
       _messageController.clear();
+      _scrollToBottom();
     } catch (e) {
       print('Errore nell\'invio del messaggio: $e');
     }
@@ -112,49 +127,43 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
   }
   @override
   Widget build(BuildContext context) {
-    // Se non è il proprietario del profilo, mostra la chat singola
-    if (widget.currentUser.uid != widget.profileUser.uid) {
-      return _buildSingleChat();
-    }
-    // Se è il proprietario, mostra la lista delle chat
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('chats')
-          .where('participants', arrayContains: widget.currentUser.uid)
-          .snapshots(),
+    // Check if current user has a subscription to the profile owner
+    return FutureBuilder<bool>(
+      future: _checkSubscriptionStatus(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
             ),
           );
         }
-        final chats = snapshot.data!.docs;
-        if (selectedChatUserId != null) {
-          return _buildSingleChat(userId: selectedChatUserId);
-        }
-        if (chats.isEmpty) {
+
+        final hasSubscription = snapshot.data ?? false;
+
+        // If not the owner and no subscription, show message
+        if (widget.currentUser.uid != widget.profileUser.uid && !hasSubscription) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SvgPicture.asset(
-                  'assets/empty_chat.svg',
-                  width: 200,
+                Icon(
+                  Icons.lock_outline,
+                  size: 64,
+                  color: Colors.white.withOpacity(0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No messages yet',
+                  'Private chat not available',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 18,
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Start a conversation!',
+                  'Subscribe to chat with this creator',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 14,
@@ -164,194 +173,270 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
             ),
           );
         }
-        return Scaffold(
-          backgroundColor: const Color(0xFF181819),
-          body: Column(
-            children: [
-              // Header elegante
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E1E1E),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+
+        // If owner or has subscription, show chat
+        if (widget.currentUser.uid != widget.profileUser.uid) {
+          return _buildSingleChat();
+        }
+
+        // Existing code for chat list
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('chats')
+              .where('participants', arrayContains: widget.currentUser.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
                 ),
-                child: Row(
-                  children: const [
+              );
+            }
+            final chats = snapshot.data!.docs;
+            if (selectedChatUserId != null) {
+              return _buildSingleChat(userId: selectedChatUserId);
+            }
+            if (chats.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SvgPicture.asset(
+                      'assets/empty_chat.svg',
+                      width: 200,
+                    ),
+                    const SizedBox(height: 16),
                     Text(
-                      'Chat',
+                      'No messages yet',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Montserrat',
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Start a conversation!',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 14,
                       ),
                     ),
                   ],
                 ),
-              ),
-              // Lista chat con animazioni
-              Expanded(
-                child: ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: chats.length,
-                  itemBuilder: (context, index) {
-                    final chat = chats[index];
-                    final otherUserId = ((chat.data() as Map<String, dynamic>)['participants'] as List)
-                        .firstWhere((id) => id != widget.currentUser.uid);
-                    return FutureBuilder<DocumentSnapshot>(
-                      future: FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(otherUserId)
-                          .get(),
-                      builder: (context, userSnapshot) {
-                        if (!userSnapshot.hasData) {
-                          return const SizedBox();
-                        }
-                        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
-                        final userName = userData['name'] ?? 'Utente';
-                        final userImage = userData['profileImageUrl'];
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF282828),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+              );
+            }
+            return Scaffold(
+              backgroundColor: const Color(0xFF181819),
+              body: Column(
+                children: [
+                  // Header elegante
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: const [
+                        Text(
+                          'Chat',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Montserrat',
                           ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                setState(() {
-                                  selectedChatUserId = otherUserId;
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    Hero(
-                                      tag: 'avatar_$otherUserId',
-                                      child: CircleAvatar(
-                                        radius: 28,
-                                        backgroundColor: Colors.yellowAccent,
-                                        child: CircleAvatar(
-                                          radius: 26,
-                                          backgroundImage: userImage != null
-                                              ? NetworkImage(userImage)
-                                              : null,
-                                          child: userImage == null
-                                              ? Text(
-                                                  userName[0].toUpperCase(),
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 20,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                )
-                                              : null,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            userName,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              fontFamily: 'Montserrat',
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Lista chat con animazioni
+                  Expanded(
+                    child: ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: chats.length,
+                      itemBuilder: (context, index) {
+                        final chat = chats[index];
+                        final otherUserId = ((chat.data() as Map<String, dynamic>)['participants'] as List)
+                            .firstWhere((id) => id != widget.currentUser.uid);
+                        return FutureBuilder<DocumentSnapshot>(
+                          future: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(otherUserId)
+                              .get(),
+                          builder: (context, userSnapshot) {
+                            if (!userSnapshot.hasData) {
+                              return const SizedBox();
+                            }
+                            final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                            final userName = userData['name'] ?? 'Utente';
+                            final userImage = userData['profileImageUrl'];
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF282828),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    setState(() {
+                                      selectedChatUserId = otherUserId;
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Row(
+                                      children: [
+                                        Hero(
+                                          tag: 'avatar_$otherUserId',
+                                          child: CircleAvatar(
+                                            radius: 28,
+                                            backgroundColor: Colors.yellowAccent,
+                                            child: CircleAvatar(
+                                              radius: 26,
+                                              backgroundImage: userImage != null
+                                                  ? NetworkImage(userImage)
+                                                  : null,
+                                              child: userImage == null
+                                                  ? Text(
+                                                      userName[0].toUpperCase(),
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 20,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    )
+                                                  : null,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          StreamBuilder<QuerySnapshot>(
-                                            stream: FirebaseFirestore.instance
-                                                .collection('chats')
-                                                .doc(chat.id)
-                                                .collection('messages')
-                                                .orderBy('timestamp', descending: true)
-                                                .limit(1)
-                                                .snapshots(),
-                                            builder: (context, messageSnapshot) {
-                                              if (!messageSnapshot.hasData ||
-                                                  messageSnapshot.data!.docs.isEmpty) {
-                                                return const SizedBox();
-                                              }
-                                              final lastMessage = messageSnapshot
-                                                  .data!.docs.first
-                                                  .data() as Map<String, dynamic>;
-                                              final isMyMessage = 
-                                                  lastMessage['senderId'] == widget.currentUser.uid;
-                                              return Row(
-                                                children: [
-                                                  if (isMyMessage)
-                                                    const Icon(
-                                                      Icons.reply,
-                                                      size: 16,
-                                                      color: Colors.yellowAccent,
-                                                    ),
-                                                  const SizedBox(width: 4),
-                                                  Expanded(
-                                                    child: Text(
-                                                      lastMessage['message'] as String,
-                                                      style: TextStyle(
-                                                        color: Colors.white.withOpacity(0.7),
-                                                        fontFamily: 'Montserrat',
-                                                        fontSize: 14,
+                                        ),
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                userName,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontFamily: 'Montserrat',
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              StreamBuilder<QuerySnapshot>(
+                                                stream: FirebaseFirestore.instance
+                                                    .collection('chats')
+                                                    .doc(chat.id)
+                                                    .collection('messages')
+                                                    .orderBy('timestamp', descending: true)
+                                                    .limit(1)
+                                                    .snapshots(),
+                                                builder: (context, messageSnapshot) {
+                                                  if (!messageSnapshot.hasData ||
+                                                      messageSnapshot.data!.docs.isEmpty) {
+                                                    return const SizedBox();
+                                                  }
+                                                  final lastMessage = messageSnapshot
+                                                      .data!.docs.first
+                                                      .data() as Map<String, dynamic>;
+                                                  final isMyMessage = 
+                                                      lastMessage['senderId'] == widget.currentUser.uid;
+                                                  return Row(
+                                                    children: [
+                                                      if (isMyMessage)
+                                                        const Icon(
+                                                          Icons.reply,
+                                                          size: 16,
+                                                          color: Colors.yellowAccent,
+                                                        ),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          lastMessage['message'] as String,
+                                                          style: TextStyle(
+                                                            color: Colors.white.withOpacity(0.7),
+                                                            fontFamily: 'Montserrat',
+                                                            fontSize: 14,
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
                                                       ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                ],
-                                              );
-                                            },
+                                                    ],
+                                                  );
+                                                },
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                        const Icon(
+                                          Icons.chevron_right,
+                                          color: Colors.yellowAccent,
+                                          size: 24,
+                                        ),
+                                      ],
                                     ),
-                                    const Icon(
-                                      Icons.chevron_right,
-                                      color: Colors.yellowAccent,
-                                      size: 24,
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
-      },
+      }
     );
   }
+
+  // Add this new method to check subscription status
+  Future<bool> _checkSubscriptionStatus() async {
+    if (widget.currentUser.uid == widget.profileUser.uid) {
+      return true; // Owner always has access
+    }
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.currentUser.uid)
+        .get();
+
+    if (!userDoc.exists) return false;
+
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+    
+    return subscriptions.contains(widget.profileUser.uid);
+  }
+
   Widget _buildSingleChat({String? userId}) {
     final chatUserId = userId ?? widget.profileUser.uid;
     

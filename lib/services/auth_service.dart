@@ -153,17 +153,38 @@ class AuthService {
   /// Modifica il metodo signInWithGoogle
   Future<User?> _signInWithGoogleBase() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        return null; // L'utente ha annullato il login
+      // Forza la disconnessione prima di iniziare un nuovo accesso
+      await _googleSignIn.signOut();
+      
+      // Configura GoogleSignIn per Android
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        _googleSignIn.signIn().catchError((error) {
+          print('Errore specifico Android: $error');
+          return null;
+        });
       }
 
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        print('Login Google annullato dall\'utente');
+        return null;
+      }
+
+      // Ottieni le credenziali di autenticazione
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      
+      // Verifica che i token siano presenti
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        print('Errore: token di accesso o ID token mancanti');
+        return null;
+      }
+
       final AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
+      // Effettua il login con Firebase
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
       final User? user = userCredential.user;
 
@@ -188,7 +209,7 @@ class AuthService {
 
       return user;
     } catch (e) {
-      print('Errore durante il login con Google: $e');
+      print('Errore dettagliato durante il login con Google: $e');
       return null;
     }
   }

@@ -1268,7 +1268,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     ListTile(
                                       leading: Icon(Icons.add_box_outlined, color: Colors.white),
                                       title: Text(
-                                        'Crea Nuovo Corso',
+                                        'Courses',
                                         style: TextStyle(color: Colors.white),
                                       ),
                                       onTap: () {

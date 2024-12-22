@@ -93,7 +93,7 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
             child: Stack(
               children: [
                 _buildNavItem(
-                  'assets/ic_round-quiz.svg', // Assicurati di avere questa icona
+                  'assets/jam_messages-alt-f.svg', // Assicurati di avere questa icona
                   widget.selectedIndex == 3,
                 ),
                 if (hasUnreadNotifications)

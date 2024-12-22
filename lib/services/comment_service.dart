@@ -12,19 +12,19 @@ class CommentService {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        // 1. Ottieni i dati dell'utente che sta rispondendo
+        // 1. Get replying user data
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
-        final username = userDoc.data()?['name'] ?? 'Anonimo';
+        final username = userDoc.data()?['name'] ?? 'Anonymous';
 
-        // 2. Ottieni il commento padre
+        // 2. Get parent comment
         final commentDoc = await commentCollection.doc(parentCommentId).get();
         final parentComment = commentDoc.data() as Map<String, dynamic>;
         final parentUserId = parentComment['userId'] as String;
 
-        // 3. Crea la risposta
+        // 3. Create reply
         final reply = Comment(
           commentId: commentCollection.doc().id,
           userId: user.uid,
@@ -34,12 +34,32 @@ class CommentService {
           timestamp: DateTime.now(),
         );
 
-        // 4. Aggiungi la risposta al commento padre
-        await commentDoc.reference.update({
-          'replies': FieldValue.arrayUnion([reply.toMap()]),
+        // 4. Add notification for original comment user
+        if (parentUserId != user.uid) { // Don't send notification if user replies to their own comment
+          final notification = {
+            'id': DateTime.now().millisecondsSinceEpoch.toString(),
+            'message': '@$username replied to your comment',
+            'timestamp': DateTime.now().toIso8601String(),
+            'isRead': false,
+            'videoId': parentComment['videoId'],
+            'senderId': user.uid,
+            'type': 'commentReply'
+          };
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(parentUserId)
+              .update({
+            'notifications': FieldValue.arrayUnion([notification])
+          });
+        }
+
+        // 5. Update comment with reply
+        await commentCollection.doc(parentCommentId).update({
+          'replies': FieldValue.arrayUnion([reply.toMap()])
         });
 
-        // Invia notifica all'autore del commento originale
+        // Send push notification to original comment author
         final parentUserDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(parentUserId)
@@ -57,7 +77,7 @@ class CommentService {
           }
         }
       } catch (e) {
-        print('Errore nell\'aggiunta della risposta: $e');
+        print('Error adding reply: $e');
         rethrow;
       }
     }

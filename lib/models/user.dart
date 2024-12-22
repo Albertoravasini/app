@@ -170,6 +170,8 @@ class Notification {
   final bool isRead;
   final String? videoId;
   final bool isFromTeacher;
+  final String? senderId;
+  final NotificationType type;
 
   Notification({
     required this.id,
@@ -178,16 +180,22 @@ class Notification {
     this.isRead = false,
     this.videoId,
     this.isFromTeacher = false,
+    this.senderId,
+    required this.type,
   });
 
   factory Notification.fromMap(Map<String, dynamic> map) {
     return Notification(
       id: map['id'] ?? '',
       message: map['message'] ?? '',
-      timestamp: map['timestamp']?.toDate() ?? DateTime.now(),
+      timestamp: map['timestamp'] is Timestamp 
+          ? map['timestamp'].toDate() 
+          : DateTime.parse(map['timestamp']),
       isRead: map['isRead'] ?? false,
       videoId: map['videoId'],
       isFromTeacher: map['isFromTeacher'] ?? false,
+      senderId: map['senderId'],
+      type: NotificationType.fromString(map['type'] ?? ''),
     );
   }
 
@@ -195,11 +203,37 @@ class Notification {
     return {
       'id': id,
       'message': message,
-      'timestamp': timestamp,
+      'timestamp': timestamp.toIso8601String(),
       'isRead': isRead,
       'videoId': videoId,
       'isFromTeacher': isFromTeacher,
+      'senderId': senderId,
+      'type': type.toString(),
     };
+  }
+}
+
+enum NotificationType {
+  teacherMessage,    // Messaggi dall'insegnante
+  studentMessage,    // Messaggi dallo studente
+  commentReply;      // Risposte ai commenti
+
+  static NotificationType fromString(String type) {
+    switch (type) {
+      case 'teacherMessage':
+        return NotificationType.teacherMessage;
+      case 'studentMessage':
+        return NotificationType.studentMessage;
+      case 'commentReply':
+        return NotificationType.commentReply;
+      default:
+        return NotificationType.commentReply;
+    }
+  }
+
+  @override
+  String toString() {
+    return name;
   }
 }
 
