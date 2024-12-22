@@ -15,501 +15,355 @@ import 'dart:io';
 import 'package:Just_Learn/services/image_service.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'profile_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
-  final UserModel? currentUser;
+  final UserModel currentUser;
 
-  const SettingsScreen({super.key, this.currentUser});
+  const SettingsScreen({
+    Key? key,
+    required this.currentUser,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF121212),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (Route<dynamic> route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           children: [
-            _buildWelcomeSection(),
-            if (currentUser?.role == 'teacher')
-              _buildTeacherDashboard(),
-            const SizedBox(height: 20),
-            _buildStreakSection(),
-            const SizedBox(height: 20),
-            _buildStatsSection(context),
+            // Profile Section - Prima sezione perché è l'identità dell'utente
+            _buildProfileSection(context),
+            const SizedBox(height: 32),
+            
+            // Premium Button - Seconda per importanza, alta visibilità per conversione
+            _buildPremiumButton(context),
+            const SizedBox(height: 32),
+            
+            // Weekly Streak Section - Terza, engagement e gamification
+            _buildWeeklyStreakSection(context),
+            const SizedBox(height: 32),
+            
+            // Main Actions Group - Funzionalità principali raggruppate
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, bottom: 8),
+                  child: Text(
+                    'Features',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (currentUser.role == 'teacher')
+                  _buildSettingsSection(
+                    context,
+                    'Teacher Dashboard',
+                    Icons.dashboard,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfileScreen(currentUser: currentUser),
+                      ),
+                    ),
+                  )
+                else
+                  _buildSettingsSection(
+                    context,
+                    'Become a Teacher',
+                    Icons.school,
+                    () async {
+                      final Uri url = Uri.parse(
+                        'https://calendly.com/ravasini-aziendale/become-a-teacher-on-justlearn'
+                      );
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not launch the booking page'),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            
+            // Support & Legal Group
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, bottom: 8),
+                  child: Text(
+                    'Support & Legal',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                _buildSettingsSection(
+                  context,
+                  'Privacy Policy',
+                  Icons.privacy_tip_outlined,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PrivacyPolicyScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            
+            // Account Management Group - In fondo perché usate meno frequentemente
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, bottom: 8),
+                  child: Text(
+                    'Account',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                _buildSettingsSection(
+                  context,
+                  'Delete Account',
+                  Icons.delete_forever,
+                  () => _showDeleteAccountDialog(context),
+                  isDestructive: true,
+                ),
+                const SizedBox(height: 2),
+                _buildSettingsSection(
+                  context,
+                  'Logout',
+                  Icons.logout,
+                  () => _handleLogout(context),
+                ),
+              ],
+            ),
             const SizedBox(height: 24),
-            _buildPreferencesSection(context),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildWelcomeSection() {
-    return Builder(
-      builder: (BuildContext context) => Container(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildProfileSection(BuildContext context) {
+    return GestureDetector(
+      
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF282828),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
+            CircleAvatar(
+              radius: 30,
+              backgroundImage: currentUser.profileImageUrl != null
+                  ? NetworkImage(currentUser.profileImageUrl!)
+                  : null,
+              child: currentUser.profileImageUrl == null
+                  ? const Icon(Icons.person, size: 30, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: () async {
-                      if (currentUser == null) return;
-                      await ImageService.uploadProfileImage(
-                        userId: currentUser!.uid,
-                        isProfileImage: true,
-                        context: context,
-                      );
-                    },
-                    child: Container(
-                      width: 72,
-                      height: 73,
-                      clipBehavior: Clip.antiAlias,
-                      decoration: ShapeDecoration(
-                        image: DecorationImage(
-                          image: NetworkImage(currentUser?.profileImageUrl ?? "https://via.placeholder.com/72x73"),
-                          fit: BoxFit.cover,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(200),
-                        ),
-                      ),
+                  Text(
+                    currentUser.name,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome Back!',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 25,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          currentUser?.name ?? 'User',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.65),
-                            fontSize: 14,
-                            fontFamily: 'Montserrat',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 4),
+                  Text(
+                    currentUser.email,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.7),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 23),
-            if (currentUser?.role != 'teacher')
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: ShapeDecoration(
-                  color: const Color(0xFF1E1E1E),
-                  shape: RoundedRectangleBorder(
-                    side: BorderSide(
-                      width: 1,
-                      color: Colors.white.withOpacity(0.10),
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: InkWell(
-                  onTap: () async {
-                    if (currentUser == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Errore: Utente non trovato'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                      return;
-                    }
-
-                    final Uri url = Uri.parse('https://calendly.com/ravasini-aziendale/become-a-teacher-on-justlearn');
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(url);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Impossibile aprire il link'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  child: const Text(
-                    'Become a teacher',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.84,
-                    ),
-                  ),
-                ),
-              ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white54,
+              size: 16,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStreakSection() {
-    List<String> weekDays = ["M", "T", "W", "T", "F", "S", "S"];
-    int streakDays = currentUser?.consecutiveDays ?? 0;
-    DateTime today = DateTime.now();
-    DateTime lastAccess = currentUser?.lastAccess ?? today;
-
-    // Calcola la differenza in giorni tra oggi e l'ultimo accesso
-    int differenceInDays = today.difference(lastAccess).inDays;
-
-    // Aggiorna il numero di streak in base alla differenza temporale
-    if (differenceInDays == 0) {
-      // Se l'ultimo accesso è stato oggi, non modificare streakDays ma segna il giorno come completo
-      streakDays = currentUser?.consecutiveDays ?? 0;
-    } else if (differenceInDays == 1) {
-      // Se l'accesso è stato ieri, aumenta la streak
-      streakDays += 1;
-    } else if (differenceInDays > 1) {
-      // Se l'ultimo accesso è stato più di un giorno fa, resetta la streak
-      streakDays = 0;
-    }
-
+  Widget _buildPremiumButton(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Sfondo leggermente più chiaro per la card
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF2C2C2E),
+            const Color(0xFF1C1C1E),
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          const Icon(
-            Icons.local_fire_department,
-            color: Colors.yellowAccent,
-            size: 60,
+        border: Border.all(
+          color: Colors.yellowAccent.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '$streakDays',
-            style: const TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const Text(
-            'Week Streak',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'You are doing really great, ${currentUser?.name ?? 'User'}!',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildScrollableWeekDays(streakDays, weekDays, lastAccess),
         ],
       ),
-    );
-  }
-
-  Widget _buildScrollableWeekDays(int streakDays, List<String> weekDays, DateTime lastAccess) {
-    DateTime today = DateTime.now();
-    
-    // Trova la data del lunedì della settimana corrente
-    DateTime monday = today.subtract(Duration(days: today.weekday - 1));
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(weekDays.length, (index) {
-        // Calcola la data per ogni giorno della settimana partendo dal lunedì
-        DateTime currentDay = monday.add(Duration(days: index));
-        
-        // Marca il giorno come completato solo se rientra nella streak e non va oltre l'ultimo accesso
-        bool shouldMarkDay = currentDay.isBefore(lastAccess.add(Duration(days: 1))) && (index < streakDays || currentDay.isAtSameMomentAs(today));
-
-        // Controlla se il giorno è passato
-        bool isPast = currentDay.isBefore(today);
-
-        return Column(
-          children: [
-            Text(
-              weekDays[index], // Mostra il giorno della settimana (L, M, ...)
-              style: TextStyle(
-                color: isPast ? Colors.grey : Colors.white, // Usa grigio per i giorni passati
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: 36, // Dimensioni del cerchio contenente la data
-              height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: shouldMarkDay ? Colors.yellowAccent : Colors.transparent,
-              ),
-              child: Center(
-                child: shouldMarkDay
-                    ? const Icon(Icons.check, color: Colors.grey, size: 20) // Pallino riempito se completo
-                    : Text(
-                        '${currentDay.day}', // Mostra il numero del giorno del mese
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.workspace_premium,
+                            size: 16,
+                            color: Colors.yellowAccent,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'PRO',
+                            style: TextStyle(
+                              color: Colors.yellowAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'SAVE 50%',
                         style: TextStyle(
-                          color: isPast ? Colors.grey : Colors.white, // Usa grigio per i giorni passati
+                          color: Colors.yellowAccent,
                           fontWeight: FontWeight.bold,
+                          fontSize: 12,
                         ),
                       ),
-              ),
-            ),
-          ],
-        );
-      }),
-    );
-  }
-
-  Widget _buildStatsSection(BuildContext context) {
-    int totalVideosWatched = currentUser?.WatchedVideos.values.expand((videos) => videos).length ?? 0;
-    int totalQuestionsAnswered = currentUser?.answeredQuestions.values.expand((questions) => questions).length ?? 0;
-    int totalCoins = currentUser?.coins ?? 0; // Recupera i coins dell'utente
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Sfondo leggermente più chiaro
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Your Stats',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('Days', '${currentUser?.consecutiveDays ?? 0}'),
-              _buildStatItem('Videos', '$totalVideosWatched'),
-              _buildStatItem('Questions', '$totalQuestionsAnswered'),
-              _buildStatItem('Coins', '$totalCoins'), // Mostra i coins invece dei minuti
-            ],
-          ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SubscriptionScreen()), // Naviga alla SubscriptionScreen
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF333333), // Colore per il bottone scuro
-              side: const BorderSide(color: Colors.purpleAccent),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.insights, color: Colors.purpleAccent),
-                SizedBox(width: 8),
-                Text('2 Insights Available', style: TextStyle(color: Colors.purpleAccent)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white, // Testo bianco per il valore
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey, // Testo grigio per il label
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPreferencesSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildPreferenceItem(
-          context,
-          icon: Icons.privacy_tip,
-          title: 'Privacy Policy',
-          onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()));
-          },
-        ),
-        _buildPreferenceItem(
-          context,
-          icon: Icons.delete,
-          title: 'Delete Account',
-          onTap: () => _showDeleteAccountDialog(context),
-          color: Colors.redAccent,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPreferenceItem(BuildContext context, {required IconData icon, required String title, required VoidCallback onTap, Color color = Colors.white}) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          color: color,
-        ),
-      ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
-      onTap: onTap,
-    );
-  }
-
-  void _showDeleteAccountDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Delete Account',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Are you sure you want to delete your account? This action cannot be undone.',
+                  'Upgrade to Premium',
                   style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                Text(
+                  'Get unlimited access to all features',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Cancel',
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                    Text(
+                      '\$2.49',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          try {
-                            User? user = FirebaseAuth.instance.currentUser;
-                            
-                            // Elimina l'account e i dati
-                            await user?.delete();
-                            await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(user?.uid)
-                                .delete();
-                            
-                            Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(builder: (context) => const LoginScreen()),
-                              (Route<dynamic> route) => false,
-                            );
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Error: ${e.toString()}',
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    Text(
+                      '/month',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 14,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Get Started',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward,
+                            color: Colors.black,
+                            size: 16,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -517,147 +371,85 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildTeacherDashboard() {
-    if (currentUser?.role != 'teacher') return const SizedBox.shrink();
-
+  Widget _buildSettingsSection(
+    BuildContext context,
+    String title,
+    IconData icon,
+    VoidCallback onTap, {
+    bool isDestructive = false,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(top: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header con stile simile a profile_screen
-          Container(
-            height: 200,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(16),
-              image: DecorationImage(
-                image: NetworkImage(currentUser?.coverImageUrl ?? 'https://picsum.photos/375/200'),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                  Colors.black.withOpacity(0.4),
-                  BlendMode.darken,
-                ),
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Overlay gradient
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.7),
-                      ],
-                    ),
-                  ),
-                ),
-                // Contenuto
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Dashboard Insegnante',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundImage: NetworkImage(
-                              currentUser?.profileImageUrl ?? 'https://picsum.photos/40/40',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            currentUser?.name ?? '',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      margin: const EdgeInsets.symmetric(vertical: 1),
+      decoration: BoxDecoration(
+        color: const Color(0xFF282828),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isDestructive ? Colors.redAccent : Colors.white,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isDestructive ? Colors.redAccent : Colors.white,
+            fontSize: 16,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          color: Colors.white54,
+          size: 16,
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF282828),
+        title: const Text(
+          'Delete Account',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Are you sure you want to delete your account? This action cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white70),
             ),
           ),
-
-          // Statistiche in stile card
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Row(
-              children: [
-                _buildStatCard(
-                  'Studenti',
-                  StreamBuilder<DocumentSnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(currentUser?.uid)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      return Text(
-                        '${snapshot.data?['followers']?.length ?? 0}',
-                        style: const TextStyle(
-                          color: Colors.yellowAccent,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    },
-                  ),
-                  Icons.people,
-                  Colors.yellowAccent,
-                ),
-                const SizedBox(width: 12),
-                _buildStatCard(
-                  'Guadagno',
-                  StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('transactions')
-                        .where('teacherId', isEqualTo: currentUser?.uid)
-                        .where('date', isGreaterThan: DateTime.now().subtract(const Duration(days: 30)))
-                        .snapshots(),
-                    builder: (context, snapshot) {
-                      final earnings = snapshot.data?.docs.fold<double>(
-                        0,
-                        (sum, doc) => sum + (doc.data() as Map<String, dynamic>)['amount'] as double,
-                      ) ?? 0;
-                      return Text(
-                        '€${earnings.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      );
-                    },
-                  ),
-                  Icons.euro,
-                  Colors.greenAccent,
-                ),
-              ],
+          TextButton(
+            onPressed: () async {
+              try {
+                await FirebaseAuth.instance.currentUser?.delete();
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error deleting account: $e')),
+                );
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],
@@ -665,50 +457,151 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatCard(String label, Widget value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF282828),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1,
-          ),
+  Future<void> _handleLogout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error logging out: $e')),
+      );
+    }
+  }
+
+  Widget _buildWeeklyStreakSection(BuildContext context) {
+    final now = DateTime.now();
+    final weekDays = List.generate(7, (index) {
+      return now.subtract(Duration(days: now.weekday - 1 - index));
+    });
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF282828),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.yellowAccent.withOpacity(0.3),
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 12),
-            value,
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 14,
-                fontFamily: 'Montserrat',
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.local_fire_department_rounded,
+                color: Colors.yellowAccent,
+                size: 24,
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              Text(
+                'Weekly Streak',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.yellowAccent.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  '${currentUser.consecutiveDays} days',
+                  style: const TextStyle(
+                    color: Colors.yellowAccent,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: weekDays.map((date) {
+              final isToday = isSameDay(date, now);
+              final isAccessDay = _hasAccessedOnDay(date);
+              
+              return Column(
+                children: [
+                  Text(
+                    DateFormat('E').format(date)[0],
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isAccessDay 
+                          ? Colors.yellowAccent.withOpacity(0.2)
+                          : isToday 
+                              ? Colors.white.withOpacity(0.1)
+                              : Colors.white.withOpacity(0.05),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isAccessDay 
+                            ? Colors.yellowAccent
+                            : isToday 
+                                ? Colors.white.withOpacity(0.3)
+                                : Colors.white.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: isAccessDay
+                        ? const Icon(
+                            Icons.check,
+                            color: Colors.yellowAccent,
+                            size: 16,
+                          )
+                        : null,
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
 
-  String _formatTimestamp(Timestamp timestamp) {
-    final now = DateTime.now();
-    final date = timestamp.toDate();
-    final diff = now.difference(date);
+  bool isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+           date1.month == date2.month &&
+           date1.day == date2.day;
+  }
 
-    if (diff.inDays == 0) {
-      return DateFormat('HH:mm').format(date);
-    } else if (diff.inDays == 1) {
-      return 'Ieri';
-    } else {
-      return DateFormat('dd/MM').format(date);
+  bool _hasAccessedOnDay(DateTime date) {
+    final lastAccess = currentUser.lastAccess;
+    final startOfWeek = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
+    
+    if (isSameDay(date, DateTime.now()) || 
+        (isSameDay(date, DateTime.now().subtract(const Duration(days: 1))) && currentUser.consecutiveDays > 0)) {
+      return true;
     }
+    
+    if (date.isAfter(startOfWeek.subtract(const Duration(days: 1))) && 
+        date.isBefore(lastAccess)) {
+      return true;
+    }
+    
+    return false;
   }
 }

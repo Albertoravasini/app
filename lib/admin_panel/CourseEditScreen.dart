@@ -42,7 +42,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   List<String> _recommendedPodcasts = [];
   List<String> _recommendedWebsites = [];
 
-  final List<String> _stepTitles = ['Base', 'Contenuti', 'Risorse', 'Riepilogo'];
+  final List<String> _stepTitles = ['Basic', 'Content', 'Resources', 'Summary'];
 
   int? _expandedStepIndex;
 
@@ -55,18 +55,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header compatto
+              // Header semplificato con lo stesso colore di sfondo
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Color(0xFF282828),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Colors.white.withOpacity(0.1),
-                      width: 1,
-                    ),
-                  ),
-                ),
+                color: const Color(0xFF181819),
                 child: Row(
                   children: [
                     IconButton(
@@ -113,18 +105,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                             : _buildSummaryStep(),
               ),
               
-              // Pulsanti di navigazione compatti
+              // Pulsanti di navigazione con lo stesso colore di sfondo
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Color(0xFF282828),
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.white.withOpacity(0.1),
-                      width: 1,
-                    ),
-                  ),
-                ),
+                color: const Color(0xFF181819),
                 child: Row(
                   children: [
                     if (_currentStep > 0)
@@ -154,7 +138,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            _currentStep == _stepTitles.length - 1 ? 'Salva' : 'Avanti',
+                            _currentStep == _stepTitles.length - 1 ? 'Save' : 'Next',
                             style: TextStyle(
                               color: Colors.black,
                               fontSize: 14,
@@ -211,7 +195,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Dettagli del Corso',
+                      'Course Details',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -244,7 +228,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                 
                 TextFormField(
                   initialValue: _courseTitle,
-                  decoration: _inputDecoration('Titolo del Corso'),
+                  decoration: _inputDecoration('Course Title'),
                   style: TextStyle(
                     color: Colors.white,
                     fontFamily: 'Montserrat',
@@ -255,7 +239,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                 
                 TextFormField(
                   initialValue: _courseDescription,
-                  decoration: _inputDecoration('Descrizione'),
+                  decoration: _inputDecoration('Description'),
                   style: TextStyle(
                     color: Colors.white,
                     fontFamily: 'Montserrat',
@@ -267,7 +251,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                 
                 TextFormField(
                   initialValue: _courseCost?.toString(),
-                  decoration: _inputDecoration('Costo (coins)'),
+                  decoration: _inputDecoration('Cost (coins)'),
                   style: TextStyle(
                     color: Colors.white,
                     fontFamily: 'Montserrat',
@@ -1248,8 +1232,6 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   }
 
   void _deleteStep(int sectionIndex, int stepIndex) {
-    final step = _sections[sectionIndex].steps[stepIndex];
-    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1271,38 +1253,14 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
             ),
           ),
           TextButton(
-            onPressed: () async {
-              try {
-                // Se è un video, elimina prima il file dallo storage
-                if (step.type == 'video' && step.videoUrl != null) {
-                  // Ottieni il riferimento al file dallo storage usando l'URL
-                  final videoRef = firebase_storage.FirebaseStorage.instance
-                      .refFromURL(step.videoUrl!);
-                  
-                  // Elimina il file
-                  await videoRef.delete();
-                  print('Video eliminato dallo storage: ${step.videoUrl}');
-                }
-
-                // Elimina lo step dalla sezione
-                setState(() {
-                  _sections[sectionIndex].steps.removeAt(stepIndex);
-                });
-                
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Step eliminato con successo')),
-                );
-              } catch (e) {
-                print('Errore durante l\'eliminazione: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Errore durante l\'eliminazione: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                Navigator.pop(context);
-              }
+            onPressed: () {
+              setState(() {
+                _sections[sectionIndex].steps.removeAt(stepIndex);
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Step eliminato con successo')),
+              );
             },
             child: Text(
               'Elimina',
@@ -1315,65 +1273,90 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   }
 
 void _saveCourse() async {
-    if (_formKey.currentState != null && _formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
-      
-      final course = Course(
-        id: widget.course?.id ?? '', // Mantieni l'ID esistente se è un aggiornamento
-        title: _courseTitle ?? '',
-        description: _courseDescription ?? '',
-        cost: _courseCost ?? 0,
-        visible: true,
-        sections: _sections,
-        topic: _selectedTopic ?? '',
-        subtopic: '',
-        thumbnailUrl: widget.course?.thumbnailUrl ?? '',
-        coverImageUrl: _coverImageUrl ?? widget.course?.coverImageUrl ?? '',
-        sources: widget.course?.sources ?? [],
-        acknowledgments: widget.course?.acknowledgments ?? [],
-        recommendedBooks: widget.course?.recommendedBooks ?? [],
-        recommendedPodcasts: widget.course?.recommendedPodcasts ?? [],
-        recommendedWebsites: widget.course?.recommendedWebsites ?? [],
-        rating: widget.course?.rating ?? 0.0,
-        totalRatings: widget.course?.totalRatings ?? 0,
-        authorId: widget.course?.authorId ?? FirebaseAuth.instance.currentUser!.uid,
-        authorName: widget.course?.authorName ?? '', 
-        authorProfileUrl: widget.course?.authorProfileUrl ?? '',
+  if (_formKey.currentState != null && _formKey.currentState!.validate()) {
+    _formKey.currentState!.save();
+    
+    // Ottieni i dati dell'utente corrente
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Errore: Utente non autenticato')),
       );
+      return;
+    }
 
-      try {
-        if (widget.course != null) {
-          // Aggiorna il corso esistente
-          await FirebaseFirestore.instance
-              .collection('courses')
-              .doc(widget.course!.id)
-              .update(course.toMap());
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Corso aggiornato con successo')),
-          );
-        } else {
-          // Crea un nuovo corso
-          await FirebaseFirestore.instance
-              .collection('courses')
-              .add(course.toMap());
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nuovo corso creato con successo')),
-          );
-        }
+    // Recupera i dati dell'autore da Firestore
+    final authorDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUser.uid)
+        .get();
+
+    if (!authorDoc.exists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Errore: Dati utente non trovati')),
+      );
+      return;
+    }
+
+    final authorData = authorDoc.data()!;
+      
+    final course = Course(
+      id: widget.course?.id ?? '',
+      title: _courseTitle ?? '',
+      description: _courseDescription ?? '',
+      cost: _courseCost ?? 0,
+      visible: true,
+      sections: _sections,
+      topic: _selectedTopic ?? '',
+      subtopic: '',
+      thumbnailUrl: widget.course?.thumbnailUrl ?? '',
+      coverImageUrl: _coverImageUrl ?? widget.course?.coverImageUrl ?? '',
+      sources: _sources,
+      acknowledgments: _acknowledgments,
+      recommendedBooks: _recommendedBooks,
+      recommendedPodcasts: _recommendedPodcasts,
+      recommendedWebsites: _recommendedWebsites,
+      rating: widget.course?.rating ?? 0.0,
+      totalRatings: widget.course?.totalRatings ?? 0,
+      // Aggiorna i dati dell'autore
+      authorId: currentUser.uid,
+      authorName: authorData['name'] ?? 'Utente Anonimo',
+      authorProfileUrl: authorData['profileImageUrl'] ?? '',
+    );
+
+    try {
+      if (widget.course != null) {
+        // Aggiorna il corso esistente
+        await FirebaseFirestore.instance
+            .collection('courses')
+            .doc(widget.course!.id)
+            .update(course.toMap());
         
-        Navigator.pop(context);
-      } catch (e) {
-        print('Errore durante il salvataggio: $e'); // Per debug
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Errore durante il salvataggio: $e'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('Corso aggiornato con successo')),
+        );
+      } else {
+        // Crea un nuovo corso
+        await FirebaseFirestore.instance
+            .collection('courses')
+            .add(course.toMap());
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nuovo corso creato con successo')),
         );
       }
+      
+      Navigator.pop(context);
+    } catch (e) {
+      print('Errore durante il salvataggio: $e'); // Per debug
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Errore durante il salvataggio: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
 }
 
   // Aggiungi questa funzione per migrare i corsi esistenti
@@ -1452,23 +1435,23 @@ void _saveCourse() async {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ListTile(
-                  title: const Text('Fonti', style: TextStyle(color: Colors.white)),
+                  title: const Text('Sources', style: TextStyle(color: Colors.white)),
                   trailing: IconButton(
                     icon: const Icon(Icons.add, color: Colors.white),
-                    onPressed: () => _addItemDialog('Fonte', (item) {
+                    onPressed: () => _addItemDialog('Source', (item) {
                       setState(() => _sources.add(item));
                     }),
                 )),
                 ListTile(
-                  title: const Text('Libri Consigliati', style: TextStyle(color: Colors.white)),
+                  title: const Text('Recommended Books', style: TextStyle(color: Colors.white)),
                   trailing: IconButton(
                     icon: const Icon(Icons.add, color: Colors.white),
-                    onPressed: () => _addItemDialog('Libro', (item) {
+                    onPressed: () => _addItemDialog('Book', (item) {
                       setState(() => _recommendedBooks.add(item));
                     }),
                 )),
                 ListTile(
-                  title: const Text('Podcast Consigliati', style: TextStyle(color: Colors.white)),
+                  title: const Text('Recommended Podcasts', style: TextStyle(color: Colors.white)),
                   trailing: IconButton(
                     icon: const Icon(Icons.add, color: Colors.white),
                     onPressed: () => _addItemDialog('Podcast', (item) {
@@ -1491,16 +1474,16 @@ void _saveCourse() async {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Riepilogo del Corso', 
+            Text('Course Summary', 
                 style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
             SizedBox(height: 16),
             ListTile(
-              title: Text('Titolo: $_courseTitle', style: TextStyle(color: Colors.white)),
+              title: Text('Title: $_courseTitle', style: TextStyle(color: Colors.white)),
               subtitle: Text('Topic: $_selectedTopic', style: TextStyle(color: Colors.white70)),
             ),
             ListTile(
-              title: Text('Capitoli: ${_sections.length}', style: TextStyle(color: Colors.white)),
-              subtitle: Text('Costo: $_courseCost coins', style: TextStyle(color: Colors.white70)),
+              title: Text('Chapters: ${_sections.length}', style: TextStyle(color: Colors.white)),
+              subtitle: Text('Cost: $_courseCost coins', style: TextStyle(color: Colors.white70)),
             ),
           ],
         ),
@@ -1551,7 +1534,7 @@ void _saveCourse() async {
               ),
               SizedBox(height: 8),
               Text(
-                'Nuovo',
+                'New',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 12,

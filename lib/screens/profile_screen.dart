@@ -251,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF181819),
+      backgroundColor: const Color(0xFF121212),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

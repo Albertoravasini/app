@@ -179,50 +179,61 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
     // Segna come letta
     await _markAsRead(notification.id);
 
-    // Naviga al profilo se c'è un senderId
-    if (notification.senderId != null && context.mounted) {
-      try {
-        // Recupera i dati completi dell'utente da Firestore
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(notification.senderId)
-            .get();
+    if (!context.mounted) return;
 
-        if (userDoc.exists && context.mounted) {
-          // Crea un UserModel completo con tutti i dati
-          final userData = userDoc.data()!;
-          final profileUser = UserModel.fromMap(userData);
+    // Gestisci diversamente in base al tipo di notifica
+    switch (notification.type) {
+      case NotificationType.teacherMessage:
+      case NotificationType.studentMessage:
+        // Per i messaggi, naviga al profilo
+        if (notification.senderId != null) {
+          try {
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(notification.senderId)
+                .get();
 
-          // Naviga al profilo con i dati completi
+            if (userDoc.exists && context.mounted) {
+              final userData = userDoc.data()!;
+              final profileUser = UserModel.fromMap(userData);
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(
+                    currentUser: profileUser,
+                  ),
+                ),
+              );
+            }
+          } catch (e) {
+            print('Errore nel recupero dati utente: $e');
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Error loading profile'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        }
+        break;
+
+      case NotificationType.commentReply:
+        // Per le risposte ai commenti, naviga al video
+        if (notification.videoId != null && context.mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ProfileScreen(
-                currentUser: profileUser,
+              builder: (context) => VideoPlayerScreen(
+                videoId: notification.videoId!,
+                autoOpenComments: true, // Apre automaticamente i commenti
               ),
             ),
           );
-        } else {
-          // Gestione errore: utente non trovato
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Utente non trovato'),
-              backgroundColor: Colors.red,
-            ),
-          );
         }
-      } catch (e) {
-        // Gestione errore: problema di rete o altro
-        print('Errore nel recupero dati utente: $e');
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Errore nel caricamento del profilo'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+        break;
     }
   }
 

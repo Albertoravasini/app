@@ -231,30 +231,46 @@ void _startQuiz(String quizTitle) async {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 40), // Spazio per togliere AppBar
-
-                // Titolo Quiz allineato a sinistra
-                const Text(
-                  'Quiz',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Descrizione sotto il titolo
-                const Text(
-                  'Take a quick quiz and test what you’ve learned. New quizzes every day!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                    height: 1.5,
-                  ),
+                const SizedBox(height: 40),
+                
+                // Sostituisci il titolo esistente con questo nuovo design
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.flash_on, color: Colors.yellowAccent, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'QUIZ TIME',
+                            style: TextStyle(
+                              color: Colors.yellowAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Challenge\nYourself',
+                      style: TextStyle(
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 30),
 
