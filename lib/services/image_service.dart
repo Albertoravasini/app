@@ -12,7 +12,12 @@ class ImageService {
   }) async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
       if (image == null) return;
 
       final File imageFile = File(image.path);
@@ -25,6 +30,10 @@ class ImageService {
           .child(userId)
           .child(fileName);
 
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Caricamento in corso...')),
+      );
+
       final UploadTask uploadTask = storageRef.putFile(imageFile);
       final TaskSnapshot taskSnapshot = await uploadTask;
       final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
@@ -36,13 +45,21 @@ class ImageService {
             isProfileImage ? 'profileImageUrl' : 'coverImageUrl': downloadUrl,
           });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Immagine caricata con successo!')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Immagine caricata con successo!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Errore nel caricamento dell\'immagine: $e')),
-      );
+      print('Errore nel caricamento dell\'immagine: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Errore nel caricamento dell\'immagine: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 } 

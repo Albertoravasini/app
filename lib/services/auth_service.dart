@@ -156,15 +156,21 @@ class AuthService {
       // Forza la disconnessione prima di iniziare un nuovo accesso
       await _googleSignIn.signOut();
       
-      // Configura GoogleSignIn per Android
-      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Modifica la configurazione per Android
+      if (!kIsWeb) {
+        await _googleSignIn.signOut();
         _googleSignIn.signIn().catchError((error) {
           print('Errore specifico Android: $error');
           return null;
         });
       }
 
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      // Usa una configurazione specifica per Android
+      final GoogleSignInAccount? googleUser = await GoogleSignIn(
+        scopes: ['email', 'profile'],
+        signInOption: SignInOption.standard,
+      ).signIn();
+
       if (googleUser == null) {
         print('Login Google annullato dall\'utente');
         return null;

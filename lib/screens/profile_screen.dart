@@ -762,11 +762,29 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                     top: 5,
                                     child: GestureDetector(
                                       onTap: isEditing ? () async {
-                                        await ImageService.uploadProfileImage(
-                                          userId: widget.currentUser.uid,
-                                          isProfileImage: true,
-                                          context: context,
-                                        );
+                                        try {
+                                          await ImageService.uploadProfileImage(
+                                            userId: widget.currentUser.uid,
+                                            isProfileImage: true,
+                                            context: context,
+                                          );
+                                          
+                                          // Aggiorniamo lo stato dopo il caricamento
+                                          if (mounted) {
+                                            setState(() {
+                                              // Forza l'aggiornamento dell'UI
+                                            });
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Errore nel caricamento dell\'immagine: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        }
                                       } : null,
                                       child: Stack(
                                         children: [
