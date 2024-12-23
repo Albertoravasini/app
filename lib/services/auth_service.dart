@@ -157,8 +157,7 @@ class AuthService {
       await _googleSignIn.signOut();
       
       // Modifica la configurazione per Android
-      if (!kIsWeb) {
-        await _googleSignIn.signOut();
+       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         _googleSignIn.signIn().catchError((error) {
           print('Errore specifico Android: $error');
           return null;
@@ -166,10 +165,7 @@ class AuthService {
       }
 
       // Usa una configurazione specifica per Android
-      final GoogleSignInAccount? googleUser = await GoogleSignIn(
-        scopes: ['email', 'profile'],
-        signInOption: SignInOption.standard,
-      ).signIn();
+       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
         print('Login Google annullato dall\'utente');
