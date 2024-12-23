@@ -31,146 +31,40 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
     });
   }
 
-  Future<void> _saveSelectedTopic() async {
-    if (selectedTopic != null) {
-      await FirebaseFirestore.instance.collection('users').doc(widget.user.uid).update({
-        'topics': [selectedTopic],
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        padding: const EdgeInsets.only(top: 60, bottom: 0),
         decoration: const BoxDecoration(
-          color: Colors.black, // Sfondo nero
+          color: Color(0xFF121212),
+          image: DecorationImage(
+            image: AssetImage('assets/pattern_bg.png'),
+            opacity: 0.05,
+            fit: BoxFit.cover,
+          ),
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.only(
-                  top: 26,
-                  left: 26,
-                  right: 25,
-                  bottom: 23,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05), // Colore semi-trasparente bianco
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(31),
-                    topRight: Radius.circular(31),
-                  ),
-                ),
-                child: Column(
+            // Header con back button
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Row(
                   children: [
-                    const SizedBox(
-                      width: double.infinity,
-                      child: Text(
-                        'What do you want to Improve?',
-                        style: TextStyle(
-                          color: Colors.white, // Testo bianco
-                          fontSize: 45,
-                          fontFamily: 'Montserrat',
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: allTopics.length,
-                        itemBuilder: (context, index) {
-                          final topic = allTopics[index];
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedTopic = topic;
-                              });
-                            },
-                            child: Container(
-                              height: 56,
-                              margin: const EdgeInsets.symmetric(vertical: 10),
-                              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 17),
-                              decoration: BoxDecoration(
-                                color: selectedTopic == topic ? Colors.white.withOpacity(0.1) : Colors.white.withOpacity(0.05), // Colore del contenitore cambiato
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  width: 1,
-                                  color: selectedTopic == topic ? Colors.white : Colors.white12, // Bordi simili a quelli nel login_screen
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  topic,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: selectedTopic == topic ? Colors.white : Colors.white70, // Colore del testo cambiato
-                                    fontSize: 16,
-                                    fontFamily: 'Montserrat',
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 30),
                     GestureDetector(
-                      onTap: () async {
-                        if (selectedTopic != null) {
-                          await _saveSelectedTopic();
-                          final user = FirebaseAuth.instance.currentUser;
-
-                          if (user != null && selectedTopic != null) {
-                            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-                              'topics': [selectedTopic],
-                            });
-
-                            final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-
-                            if (userDoc.exists) {
-                              final updatedUserModel = UserModel.fromMap(userDoc.data()!);
-
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => MainScreen(userModel: updatedUserModel),
-                                ),
-                                (Route<dynamic> route) => false,
-                              );
-                            }
-                          }
-                        }
-                      },
+                      onTap: () => Navigator.pop(context),
                       child: Container(
-                        width: 324,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 17),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white, // Bottone bianco
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(width: 1, color: Colors.white12), // Bordi semi-trasparenti
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Center(
-                          child: Text(
-                            'Continue',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.black, // Testo nero
-                              fontSize: 16,
-                              fontFamily: 'Montserrat',
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
                     ),
@@ -178,7 +72,185 @@ class _TopicSelectionScreenState extends State<TopicSelectionScreen> {
                 ),
               ),
             ),
+
+            // Main content
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF181819),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 32),
+                    // Titolo animato
+                    TweenAnimationBuilder(
+                      tween: Tween<double>(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 800),
+                      builder: (context, double value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: const Text(
+                              'Choose\nYour Path',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 40,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                                fontFamily: 'Montserrat',
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Select a topic to start learning',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        fontFamily: 'Montserrat',
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Lista topics
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: allTopics.length,
+                        itemBuilder: (context, index) {
+                          final topic = allTopics[index];
+                          return _buildTopicItem(topic);
+                        },
+                      ),
+                    ),
+
+                    // Continue Button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: _buildPrimaryButton(
+                        onTap: () async {
+                          if (selectedTopic != null) {
+                            await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(widget.user.uid)
+                                .update({
+                              'topics': [selectedTopic],
+                            });
+
+                            final userDoc = await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(widget.user.uid)
+                                .get();
+
+                            if (userDoc.exists) {
+                              final userModel = UserModel.fromMap(userDoc.data()!);
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MainScreen(userModel: userModel),
+                                ),
+                                (route) => false,
+                              );
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please select a topic to continue'),
+                              ),
+                            );
+                          }
+                        },
+                        text: 'Continue',
+                        isEnabled: selectedTopic != null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopicItem(String topic) {
+    final isSelected = selectedTopic == topic;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedTopic = topic;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Colors.yellowAccent.withOpacity(0.1)
+              : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? Colors.yellowAccent.withOpacity(0.3)
+                : Colors.white.withOpacity(0.1),
+          ),
+        ),
+        child: Text(
+          topic,
+          style: TextStyle(
+            color: isSelected ? Colors.yellowAccent : Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            fontFamily: 'Montserrat',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimaryButton({
+    required VoidCallback onTap,
+    required String text,
+    required bool isEnabled,
+  }) {
+    return GestureDetector(
+      onTap: isEnabled ? onTap : null,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isEnabled ? Colors.yellowAccent : Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: isEnabled ? Colors.black : Colors.white.withOpacity(0.5),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Montserrat',
+            ),
+          ),
         ),
       ),
     );
