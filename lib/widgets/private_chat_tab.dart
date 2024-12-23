@@ -55,6 +55,27 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
     if (message.trim().isEmpty) return;
 
     try {
+      if (selectedChatUserId == null) return;
+      final receiverId = selectedChatUserId!;
+      final chatId = _getChatId(widget.currentUser.uid, receiverId);
+
+      // Crea o aggiorna il documento della chat
+      await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .set({
+        'participants': [widget.currentUser.uid, receiverId],
+        'lastMessage': message,
+        'lastMessageTimestamp': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Salva il messaggio nella subcollection
+      final messageDoc = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .doc();
+
       // Ottieni i dati del mittente
       final senderDoc = await FirebaseFirestore.instance
           .collection('users')
@@ -63,17 +84,6 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
       final senderRole = senderDoc.data()?['role'];
       final senderName = senderDoc.data()?['name'] ?? 'Unknown';
       final isTeacher = senderRole == 'teacher';
-
-      // Determina il destinatario corretto
-      final receiverId = selectedChatUserId!;
-
-      // Salva il messaggio nella chat
-      final chatId = _getChatId(widget.currentUser.uid, receiverId);
-      final messageDoc = FirebaseFirestore.instance
-          .collection('chats')
-          .doc(chatId)
-          .collection('messages')
-          .doc();
 
       final newMessage = {
         'id': messageDoc.id,
@@ -199,7 +209,16 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
             ),
           );
         }
-        final chats = snapshot.data!.docs;
+        final chats = snapshot.data!.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final chatId = doc.id;
+          final participants = List<String>.from(data['participants'] ?? []);
+          final otherUserId = participants.firstWhere(
+            (id) => id != widget.currentUser.uid,
+            orElse: () => '',
+          );
+          return {'id': chatId, 'otherUserId': otherUserId};
+        }).toList();
         if (selectedChatUserId != null) {
           return _buildSingleChat(userId: selectedChatUserId);
         }
@@ -273,8 +292,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                   itemCount: chats.length,
                   itemBuilder: (context, index) {
                     final chat = chats[index];
-                    final otherUserId = ((chat.data() as Map<String, dynamic>)['participants'] as List)
-                        .firstWhere((id) => id != widget.currentUser.uid);
+                    final otherUserId = chat['otherUserId'];
                     return FutureBuilder<DocumentSnapshot>(
                       future: FirebaseFirestore.instance
                           .collection('users')
@@ -356,7 +374,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                                           StreamBuilder<QuerySnapshot>(
                                             stream: FirebaseFirestore.instance
                                                 .collection('chats')
-                                                .doc(chat.id)
+                                                .doc(chat['id'])
                                                 .collection('messages')
                                                 .orderBy('timestamp', descending: true)
                                                 .limit(1)
