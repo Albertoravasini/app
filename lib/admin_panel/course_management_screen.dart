@@ -511,13 +511,10 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                           size: 20,
                           color: Colors.white.withOpacity(0.8),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Text(
-                          course.visible ? 'Hide Course' : 'Show Course',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
+                          course.visible ? 'Hide' : 'Show',
+                          style: TextStyle(color: Colors.white.withOpacity(0.8)),
                         ),
                       ],
                     ),
@@ -559,7 +556,41 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                       break;
                       
                     case 'visibility':
-                      _updateCourseVisibility(course, !course.visible);
+                      try {
+                        setState(() => _isLoading = true);
+                        
+                        // Update visible field in database
+                        await FirebaseFirestore.instance
+                          .collection('courses')
+                          .doc(course.id)
+                          .update({'visible': !course.visible});
+                        
+                        // Update local state
+                        setState(() {
+                          course.visible = !course.visible;
+                          _isLoading = false;
+                        });
+                        
+                        if (!mounted) return;
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(course.visible ? 'Course visible' : 'Course hidden'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e) {
+                        setState(() => _isLoading = false);
+                        
+                        if (!mounted) return;
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error updating visibility: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
                       break;
                       
                     case 'delete':
