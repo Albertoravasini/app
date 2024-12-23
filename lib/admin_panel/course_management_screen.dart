@@ -343,299 +343,311 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
   }
 
   Widget _buildEnhancedCourseCard(Course course) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF181819),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          // Immagine di copertina con overlay sfumato
-          Positioned.fill(
-            child: Image.network(
-              course.coverImageUrl ?? 'placeholder_url',
-              fit: BoxFit.cover,
-            ),
+    return InkWell(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CourseEditScreen(course: course),
           ),
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.8),
-                  ],
-                ),
+        );
+        // Reload courses after editing
+        _loadCourses();
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF181819),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Immagine di copertina con overlay sfumato
+            Positioned.fill(
+              child: Image.network(
+                course.coverImageUrl ?? 'placeholder_url',
+                fit: BoxFit.cover,
               ),
             ),
-          ),
-
-          // Contenuto
-          Positioned.fill(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Badge stato
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: course.visible
-                          ? Colors.green.withOpacity(0.9)
-                          : Colors.grey.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      course.visible ? 'Published' : 'Draft',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Info corso
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        course.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.library_books,
-                            size: 14,
-                            color: Colors.white.withOpacity(0.7),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${course.sections.length} sections',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.monetization_on,
-                            size: 14,
-                            color: Colors.yellowAccent.withOpacity(0.7),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${course.cost}',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.8),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          // Menu contestuale in alto a destra
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Theme(
-              data: Theme.of(context).copyWith(
-                popupMenuTheme: PopupMenuThemeData(
-                  color: const Color(0xFF2D2D2D),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
               ),
-              child: PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.more_vert,
-                  color: Colors.white.withOpacity(0.8),
-                  size: 20,
-                ),
-                offset: const Offset(0, 40),
-                itemBuilder: (context) => [
-                  // Edit
-                  PopupMenuItem<String>(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.edit_outlined,
-                          size: 20,
-                          color: Colors.white.withOpacity(0.8),
+            ),
+
+            // Contenuto
+            Positioned.fill(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Badge stato
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: course.visible
+                            ? Colors.green.withOpacity(0.9)
+                            : Colors.grey.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        course.visible ? 'Published' : 'Draft',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Edit Course',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                  // Visibility Toggle
-                  PopupMenuItem<String>(
-                    value: 'visibility',
-                    child: Row(
+
+                  const Spacer(),
+
+                  // Info corso
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          course.visible ? Icons.visibility_off : Icons.visibility,
-                          size: 20,
-                          color: Colors.white.withOpacity(0.8),
-                        ),
-                        const SizedBox(width: 8),
                         Text(
-                          course.visible ? 'Hide' : 'Show',
-                          style: TextStyle(color: Colors.white.withOpacity(0.8)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Divider
-                  const PopupMenuDivider(),
-                  // Delete
-                  PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.delete_outline,
-                          size: 20,
-                          color: Colors.redAccent.withOpacity(0.9),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Delete Course',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 14,
+                          course.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.library_books,
+                              size: 14,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${course.sections.length} sections',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.monetization_on,
+                              size: 14,
+                              color: Colors.yellowAccent.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${course.cost}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ],
-                onSelected: (value) async {
-                  switch (value) {
-                    case 'edit':
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CourseEditScreen(course: course),
-                        ),
-                      );
-                      _loadCourses(); // Ricarica i corsi dopo la modifica
-                      break;
-                      
-                    case 'visibility':
-                      try {
-                        setState(() => _isLoading = true);
-                        
-                        // Update visible field in database
-                        await FirebaseFirestore.instance
-                          .collection('courses')
-                          .doc(course.id)
-                          .update({'visible': !course.visible});
-                        
-                        // Update local state
-                        setState(() {
-                          course.visible = !course.visible;
-                          _isLoading = false;
-                        });
-                        
-                        if (!mounted) return;
-                        
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(course.visible ? 'Course visible' : 'Course hidden'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      } catch (e) {
-                        setState(() => _isLoading = false);
-                        
-                        if (!mounted) return;
-                        
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error updating visibility: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                      break;
-                      
-                    case 'delete':
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          backgroundColor: const Color(0xFF2D2D2D),
-                          title: const Text(
-                            'Delete Course',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          content: Text(
-                            'Are you sure you want to delete "${course.title}"?\nThis action cannot be undone.',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text(
-                                'Cancel',
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _deleteCourse(course);
-                              },
-                              child: const Text(
-                                'Delete',
-                                style: TextStyle(color: Colors.redAccent),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                      break;
-                  }
-                },
               ),
             ),
-          ),
-        ],
+
+            // Menu contestuale in alto a destra
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  popupMenuTheme: PopupMenuThemeData(
+                    color: const Color(0xFF2D2D2D),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                child: PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: Colors.white.withOpacity(0.8),
+                    size: 20,
+                  ),
+                  offset: const Offset(0, 40),
+                  itemBuilder: (context) => [
+                    // Edit
+                    PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 20,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Edit Course',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Visibility Toggle
+                    PopupMenuItem<String>(
+                      value: 'visibility',
+                      child: Row(
+                        children: [
+                          Icon(
+                            course.visible ? Icons.visibility_off : Icons.visibility,
+                            size: 20,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            course.visible ? 'Hide' : 'Show',
+                            style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Divider
+                    const PopupMenuDivider(),
+                    // Delete
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: Colors.redAccent.withOpacity(0.9),
+                          ),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Delete Course',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onSelected: (value) async {
+                    switch (value) {
+                      case 'edit':
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CourseEditScreen(course: course),
+                          ),
+                        );
+                        _loadCourses(); // Ricarica i corsi dopo la modifica
+                        break;
+                        
+                      case 'visibility':
+                        try {
+                          setState(() => _isLoading = true);
+                          
+                          // Update visible field in database
+                          await FirebaseFirestore.instance
+                            .collection('courses')
+                            .doc(course.id)
+                            .update({'visible': !course.visible});
+                          
+                          // Update local state
+                          setState(() {
+                            course.visible = !course.visible;
+                            _isLoading = false;
+                          });
+                          
+                          if (!mounted) return;
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(course.visible ? 'Course visible' : 'Course hidden'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } catch (e) {
+                          setState(() => _isLoading = false);
+                          
+                          if (!mounted) return;
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error updating visibility: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        break;
+                        
+                      case 'delete':
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            backgroundColor: const Color(0xFF2D2D2D),
+                            title: const Text(
+                              'Delete Course',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            content: Text(
+                              'Are you sure you want to delete "${course.title}"?\nThis action cannot be undone.',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _deleteCourse(course);
+                                },
+                                child: const Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.redAccent),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                        break;
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

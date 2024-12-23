@@ -15,6 +15,9 @@ class ProfileFeedTab extends StatelessWidget {
     required this.isLoading,
   }) : super(key: key);
 
+  // Filtra i corsi visibili
+  List<Course> get _visibleCourses => userCourses.where((course) => course.visible).toList();
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -39,7 +42,7 @@ class ProfileFeedTab extends StatelessWidget {
       );
     }
 
-    if (userCourses.isEmpty) {
+    if (_visibleCourses.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -73,9 +76,9 @@ class ProfileFeedTab extends StatelessWidget {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: userCourses.length,
+      itemCount: _visibleCourses.length,
       itemBuilder: (context, index) {
-        final course = userCourses[index];
+        final course = _visibleCourses[index];
         return Hero(
           tag: 'course_${course.id}',
           child: Container(
@@ -258,7 +261,16 @@ class ProfileFeedTab extends StatelessWidget {
       children: [
         _buildStat(Icons.star_rounded, course.rating.toStringAsFixed(1), 'Rating'),
         _buildDivider(),
-        _buildStat(Icons.people_outline_rounded, '${course.totalRatings}', 'Students'),
+        FutureBuilder<int>(
+          future: _getStudentsCount(course.id),
+          builder: (context, snapshot) {
+            return _buildStat(
+              Icons.people_outline_rounded, 
+              '${snapshot.data ?? 0}', 
+              'Students'
+            );
+          },
+        ),
         _buildDivider(),
         _buildStat(
           Icons.timer_outlined,
@@ -452,4 +464,9 @@ Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
     
     return unlockedCourses.contains(courseId);
   }
+
+Future<int> _getStudentsCount(String courseId) async {
+  final course = _visibleCourses.firstWhere((c) => c.id == courseId);
+  return course.getStudentsCount();
+}
 } 

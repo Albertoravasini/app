@@ -499,12 +499,25 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         children: [
           _buildStat(Icons.star_rounded, '${widget.course.rating}', 'Rating'),
           _buildVerticalDivider(),
-          _buildStat(Icons.people_alt_rounded, '${widget.course.totalRatings}', 'Reviews'),
+          FutureBuilder<int>(
+            future: _getStudentsCount(widget.course.id),
+            builder: (context, snapshot) {
+              return _buildStat(
+                Icons.people_alt_rounded, 
+                '${snapshot.data ?? 0}', 
+                'Students'
+              );
+            },
+          ),
           _buildVerticalDivider(),
           _buildStat(Icons.stars_rounded, '${widget.course.cost}', 'Cost'),
         ],
       ),
     );
+  }
+
+  Future<int> _getStudentsCount(String courseId) {
+    return widget.course.getStudentsCount();
   }
 
   Widget _buildVerticalDivider() {

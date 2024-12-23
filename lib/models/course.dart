@@ -27,6 +27,9 @@ class Course {
   String authorName;
   String? authorProfileUrl;
 
+  // Cache statica condivisa tra tutte le istanze
+  static final Map<String, int> _studentsCache = {};
+
   Course({
     required this.id,
     required this.title,
@@ -110,6 +113,43 @@ class Course {
       'authorName': authorName,
       'authorProfileUrl': authorProfileUrl,
     };
+  }
+
+  Future<int> getStudentsCount() async {
+    // Check cache first
+    if (_studentsCache.containsKey(id)) {
+      return _studentsCache[id]!;
+    }
+
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('unlockedCourses', arrayContains: id)
+          .get();
+
+      final subscribersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('subscriptions', arrayContains: authorId)
+          .get();
+
+      final uniqueStudents = <String>{};
+      
+      for (var doc in querySnapshot.docs) {
+        uniqueStudents.add(doc.id);
+      }
+      
+      for (var doc in subscribersSnapshot.docs) {
+        uniqueStudents.add(doc.id);
+      }
+      
+      // Cache the result
+      _studentsCache[id] = uniqueStudents.length;
+      
+      return uniqueStudents.length;
+    } catch (e) {
+      print('Error getting students count: $e');
+      return 0;
+    }
   }
 }
 
