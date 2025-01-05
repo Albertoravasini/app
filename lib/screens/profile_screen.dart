@@ -2,6 +2,7 @@ import 'package:Just_Learn/admin_panel/course_management_screen.dart';
 import 'package:Just_Learn/models/certification.dart';
 import 'package:Just_Learn/models/experience.dart';
 import 'package:Just_Learn/models/review.dart';
+import 'package:Just_Learn/screens/teacher_dashboard_screen.dart';
 import 'package:Just_Learn/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1084,11 +1085,15 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF282828),
+                                  color: _isSubscribed 
+                                      ? Colors.yellowAccent.withOpacity(0.1)
+                                      : Colors.yellowAccent.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.yellowAccent.withOpacity(0.3),
-                                    width: 1,
+                                    color: _isSubscribed 
+                                        ? Colors.yellowAccent 
+                                        : Colors.yellowAccent.withOpacity(0.3),
+                                    width: _isSubscribed ? 1 : 2,
                                   ),
                                 ),
                                 child: Row(
@@ -1100,15 +1105,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                           Container(
                                             margin: const EdgeInsets.only(right: 12),
                                             child: Icon(
-                                              Icons.discount_outlined,
-                                              color: Colors.yellowAccent.withOpacity(0.8),
+                                              _isSubscribed 
+                                                  ? Icons.verified
+                                                  : Icons.workspace_premium,
+                                              color: _isSubscribed 
+                                                  ? Colors.yellowAccent
+                                                  : Colors.yellowAccent,
                                               size: 22,
                                             ),
                                           ),
                                           Text(
-                                            'Subscribe',
+                                            _isSubscribed ? 'Subscribed' : 'Subscribe',
                                             style: TextStyle(
-                                              color: Colors.yellowAccent.withOpacity(0.8),
+                                              color: _isSubscribed 
+                                                  ? Colors.yellowAccent
+                                                  : Colors.white,
                                               fontSize: 14,
                                               fontFamily: 'Montserrat',
                                               fontWeight: FontWeight.w700,
@@ -1123,19 +1134,25 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF1E1E1E),
+                                        color: _isSubscribed 
+                                            ? Colors.black.withOpacity(0.3)
+                                            : Colors.black.withOpacity(0.3),
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
-                                          color: Colors.white.withOpacity(0.1),
+                                          color: _isSubscribed 
+                                              ? Colors.yellowAccent.withOpacity(0.5)
+                                              : Colors.yellowAccent.withOpacity(0.3),
                                           width: 1,
                                         ),
                                       ),
                                       child: Text(
                                         widget.currentUser.subscriptionPrice == 0 
-                                          ? 'FREE' 
-                                          : '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                            ? 'FREE' 
+                                            : '\$ ${widget.currentUser.subscriptionPrice.toStringAsFixed(2)} / mo',
+                                        style: TextStyle(
+                                          color: _isSubscribed 
+                                              ? Colors.yellowAccent
+                                              : Colors.yellowAccent,
                                           fontSize: 14,
                                           fontFamily: 'Montserrat',
                                           fontWeight: FontWeight.w700,
@@ -1290,12 +1307,30 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                         style: TextStyle(color: Colors.white),
                                       ),
                                       onTap: () {
-                                        Navigator.pop(context); // Chiude il bottom sheet
+                                        Navigator.pop(context);
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder: (context) => CourseManagementScreen(
                                               userId: widget.currentUser.uid,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: Icon(Icons.dashboard_rounded, color: Colors.white),
+                                      title: Text(
+                                        'Dashboard',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => TeacherDashboardScreen(
+                                              teacherId: widget.currentUser.uid,
                                             ),
                                           ),
                                         );

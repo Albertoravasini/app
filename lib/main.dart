@@ -26,6 +26,7 @@ import 'screens/support_screen.dart'; // Importa la schermata di supporto
 import 'screens/profile_screen.dart'; // Importa la schermata del profilo insegnante
 import 'web/screens/web_home_screen.dart';
 import 'screens/NotificationsScreen.dart';
+import 'web/screens/web_landing_screen.dart';
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

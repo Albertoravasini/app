@@ -131,8 +131,71 @@ class SignInOptionsScreen extends StatelessWidget {
                     // Sign In with Google button
                     _buildSignInButton(
                       onTap: () async {
-                        User? user = await authService.signInWithGoogle();
-                        // ... existing Google sign-in logic ...
+                        try {
+                          final authService = Provider.of<AuthService>(context, listen: false);
+                          User? user = await authService.signInWithGoogle();
+
+                          if (user != null) {
+                            final userDoc = await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(user.uid)
+                                .get();
+
+                            if (userDoc.exists) {
+                              final userModel = UserModel.fromMap(userDoc.data()!);
+
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => MainScreen(userModel: userModel),
+                                ),
+                                (Route<dynamic> route) => false,
+                              );
+                            } else {
+                              // Crea un nuovo utente se non esiste
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .set({
+                                'uid': user.uid,
+                                'email': user.email ?? '',
+                                'name': user.displayName ?? '',
+                                'topics': [],
+                                'completedLevels': [],
+                                'consecutiveDays': 0,
+                                'role': 'user',
+                                'lastAccess': DateTime.now().toIso8601String(),
+                                'WatchedVideos': {},
+                                'answeredQuestions': {},
+                                'currentSteps': {},
+                                'completedSections': [],
+                                'notifications': [],
+                                'unlockedCourses': [],
+                                'coins': 0,
+                                'dailyVideosCompleted': 0,
+                                'dailyQuizFreeUses': 0,
+                                'hasSeenTutorial': false
+                              });
+
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TopicSelectionScreen(user: user),
+                                ),
+                                (Route<dynamic> route) => false,
+                              );
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Fallito il login con Google')),
+                            );
+                          }
+                        } catch (e) {
+                          print('Errore durante il login con Google: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Errore: $e')),
+                          );
+                        }
                       },
                       icon: 'assets/Vector1.png',
                       text: 'Sign In with Google',
@@ -145,11 +208,69 @@ class SignInOptionsScreen extends StatelessWidget {
                       _buildSignInButton(
                         onTap: () async {
                           try {
+                            final authService = Provider.of<AuthService>(context, listen: false);
                             User? user = await authService.signInWithApple();
-                            // ... existing Apple sign-in logic ...
-                          } catch (error) {
+                            
+                            if (user != null) {
+                              final userDoc = await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .get();
+
+                              if (userDoc.exists) {
+                                final userModel = UserModel.fromMap(userDoc.data()!);
+
+                                
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => MainScreen(userModel: userModel),
+                                  ),
+                                  (Route<dynamic> route) => false,
+                                );
+                              } else {
+                                // Crea un nuovo utente se non esiste
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user.uid)
+                                    .set({
+                                  'uid': user.uid,
+                                  'email': user.email ?? '',
+                                  'name': user.displayName ?? '',
+                                  'topics': [],
+                                  'completedLevels': [],
+                                  'consecutiveDays': 0,
+                                  'role': 'user',
+                                  'lastAccess': DateTime.now().toIso8601String(),
+                                  'WatchedVideos': {},
+                                  'answeredQuestions': {},
+                                  'currentSteps': {},
+                                  'completedSections': [],
+                                  'notifications': [],
+                                  'unlockedCourses': [],
+                                  'coins': 0,
+                                  'dailyVideosCompleted': 0,
+                                  'dailyQuizFreeUses': 0,
+                                  'hasSeenTutorial': false
+                                });
+
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => TopicSelectionScreen(user: user),
+                                  ),
+                                  (Route<dynamic> route) => false,
+                                );
+                              }
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Fallito il login con Apple')),
+                              );
+                            }
+                          } catch (e) {
+                            print('Errore durante il login con Apple: $e');
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Fallito il login con Apple')),
+                              SnackBar(content: Text('Errore: $e')),
                             );
                           }
                         },
