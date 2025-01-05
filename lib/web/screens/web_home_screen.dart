@@ -5,6 +5,7 @@ import '../widgets/web_video_info.dart';
 import 'package:Just_Learn/screens/shorts_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'web_landing_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class WebHomeScreen extends StatefulWidget {
   @override
@@ -34,21 +35,9 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAuth();
   }
 
-  void _checkAuth() {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      // Reindirizza alla landing page se l'utente non è autenticato
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => WebLandingScreen()),
-        );
-      });
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {

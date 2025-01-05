@@ -2,12 +2,15 @@ import 'package:Just_Learn/admin_panel/admin_panel_screen.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/access/onboarding_screen.dart';
 import 'package:Just_Learn/screens/streak_screen.dart'; // Importiamo la schermata di streak
+import 'package:Just_Learn/web/screens/web_home_screen.dart';
+import 'package:Just_Learn/web/screens/web_landing_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:Just_Learn/main.dart';
 import 'package:Just_Learn/services/notification_service.dart';
+import 'package:flutter/foundation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -27,8 +30,32 @@ class _SplashScreenState extends State<SplashScreen> {
 
 Future<void> _navigateToNextScreen() async {
   try {
-    Future<UserModel?> userModelFuture = _loadUserData();
+    // Aggiungi un delay per mostrare la splash screen
     await Future.delayed(const Duration(seconds: 1));
+
+    // Se l'app è in esecuzione sul web
+    if (kIsWeb) {
+      // Controlla se l'utente è autenticato
+      final user = FirebaseAuth.instance.currentUser;
+      
+      if (user != null) {
+        // Se l'utente è autenticato, vai alla home
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => WebHomeScreen()),
+        );
+      } else {
+        // Se l'utente non è autenticato, vai alla landing page
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => WebLandingScreen()),
+        );
+      }
+      return;
+    }
+
+    // Per le app mobile, continua con il flusso esistente
+    Future<UserModel?> userModelFuture = _loadUserData();
     UserModel? userModel = await userModelFuture;
 
     if (userModel != null) {

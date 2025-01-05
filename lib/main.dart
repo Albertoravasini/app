@@ -162,7 +162,7 @@ class MyApp extends StatelessWidget {
           ),
           initialRoute: '/',
           routes: {
-            '/': (context) => isWeb ? WebHomeScreen() : SplashScreen(),
+            '/': (context) => SplashScreen(),
             '/home': (context) => const HomeScreen(),
             '/login': (context) => const LoginScreen(),
             '/register': (context) => const RegisterScreen(),
