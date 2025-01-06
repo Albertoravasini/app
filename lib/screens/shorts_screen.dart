@@ -84,6 +84,9 @@ class _ShortsScreenState extends State<ShortsScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _initializeCourse(widget.initialCourse!, widget.initialSection!);
       });
+    } else {
+      // Carica i corsi normalmente se non siamo in modalità corso
+      _loadCourses();
     }
   }
 
@@ -218,7 +221,7 @@ void _preloadNextVideo(int index, String videoId) {
   }
 }
 
-void _onVideoChanged(int index) {
+void _onPageChanged(int index) {
   if (isInCourseMode && currentSection != null) {
     // Aggiorna il currentStep nel database per ogni cambio di pagina,
     // sia per video che per domande
@@ -732,45 +735,47 @@ void dispose() {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: allShortSteps.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : PageView.custom(
-              controller: _pageController,
-              scrollDirection: Axis.vertical,
-              physics: const TikTokScrollPhysics(),
-              childrenDelegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  if (index < 0 || index >= allShortSteps.length) return null;
-                  return RepaintBoundary(
-                    child: _buildPageContent(index),
-                  );
-                },
-                childCount: allShortSteps.length,
-                findChildIndexCallback: (Key key) {
-                  if (key is ValueKey<String>) {
-                    // Implementa la logica per trovare l'indice del video
-                    return int.tryParse(key.value.split('_')[1]);
-                  }
-                  return null;
-                },
-              ),
-              onPageChanged: (index) {
-                scrollCount++;
-                
-                Posthog().capture(
-                  eventName: 'short_scroll',
-                  properties: {
-                    'scroll_count': scrollCount,
-                    'course_id': currentCourse?.id ?? 'no_course',
-                    'video_index': index,
-                  },
+Widget build(BuildContext context) {
+  return Scaffold(
+    body: allShortSteps.isEmpty
+        ? const Center(child: CircularProgressIndicator())
+        : PageView.custom(
+            controller: _pageController,
+            scrollDirection: Axis.vertical,
+            physics: const TikTokScrollPhysics(),
+            childrenDelegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (index < 0 || index >= allShortSteps.length) return null;
+                return RepaintBoundary(
+                  child: _buildPageContent(index),
                 );
               },
+              childCount: allShortSteps.length,
+              findChildIndexCallback: (Key key) {
+                if (key is ValueKey<String>) {
+                  // Implementa la logica per trovare l'indice del video
+                  return int.tryParse(key.value.split('_')[1]);
+                }
+                return null;
+              },
             ),
-    );
-  }
+            onPageChanged: (index) {
+              _onPageChanged(index); // Aggiorna gli step
+
+              scrollCount++;
+              
+              Posthog().capture(
+                eventName: 'short_scroll',
+                properties: {
+                  'scroll_count': scrollCount,
+                  'course_id': currentCourse?.id ?? 'no_course',
+                  'video_index': index,
+                },
+              );
+            },
+          ),
+  );
+}
 
   void _preloadAdjacentPages(int currentIndex) {
     // Precarica solo i video immediatamente adiacenti

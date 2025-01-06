@@ -59,7 +59,7 @@ class _PageViewContainerState extends State<PageViewContainer> {
   Widget build(BuildContext context) {
     return PageView(
       controller: _pageController,
-      physics: const PageScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(),
       onPageChanged: _onPageChanged,
       children: [
         ArticlesWidget(
@@ -69,8 +69,8 @@ class _PageViewContainerState extends State<PageViewContainer> {
         VideoPlayerWidget(
           videoUrl: widget.videoUrl,
           course: widget.course,
-          onShowArticles: (_) => _pageController.animateToPage(0, duration: Duration(milliseconds: 300), curve: Curves.easeInOut),
-          onShowNotes: (_) => _pageController.animateToPage(2, duration: Duration(milliseconds: 300), curve: Curves.easeInOut),
+          onShowArticles: (_) => _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+          onShowNotes: (_) => _pageController.animateToPage(2, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
           openComments: (_) => showModalBottomSheet(
             context: context,
             isScrollControlled: true,
