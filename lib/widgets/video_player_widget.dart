@@ -264,13 +264,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     return Stack(
       children: [
         _controller.value.isInitialized
-          ? SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _controller.value.size.width,
-                  height: _controller.value.size.height,
-                  child: VideoPlayer(_controller),
+          ? Center(
+              child: AspectRatio(
+                aspectRatio: 9/16, // Forza il rapporto verticale
+                child: Container(
+                  color: Colors.black,
+                  child: Center(
+                    child: AspectRatio(
+                      aspectRatio: _controller.value.aspectRatio,
+                      child: VideoPlayer(_controller),
+                    ),
+                  ),
                 ),
               ),
             )

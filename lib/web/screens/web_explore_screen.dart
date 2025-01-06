@@ -4,8 +4,17 @@ import '../../services/course_service.dart';
 import '../../models/course.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ExploreScreen extends StatefulWidget {
+  final Function(Course, Section?) onCourseSelected;
+
+  const ExploreScreen({
+    Key? key,
+    required this.onCourseSelected,
+  }) : super(key: key);
+
   @override
   _ExploreScreenState createState() => _ExploreScreenState();
 }
@@ -218,7 +227,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
             SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => _showCoursePreview(context, course),
+              onPressed: () => widget.onCourseSelected(course, null),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellowAccent,
                 foregroundColor: Colors.black,
@@ -278,142 +287,165 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildCourseCard(Course course) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Immagine di copertina
-          AspectRatio(
-            aspectRatio: 16 / 10,
-            child: Image.network(
-              course.coverImageUrl ?? '',
-              fit: BoxFit.cover,
-            ),
+    return InkWell(
+      onTap: () async {
+        // Controlla il progresso salvato
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final currentSteps = Map<String, dynamic>.from(userData['currentSteps'] ?? {});
+            
+            // Trova l'ultima sezione con progresso
+            Section? lastSection;
+            for (var section in course.sections) {
+              if (currentSteps.containsKey(section.title)) {
+                lastSection = section;
+              }
+            }
+            
+            // Usa l'ultima sezione con progresso o la prima sezione
+            widget.onCourseSelected(course, lastSection ?? course.sections.first);
+          } else {
+            widget.onCourseSelected(course, course.sections.first);
+          }
+        } else {
+          widget.onCourseSelected(course, course.sections.first);
+        }
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
           ),
-
-          // Contenuto del corso
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Badge categoria
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      course.topic ?? 'Course',
-                      style: GoogleFonts.inter(
-                        color: Colors.grey[400],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 8),
-
-                  // Titolo del corso
-                  Text(
-                    course.title,
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 8),
-
-                  // Info autore
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 8,
-                        backgroundImage: course.authorProfileUrl != null
-                            ? NetworkImage(course.authorProfileUrl!)
-                            : null,
-                        child: course.authorProfileUrl == null
-                            ? Text(course.authorName[0].toUpperCase(), style: TextStyle(fontSize: 8))
-                            : null,
-                      ),
-                      SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          course.authorName,
-                          style: GoogleFonts.inter(
-                            color: Colors.grey[400],
-                            fontSize: 12,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  Spacer(),
-
-                  // Footer con prezzo e rating
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Prezzo
-                      Text(
-                        '${course.cost} coins',
-                        style: GoogleFonts.inter(
-                          color: Colors.yellowAccent,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                        ),
-                      ),
-                      // Rating
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.star,
-                            size: 12,
-                            color: Colors.yellowAccent,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            '${course.rating ?? 4.5}',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Immagine di copertina
+            AspectRatio(
+              aspectRatio: 16 / 10,
+              child: Image.network(
+                course.coverImageUrl ?? '',
+                fit: BoxFit.cover,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  void _showCoursePreview(BuildContext context, Course course) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => CoursePreviewSheet(course: course),
+            // Contenuto del corso
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Badge categoria
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        course.topic ?? 'Course',
+                        style: GoogleFonts.inter(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+
+                    // Titolo del corso
+                    Text(
+                      course.title,
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 8),
+
+                    // Info autore
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 8,
+                          backgroundImage: course.authorProfileUrl != null
+                              ? NetworkImage(course.authorProfileUrl!)
+                              : null,
+                          child: course.authorProfileUrl == null
+                              ? Text(course.authorName[0].toUpperCase(), style: TextStyle(fontSize: 8))
+                              : null,
+                        ),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            course.authorName,
+                            style: GoogleFonts.inter(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    Spacer(),
+
+                    // Footer con prezzo e rating
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Prezzo
+                        Text(
+                          '${course.cost} coins',
+                          style: GoogleFonts.inter(
+                            color: Colors.yellowAccent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        // Rating
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.star,
+                              size: 12,
+                              color: Colors.yellowAccent,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '${course.rating ?? 4.5}',
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
