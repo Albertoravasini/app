@@ -43,10 +43,10 @@ class ShortsScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _ShortsScreenState createState() => _ShortsScreenState();
+  ShortsScreenState createState() => ShortsScreenState();
 }
 
-class _ShortsScreenState extends State<ShortsScreen> {
+class ShortsScreenState extends State<ShortsScreen> {
   final ShortsController _shortsController = ShortsController();
   final CourseService _courseService = CourseService();
   List<Map<String, dynamic>> allShortSteps = [];
@@ -892,5 +892,11 @@ Widget build(BuildContext context) {
         ),
       );
     }).toList();
+  }
+
+  void jumpToPage(int index) {
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(index);
+    }
   }
 }

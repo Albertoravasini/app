@@ -9,6 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:Just_Learn/screens/profile_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:Just_Learn/utils/platform_helper.dart';
 
 class CourseInfoOverlay extends StatefulWidget {
   final Course? course;
@@ -371,6 +373,10 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    if (PlatformHelper.isWeb) {
+      return const SizedBox.shrink(); // Non mostrare nulla su web
+    }
+
     return Stack(
       children: [
         // Titolo e Topic/Section

@@ -5,10 +5,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class WebVideoPlayer extends StatefulWidget {
   final VideoPlayerManager videoManager;
+  final bool showControls;
 
   const WebVideoPlayer({
     Key? key,
     required this.videoManager,
+    this.showControls = true,
   }) : super(key: key);
 
   @override
@@ -70,44 +72,43 @@ class _WebVideoPlayerState extends State<WebVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator());
-    }
-
     if (!_isInitialized) {
-      return Center(
-        child: Text(
-          'Nessun video disponibile',
-          style: TextStyle(color: Colors.white),
-        ),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: _controller.value.aspectRatio,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              VideoPlayer(_controller),
-              _buildControls(),
-            ],
+    return MouseRegion(
+      onEnter: (_) => _showControls(),
+      onExit: (_) => _hideControls(),
+      child: Stack(
+        children: [
+          // Video player
+          Center(
+            child: AspectRatio(
+              aspectRatio: _controller.value.aspectRatio,
+              child: VideoPlayer(_controller),
+            ),
           ),
-        ),
+
+          // Controlli minimi che appaiono solo al passaggio del mouse
+          if (_isHovering)
+            AnimatedOpacity(
+              opacity: _isHovering ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: _buildMinimalControls(),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildControls() {
+  Widget _buildMinimalControls() {
     return Positioned(
       bottom: 0,
       left: 0,
       right: 0,
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        color: Colors.black54,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        color: Colors.black26,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -115,7 +116,6 @@ class _WebVideoPlayerState extends State<WebVideoPlayer> {
               icon: Icon(
                 _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
                 color: Colors.white,
-                size: 32,
               ),
               onPressed: () {
                 setState(() {
@@ -125,11 +125,20 @@ class _WebVideoPlayerState extends State<WebVideoPlayer> {
                 });
               },
             ),
-            // Aggiungere qui altri controlli come volume, progress bar, ecc.
           ],
         ),
       ),
     );
+  }
+
+  bool _isHovering = false;
+
+  void _showControls() {
+    setState(() => _isHovering = true);
+  }
+
+  void _hideControls() {
+    setState(() => _isHovering = false);
   }
 
   @override

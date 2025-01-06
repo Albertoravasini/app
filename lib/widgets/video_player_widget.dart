@@ -23,6 +23,7 @@ import '../controllers/video_player_manager.dart';
 import '../controllers/course_video_controller.dart';
 import '../widgets/course_video/course_info_overlay.dart';
 import 'package:video_player/video_player.dart';
+import 'package:Just_Learn/utils/platform_helper.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
@@ -266,7 +267,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
         _controller.value.isInitialized
           ? Center(
               child: AspectRatio(
-                aspectRatio: 9/16, // Forza il rapporto verticale
+                aspectRatio: 9/16, // Manteniamo il rapporto verticale
                 child: Container(
                   color: Colors.black,
                   child: Center(
@@ -279,90 +280,92 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
               ),
             )
           : Center(child: CircularProgressIndicator()),
-        GestureDetector(
-          onTap: () {
-            if (_controller.value.isPlaying) {
-              _controller.pause();
-            } else {
-              _controller.play();
-            }
-          },
-          onHorizontalDragStart: _onHorizontalDragStart,
-          onHorizontalDragUpdate: _onHorizontalDragUpdate,
-          onHorizontalDragEnd: _onHorizontalDragEnd,
-          child: Container(
-            color: Colors.transparent,
-            width: double.infinity,
-            height: double.infinity,
+
+        if (!PlatformHelper.isWeb) ...[
+          GestureDetector(
+            onTap: () {
+              if (_controller.value.isPlaying) {
+                _controller.pause();
+              } else {
+                _controller.play();
+              }
+            },
+            onHorizontalDragStart: _onHorizontalDragStart,
+            onHorizontalDragUpdate: _onHorizontalDragUpdate,
+            onHorizontalDragEnd: _onHorizontalDragEnd,
+            child: Container(
+              color: Colors.transparent,
+              width: double.infinity,
+              height: double.infinity,
+            ),
           ),
-        ),
-        if (widget.course != null)
-          CourseInfoOverlay(
-            course: widget.course,
-            isInCourse: widget.isInCourse,
-            onShowArticles: widget.onShowArticles,
-            onShowNotes: widget.onShowNotes,
-            openComments: widget.openComments,
-            videoTitle: widget.videoTitle ?? 'Video senza titolo',
-            controller: CourseVideoController(
-              videoManager: VideoPlayerManager(),
+
+          if (widget.course != null)
+            CourseInfoOverlay(
               course: widget.course,
-              onStartCourse: widget.onStartCourse,
-              onUnlockOptionsChanged: (show) => setState(() => _showUnlockOptions = show),
+              isInCourse: widget.isInCourse,
+              onShowArticles: widget.onShowArticles,
+              onShowNotes: widget.onShowNotes,
+              openComments: widget.openComments,
+              videoTitle: widget.videoTitle ?? 'Video senza titolo',
+              controller: CourseVideoController(
+                videoManager: VideoPlayerManager(),
+                course: widget.course,
+                onStartCourse: widget.onStartCourse,
+                onUnlockOptionsChanged: (show) => setState(() => _showUnlockOptions = show),
+                onCoinsUpdate: widget.onCoinsUpdate,
+              ),
+              currentSection: widget.currentSection,
+              topic: widget.topic,
               onCoinsUpdate: widget.onCoinsUpdate,
             ),
-            currentSection: widget.currentSection,
-            topic: widget.topic,
-            onCoinsUpdate: widget.onCoinsUpdate,
-          ),
-        
-        // Progress bar
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            height: 4,
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1F1F1F),
-                  ),
-                ),
-                FractionallySizedBox(
-                  widthFactor: _progress,
-                  child: Container(
+          
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: 4,
+              child: Stack(
+                children: [
+                  Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey[600],
+                      color: const Color(0xFF1F1F1F),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        
-        // Seek indicator
-        if (_isDragging)
-          Positioned(
-            top: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+                  FractionallySizedBox(
+                    widthFactor: _progress,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          
+          if (_isDragging)
+            Positioned(
+              top: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }
