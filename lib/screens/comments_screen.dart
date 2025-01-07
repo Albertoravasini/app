@@ -1,3 +1,4 @@
+import 'package:Just_Learn/models/ai_chat_message.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +7,7 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import '../services/comment_service.dart';
 import '../services/ai_chat_service.dart';
 import '../widgets/ai_chat_widget.dart';
+import '../utils/platform_helper.dart';
 
 class CommentsScreen extends StatefulWidget {
   final String videoId;
@@ -34,6 +36,8 @@ class _CommentsScreenState extends State<CommentsScreen> {
   String? _replyingTo; // Nuovo: tiene traccia del commento a cui stiamo rispondendo
   String? _replyingToUsername; // Nuovo: tiene traccia dell'username
 
+  bool _isProcessing = false; // Nuovo: gestisce lo stato di invio del messaggio
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +65,133 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PlatformHelper.isWeb 
+        ? _buildWebComments() 
+        : _buildMobileComments();
+  }
+
+  Widget _buildWebComments() {
+    return Container(
+      color: const Color(0xFF121212),
+      child: Column(
+        children: [
+          // Header con toggle buttons
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildToggleButton(
+                  title: 'Comments',
+                  isSelected: !_showAiChat,
+                  onTap: () => setState(() => _showAiChat = false),
+                ),
+                const SizedBox(width: 12),
+                _buildToggleButton(
+                  title: 'AI Chat',
+                  isSelected: _showAiChat,
+                  onTap: () => setState(() => _showAiChat = true),
+                ),
+              ],
+            ),
+          ),
+
+          // Contenuto
+          Expanded(
+            child: _showAiChat
+                ? AIChatWidget(
+                    key: _aiChatKey,
+                    videoId: widget.videoId,
+                    levelId: 'default',
+                    aiChatKey: _aiChatKey,
+                  )
+                : StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _commentService.getCommentsWithUsernames(widget.videoId),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return const Center(
+                          child: Text(
+                            'Error loading comments',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        );
+                      }
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(color: Colors.yellowAccent),
+                        );
+                      }
+                      final comments = snapshot.data!;
+                      if (comments.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'Be the first to comment',
+                            style: TextStyle(
+                              color: Colors.white60,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: comments.length,
+                        itemBuilder: (context, index) {
+                          final commentData = comments[index];
+                          return _buildCommentTile(
+                            commentData['comment'],
+                            commentData['username'],
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+
+          // Input field
+          _buildCommentInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.yellowAccent.withOpacity(0.1) : Colors.transparent,
+          border: Border.all(
+            color: isSelected ? Colors.yellowAccent : Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: isSelected ? Colors.yellowAccent : Colors.white60,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileComments() {
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.7,
@@ -485,91 +616,67 @@ class _CommentsScreenState extends State<CommentsScreen> {
 
   Widget _buildCommentInput() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.05),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+      child: Row(
         children: [
-          // Mostra l'indicatore di risposta
-          if (_replyingTo != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    'Replying to @$_replyingToUsername',
-                    style: const TextStyle(
-                      color: Colors.yellowAccent,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _replyingTo = null;
-                        _replyingToUsername = null;
-                        _commentController.clear();
-                      });
-                    },
-                    child: const Icon(
-                      Icons.close,
-                      color: Colors.white54,
-                      size: 16,
-                    ),
-                  ),
-                ],
+          Expanded(
+            child: TextField(
+              controller: _commentController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: _showAiChat ? 'Ask AI something...' : 'Write a comment...',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: const BorderSide(color: Colors.yellowAccent),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
               ),
             ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _commentController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: _replyingTo != null ? 'Write a reply...' : 'Add a comment...',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  ),
-                  maxLines: null,
-                  keyboardType: TextInputType.multiline,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.send),
-                color: Colors.yellowAccent,
-                onPressed: () async {
-                  final message = _commentController.text.trim();
-                  if (message.isEmpty) return;
-
-                  if (_replyingTo != null) {
-                    // Aggiungi la menzione dell'utente all'inizio della risposta
-                    final replyWithMention = '@$_replyingToUsername $message';
-                    await _commentService.addReply(_replyingTo!, replyWithMention);
-                    setState(() {
-                      _replyingTo = null;
-                      _replyingToUsername = null;
-                    });
-                  } else {
-                    await _addComment(message);
-                  }
-                  _commentController.clear();
-                },
-              ),
-            ],
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.send, color: Colors.yellowAccent),
+            onPressed: _isProcessing ? null : () => _handleMessageSubmit(),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleMessageSubmit() async {
+    final message = _commentController.text.trim();
+    if (message.isEmpty) return;
+
+    setState(() => _isProcessing = true);
+    _commentController.clear();
+
+    try {
+      if (_showAiChat) {
+        final userMessage = AIChatMessage(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          isAi: false,
+          content: message,
+          timestamp: DateTime.now(),
+        );
+        setState(() => _aiChatService.addMessage(userMessage));
+        
+        await _aiChatService.sendMessage(message, widget.videoId, 'default');
+      } else {
+        await _addComment(message);
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
   }
 
   void _showDeleteDialog(String commentId, {bool isReply = false}) {

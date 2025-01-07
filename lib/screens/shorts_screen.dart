@@ -899,4 +899,32 @@ Widget build(BuildContext context) {
       _pageController.jumpToPage(index);
     }
   }
+
+  void previousPage() {
+    if (_pageController.hasClients) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void nextPage() {
+    if (_pageController.hasClients) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  String getCurrentVideoId() {
+    if (_pageController.hasClients && allShortSteps.isNotEmpty) {
+      final int currentIndex = _pageController.page?.round() ?? 0;
+      if (currentIndex >= 0 && currentIndex < allShortSteps.length) {
+        return (allShortSteps[currentIndex]['step'] as LevelStep).content;
+      }
+    }
+    return '';
+  }
 }

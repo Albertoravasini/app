@@ -1,9 +1,11 @@
 import 'package:Just_Learn/models/course.dart';
+import 'package:Just_Learn/screens/comments_screen.dart';
 import 'package:Just_Learn/screens/section_selection_sheet.dart';
 import 'package:flutter/material.dart';
 import '../widgets/web_video_info.dart';
 import 'package:Just_Learn/screens/shorts_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class WebHomeScreen extends StatefulWidget {
   final Course? selectedCourse;
@@ -58,25 +60,16 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Section Selection Sheet
-        if (currentCourse != null) 
+        // SectionSelectionSheet (a sinistra)
+        if (currentCourse != null)
           Container(
-            width: 300, // Larghezza fissa per la section sheet
-            decoration: BoxDecoration(
-              border: Border(
-                right: BorderSide(
-                  color: Colors.grey[800]!,
-                  width: 1,
-                ),
-              ),
-            ),
+            width: 400,
             child: SectionSelectionSheet(
               course: currentCourse!,
               currentSection: currentSection,
               onSelectSection: (section) {
                 setState(() {
                   currentSection = section;
-                  // Calcola l'indice di inizio della sezione
                   int startIndex = 0;
                   for (var s in currentCourse!.sections) {
                     if (s.title == section.title) break;
@@ -85,7 +78,6 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
                   currentVideoIndex = startIndex;
                 });
                 
-                // Aggiorna anche il ShortsScreen
                 if (_shortsScreenKey.currentState != null) {
                   _shortsScreenKey.currentState!.jumpToPage(currentVideoIndex);
                 }
@@ -93,40 +85,91 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
             ),
           ),
 
-        // Video Player e contenuto principale
+        // Area centrale con video e controlli
         Expanded(
           child: Stack(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Container verticale per il video che mantiene il rapporto 9/16
+                  // Container video e pulsanti di navigazione
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final width = (constraints.maxHeight * 9) / 16;
-                      
-                      return Container(
-                        width: width,
-                        
-                        child: ShortsScreen(
-                          key: _shortsScreenKey,
-                          selectedTopic: selectedTopic,
-                          selectedSubtopic: selectedSubtopic,
-                          onVideoTitleChange: _updateVideoTitle,
-                          onCoinsUpdate: _updateCoins,
-                          showSavedVideos: showSavedVideos,
-                          onPageChanged: _onPageChanged,
-                          onSectionProgressUpdate: updateSectionProgress,
-                          initialCourse: widget.selectedCourse,
-                          initialSection: widget.selectedSection,
-                          isInCourse: isInCourse,
-                        ),
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: width,
+                            child: ShortsScreen(
+                              key: _shortsScreenKey,
+                              selectedTopic: selectedTopic,
+                              selectedSubtopic: selectedSubtopic,
+                              onVideoTitleChange: _updateVideoTitle,
+                              onCoinsUpdate: _updateCoins,
+                              showSavedVideos: showSavedVideos,
+                              onPageChanged: _onPageChanged,
+                              onSectionProgressUpdate: updateSectionProgress,
+                              initialCourse: widget.selectedCourse,
+                              initialSection: widget.selectedSection,
+                              isInCourse: isInCourse,
+                            ),
+                          ),
+                          // Pulsanti di navigazione
+                          Padding(
+                            padding: const EdgeInsets.only(left: 24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildNavigationButton(
+                                  icon: FontAwesomeIcons.chevronUp,
+                                  onPressed: () {
+                                    if (_shortsScreenKey.currentState != null) {
+                                      _shortsScreenKey.currentState!.previousPage();
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _buildNavigationButton(
+                                  icon: FontAwesomeIcons.chevronDown,
+                                  onPressed: () {
+                                    if (_shortsScreenKey.currentState != null) {
+                                      _shortsScreenKey.currentState!.nextPage();
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),
                 ],
               ),
             ],
+          ),
+        ),
+
+        // CommentsScreen (a destra)
+        Container(
+          width: 400,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            border: Border(
+              left: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            
+            
+          ),
+          child: ClipRRect(
+            child: CommentsScreen(
+              videoId: _getCurrentVideoId(),
+            ),
           ),
         ),
       ],
@@ -192,5 +235,51 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
       startIndex += section.steps.length;
     }
     return startIndex;
+  }
+
+  Widget _buildNavigationButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: FaIcon(
+              icon,
+              color: Colors.white.withOpacity(0.8),
+              size: 20,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getCurrentVideoId() {
+    if (_shortsScreenKey.currentState != null) {
+      // Assumendo che tu abbia accesso all'ID del video corrente attraverso ShortsScreen
+      return _shortsScreenKey.currentState!.getCurrentVideoId() ?? '';
+    }
+    return '';
   }
 }
