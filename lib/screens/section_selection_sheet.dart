@@ -1,4 +1,5 @@
 import 'package:Just_Learn/models/level.dart';
+import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
 import '../models/course.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -183,37 +184,65 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     if (!userDoc.exists) return [];
 
     final userData = userDoc.data() as Map<String, dynamic>;
-    final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
-    final completedSections = List<String>.from(userData['completedSections'] ?? []);
+    final userModel = UserModel.fromMap(userData);
+    
+    // Ottieni i video completati per il topic del corso
+    final watchedVideos = userModel.WatchedVideos[widget.course.topic] ?? [];
+    // Ottieni le domande risposte per il topic del corso
+    final answeredQuestions = userModel.answeredQuestions[widget.course.topic] ?? [];
 
     return Future.wait(
       widget.course.sections.map((section) async {
-        final currentStep = (currentSteps[section.title] ?? 0) + 1;
-        final totalSteps = section.steps.length;
-        
-        // Una sezione è completata se:
-        // 1. È nella lista delle sezioni completate
-        // 2. OPPURE se l'utente ha raggiunto l'ultimo step
-        final isCompleted = completedSections.contains(section.title) || 
-                          currentStep >= totalSteps;
+        int completedSteps = 0;
+        int totalSteps = section.steps.length;
 
-        // Se la sezione è completata, mostriamo il progresso come completo
-        final displayedProgress = isCompleted ? totalSteps : currentStep;
+        // Controlla ogni step della sezione
+        for (var step in section.steps) {
+          bool isStepCompleted = false;
+
+          if (step.type == 'video') {
+            final videoId = step.videoUrl ?? step.content;
+            print('\n=== DEBUG VIDEO MATCHING ===');
+            print('Step video URL/content: $videoId');
+            print('\nVideo salvati:');
+            watchedVideos.forEach((video) {
+              print('\nVideo salvato:');
+              print('- videoId: ${video.videoId}');
+              print('- completed: ${video.completed}');
+              // Aggiungi altri campi disponibili nella classe VideoWatched
+            });
+            
+            final isCompleted = watchedVideos.any((video) => 
+              video.videoId == videoId && 
+              video.completed
+            );
+            print('\nRisultato matching: ${isCompleted ? "TROVATO" : "NON TROVATO"}');
+            print('============================\n');
+            isStepCompleted = isCompleted;
+          } else if (step.type == 'question') {
+            // Verifica se la domanda è stata risposta
+            isStepCompleted = answeredQuestions.contains(step.content);
+          }
+
+          if (isStepCompleted) {
+            completedSteps++;
+          }
+        }
 
         return {
-          'currentStep': displayedProgress,  // Mostra progresso completo se la sezione è completata
+          'currentStep': completedSteps,
           'totalSteps': totalSteps,
-          'isCompleted': isCompleted
+          'isCompleted': completedSteps == totalSteps
         };
       }),
     );
   }
 
   Widget _buildSectionCard(Section section, Map<String, dynamic> progressData, int index) {
-    final currentStep = progressData['currentStep'] as int;
+    final completedSteps = progressData['currentStep'] as int;
     final totalSteps = progressData['totalSteps'] as int;
     final isCompleted = progressData['isCompleted'] as bool;
-    final progress = currentStep / totalSteps;
+    final progress = completedSteps / totalSteps;
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -296,7 +325,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                             ),
                             SizedBox(width: 12),
                             Text(
-                              '$currentStep/$totalSteps lezioni',
+                              '$completedSteps/$totalSteps lezioni',
                               style: TextStyle(
                                 color: Colors.grey[500],
                                 fontSize: 12,
@@ -346,15 +375,18 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
               itemCount: section.steps.length,
               itemBuilder: (context, stepIndex) {
                 final step = section.steps[stepIndex];
-                final isCurrentStep = stepIndex == currentStep - 1;
-                final isStepCompleted = stepIndex < currentStep - 1;
-                
-                return _buildStepItem(
-                  step: step,
-                  stepNumber: stepIndex + 1,
-                  isCurrentStep: isCurrentStep,
-                  isCompleted: isStepCompleted,
-                  onTap: () => _handleStepSelection(section, stepIndex),
+                return FutureBuilder<bool>(
+                  future: _isStepCompleted(step),
+                  builder: (context, snapshot) {
+                    final isStepCompleted = snapshot.data ?? false;
+                    return _buildStepItem(
+                      step: step,
+                      stepNumber: stepIndex + 1,
+                      isCurrentStep: stepIndex == completedSteps,
+                      isCompleted: isStepCompleted,
+                      onTap: () => _handleStepSelection(section, stepIndex),
+                    );
+                  },
                 );
               },
             ),
@@ -419,8 +451,13 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                 ),
               ),
             if (isCompleted)
-              Padding(
-                padding: EdgeInsets.only(left: 12),
+              Container(
+                margin: EdgeInsets.only(left: 8),
+                padding: EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Icon(
                   FontAwesomeIcons.check,
                   color: Colors.yellowAccent,
@@ -475,5 +512,50 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     int totalQuestions = section.steps.where((step) => step.type == 'question').length;
     double totalTime = totalVideos * 1 + totalQuestions * 0.5;
     return totalTime.ceil();
+  }
+
+  Future<bool> _isStepCompleted(LevelStep step) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) return false;
+
+    final userModel = UserModel.fromMap(userDoc.data()!);
+
+    if (step.type == 'video') {
+      final videoId = step.videoUrl ?? step.content;
+      // Controlla in tutti i topic per i video completati
+      final allWatchedVideos = userModel.WatchedVideos.values
+          .expand((videos) => videos)
+          .toList();
+          
+      print('\n=== DEBUG VIDEO MATCHING ===');
+      print('Section: ${widget.currentSection?.title}');
+      print('Step video: $videoId');
+      print('Totale video trovati: ${allWatchedVideos.length}');
+      
+      return allWatchedVideos.any((video) {
+        final isMatch = video.videoId.contains(videoId.split('?')[0]) && video.completed;
+        if (isMatch) print('Video trovato e completato!');
+        return isMatch;
+      });
+    } else if (step.type == 'question') {
+      final answeredQuestions = userModel.answeredQuestions[widget.course.topic] ?? [];
+      return answeredQuestions.contains(step.content);
+    }
+
+    return false;
+  }
+
+  String _extractVideoId(String url) {
+    // Estrae il numero dal percorso, es: 1734344379372 da course_videos/1734344379372.mp4
+    final regex = RegExp(r'course_videos%2F(\d+)\.mp4');
+    final match = regex.firstMatch(url);
+    return match?.group(1) ?? url;
   }
 } 

@@ -114,11 +114,52 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       if (duration.inMilliseconds > 0) {
         setState(() {
           _progress = position.inMilliseconds / duration.inMilliseconds;
-          if (_progress >= 0.99 && !_completionHandled) {
-            _handleProgressCompletion();
+          
+          // Segna il video come completato quando raggiunge il 95% della durata
+          if (_progress >= 0.95 && !_completionHandled) {
+            _handleVideoCompletion();
           }
         });
       }
+    }
+  }
+
+  Future<void> _handleVideoCompletion() async {
+    _completionHandled = true;
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // Aggiorna il documento dell'utente
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      
+      await userRef.update({
+        'WatchedVideos.${widget.topic}': FieldValue.arrayUnion([{
+          'videoId': widget.videoUrl,
+          'title': widget.videoTitle ?? '',
+          'watchedAt': DateTime.now().toIso8601String(),
+          'completed': true,
+        }])
+      });
+
+      // Aggiorna l'UI per mostrare il video come completato
+      setState(() {
+        // Qui puoi aggiungere logica per mostrare un indicatore di completamento
+      });
+
+      // Traccia l'evento con Posthog
+      Posthog().capture(
+        eventName: 'video_completed',
+        properties: {
+          'videoId': widget.videoUrl,
+          'topic': widget.topic,
+          
+        },
+      );
+
+    } catch (e) {
+      print('Error marking video as completed: $e');
     }
   }
 

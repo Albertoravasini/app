@@ -221,70 +221,29 @@ void _preloadNextVideo(int index, String videoId) {
   }
 }
 
-void _onPageChanged(int index) {
+void _onPageChanged(int index) async {
+  if (!mounted) return;
+  
+  // Non aggiornare il progresso solo per lo scroll
+  setState(() {
+    currentStepIndex = index;
+  });
+
+  // Notifica solo il cambio di pagina, non il progresso
+  widget.onPageChanged(index);
+  
+  // Aggiorna solo la posizione corrente nella sezione
   if (isInCourseMode && currentSection != null) {
-    // Aggiorna il currentStep nel database per ogni cambio di pagina,
-    // sia per video che per domande
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
         'currentSteps.${currentSection!.title}': index
       });
     }
-
-    // Aggiorna il contatore degli step
-    setState(() {
-      currentStepIndex = index;
-      widget.onSectionProgressUpdate(
-        index + 1, // currentStep (1-based)
-        currentSection!.steps.length, // totalSteps
-        isInCourseMode
-      );
-    });
   }
-
-  if (!mounted) return;
-  
-  // Aggiorna sempre il progresso quando si scorre, indipendentemente dal tipo di step
-  if (isInCourseMode && currentCourse != null) {
-    final currentStep = allShortSteps[index]['step'] as LevelStep;
-    final currentSection = allShortSteps[index]['section'] as Section;
-    
-    int stepIndex = currentSection.steps.indexOf(currentStep);
-    widget.onSectionProgressUpdate(stepIndex, currentSection.steps.length, true);
-  }
-
-  // Se è una domanda, non procedere con la gestione del video
-  if (allShortSteps[index]['showQuestion'] == true) {
-    return;
-  }
-
-  // Gestisci il video corrente
-  if (index < _youtubeControllers.length) {
-    _youtubeControllers[index].play();
-  } else {
-    // Crea un nuovo controller solo se necessario
-    final videoId = (allShortSteps[index]['step'] as LevelStep).content;
-    _youtubeControllers.add(
-      YoutubePlayerController(
-        initialVideoId: videoId,
-        flags: const YoutubePlayerFlags(
-          autoPlay: true,
-          mute: false,
-          disableDragSeek: true,
-          hideControls: true,
-          hideThumbnail: true,
-          forceHD: false,
-        ),
-      )
-    );
-  }
-
-  // Ottimizza la gestione dei controller adiacenti
-  _manageAdjacentControllers(index);
-  
-  // Registra l'evento e gestisci il progresso
-  _handleVideoAnalytics(index);
 }
 
 void _manageAdjacentControllers(int currentIndex) {
