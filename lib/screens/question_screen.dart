@@ -262,19 +262,7 @@ Widget build(BuildContext context) {
                               opacity: value,
                               child: Column(
                                 children: [
-                                  Expanded(
-                                    child: CourseQuestionCard(
-                                      step: currentStep,
-                                      onAnswered: (isCorrect) {
-                                        print("Domanda risposta: ${currentStep.content}");
-                                        _initializeVideo(currentLevel); // Inizializza il video
-                                      },
-                                      onCompleteStep: () {
-                                        // Gestisci il completamento della domanda
-                                      },
-                                      topic: widget.topic,
-                                    ),
-                                  ),
+                                  
                                   // Se il video è pronto, mostra il pulsante per aprire il dialog
                                   if (_showVideoButton)
                                     IconButton(

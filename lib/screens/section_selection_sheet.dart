@@ -1,9 +1,11 @@
+import 'package:Just_Learn/models/level.dart';
 import 'package:flutter/material.dart';
 import '../models/course.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class SectionSelectionSheet extends StatefulWidget {
   final Course course;
@@ -211,177 +213,261 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     final currentStep = progressData['currentStep'] as int;
     final totalSteps = progressData['totalSteps'] as int;
     final isCompleted = progressData['isCompleted'] as bool;
+    final progress = currentStep / totalSteps;
 
-    // Animazione principale per l'entrata
-    final Animation<double> slideAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Interval(
-        (index * 0.1).clamp(0.0, 1.0),
-        ((index * 0.1) + 0.5).clamp(0.0, 1.0),
-        curve: Curves.easeOutCubic,
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+          width: 1,
+        ),
       ),
-    );
-
-    // Animazione secondaria per lo scaling
-    final Animation<double> scaleAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Interval(
-        (index * 0.1).clamp(0.0, 1.0),
-        ((index * 0.1) + 0.7).clamp(0.0, 1.0),
-        curve: Curves.easeOutBack,
-      ),
-    );
-
-    // Animazione per la rotazione
-    final Animation<double> rotateAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Interval(
-        (index * 0.1).clamp(0.0, 1.0),
-        ((index * 0.1) + 0.6).clamp(0.0, 1.0),
-        curve: Curves.easeOutCubic,
-      ),
-    );
-
-    return GestureDetector(
-      onTap: () => _handleSectionSelection(section),
-      child: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return Transform(
-            transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.001)
-              ..rotateX((1 - rotateAnimation.value) * 0.2)
-              ..translate(
-                0.0,
-                50.0 * (1 - slideAnimation.value),
-                0.0,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          childrenPadding: EdgeInsets.only(left: 16, right: 16, bottom: 12),
+          backgroundColor: Colors.transparent,
+          collapsedBackgroundColor: Colors.transparent,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${(progress * 100).round()}%',
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            alignment: Alignment.center,
-            child: Opacity(
-              opacity: slideAnimation.value.clamp(0.0, 1.0),
-              child: Transform.scale(
-                scale: 0.6 + (0.4 * scaleAnimation.value),
-                child: child,
+              SizedBox(width: 8),
+              Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.grey[400],
+                size: 20,
               ),
-            ),
-          );
-        },
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Color(0xFF181819),
-                borderRadius: BorderRadius.circular(20),
-                border: isCompleted 
-                  ? Border.all(color: Colors.yellowAccent.withOpacity(0.3), width: 1.5)
-                  : null,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 15,
-                    offset: Offset(0, 5),
+            ],
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '${index + 1}.',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          section.title,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              FontAwesomeIcons.clock,
+                              size: 10,
+                              color: Colors.grey[500],
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              '${_calculateTotalTime(section)} min',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              '$currentStep/$totalSteps lezioni',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            section.title,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        if (isCompleted)
-                          SvgPicture.asset(
-                            'assets/solar_verified-check-linear.svg',
-                            width: 24,
-                            height: 24,
-                          ),
-                      ],
+              SizedBox(height: 12),
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Color(0xFF2D2D2D),
+                      valueColor: AlwaysStoppedAnimation(
+                        isCompleted 
+                            ? Colors.yellowAccent 
+                            : Colors.yellowAccent.withOpacity(0.7),
+                      ),
+                      minHeight: 3,
                     ),
-                    SizedBox(height: 15),
-                    _buildSectionDetails(section),
-                    SizedBox(height: 15),
-                    _buildProgressBar(currentStep, totalSteps, isCompleted),
-                  ],
+                  ),
+                  if (isCompleted)
+                    Positioned(
+                      right: 0,
+                      top: -8,
+                      child: Icon(
+                        FontAwesomeIcons.check,
+                        color: Colors.yellowAccent,
+                        size: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          children: [
+            ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: section.steps.length,
+              itemBuilder: (context, stepIndex) {
+                final step = section.steps[stepIndex];
+                final isCurrentStep = stepIndex == currentStep - 1;
+                final isStepCompleted = stepIndex < currentStep - 1;
+                
+                return _buildStepItem(
+                  step: step,
+                  stepNumber: stepIndex + 1,
+                  isCurrentStep: isCurrentStep,
+                  isCompleted: isStepCompleted,
+                  onTap: () => _handleStepSelection(section, stepIndex),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepItem({
+    required LevelStep step,
+    required int stepNumber,
+    required bool isCurrentStep,
+    required bool isCompleted,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 24,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                color: isCurrentStep 
+                    ? Colors.yellowAccent 
+                    : Colors.transparent,
+              ),
+            ),
+            SizedBox(width: 16),
+            Icon(
+              _getStepIcon(step.type, isCompleted),
+              color: isCompleted 
+                  ? Colors.yellowAccent
+                  : Colors.grey[400],
+              size: 14,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _getStepTitle(step),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(
+                    isCurrentStep ? 1 : 0.7,
+                  ),
+                  fontSize: 14,
+                  fontWeight: isCurrentStep 
+                      ? FontWeight.w500 
+                      : FontWeight.normal,
                 ),
               ),
             ),
-          ),
+            if (step.duration != null)
+              Text(
+                '${step.duration} min',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 12,
+                ),
+              ),
+            if (isCompleted)
+              Padding(
+                padding: EdgeInsets.only(left: 12),
+                child: Icon(
+                  FontAwesomeIcons.check,
+                  color: Colors.yellowAccent,
+                  size: 12,
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildProgressBar(int currentStep, int totalSteps, bool isCompleted) {
-    // Calcola il progresso esattamente come viene mostrato nel contatore
-    double progress = totalSteps > 0 ? currentStep / totalSteps : 0;
+  // Helper methods
+  IconData _getStepIcon(String type, bool isCompleted) {
+    if (isCompleted) return FontAwesomeIcons.checkCircle;
     
-    return Container(
-      width: double.infinity,
-      height: 6,
-      decoration: BoxDecoration(
-        color: Color(0xFF1F1F1F),
-        borderRadius: BorderRadius.circular(3),
-      ),
-      child: FractionallySizedBox(
-        alignment: Alignment.centerLeft,
-        widthFactor: progress,
-        child: Container(
-          decoration: BoxDecoration(
-            color: isCompleted ? Colors.yellowAccent : Colors.white,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-      ),
-    );
+    switch (type) {
+      case 'video':
+        return FontAwesomeIcons.play;
+      case 'question':
+        return FontAwesomeIcons.question;
+      default:
+        return FontAwesomeIcons.circle;
+    }
   }
 
-  Widget _buildSectionDetails(Section section) {
-    int totalVideos = section.steps.where((step) => step.type == 'video').length;
-    int totalQuestions = section.steps.where((step) => step.type == 'question').length;
-    int totalTime = _calculateTotalTime(section);
-
-    return Row(
-      children: [
-        _buildDetailIconText(Icons.timer, '$totalTime minutes'),
-        const SizedBox(width: 23),
-        _buildDetailIconText(Icons.video_collection, '$totalVideos videos'),
-        const SizedBox(width: 23),
-        _buildDetailIconText(Icons.quiz, '$totalQuestions questions'),
-      ],
-    );
+  String _getStepTitle(LevelStep step) {
+    switch (step.type) {
+      case 'video':
+        return step.content ?? 'Video lezione';
+      case 'question':
+        return 'Quiz';
+      default:
+        return 'Contenuto';
+    }
   }
 
-  Widget _buildDetailIconText(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white.withOpacity(0.5), size: 16),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 12,
-            fontFamily: 'Montserrat',
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
+  String _getStepDuration(LevelStep step) {
+    if (step.type == 'video' && step.duration != null) {
+      return '${step.duration} min';
+    }
+    return '';
+  }
+
+  void _handleStepSelection(Section section, int stepIndex) {
+    _handleSectionSelection(section);
+    // Implementa la logica per saltare direttamente allo step selezionato
   }
 
   int _calculateTotalTime(Section section) {

@@ -174,16 +174,7 @@ Future<void> _loadUserProgress() async {
                       }
                      
                     } else if (step.type == 'question') {
-                      return CourseQuestionCard(
-                        step: step,
-                        onAnswered: (isCorrect) {
-                          if (isCorrect) {
-                            _onCompleteStep();
-                          }
-                        },
-                        onCompleteStep: _onCompleteStep,
-                        topic: widget.section.title,
-                      );
+                      
                     }
                     
                     return const Center(
