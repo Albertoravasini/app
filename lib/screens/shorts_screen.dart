@@ -221,29 +221,33 @@ void _preloadNextVideo(int index, String videoId) {
   }
 }
 
-void _onPageChanged(int index) async {
+void _onPageChanged(int index) {
   if (!mounted) return;
-  
-  // Non aggiornare il progresso solo per lo scroll
-  setState(() {
-    currentStepIndex = index;
-  });
 
-  // Notifica solo il cambio di pagina, non il progresso
-  widget.onPageChanged(index);
-  
-  // Aggiorna solo la posizione corrente nella sezione
-  if (isInCourseMode && currentSection != null) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({
-        'currentSteps.${currentSection!.title}': index
-      });
-    }
+  if (isInCourseMode && currentCourse != null) {
+    final currentStep = allShortSteps[index];
+    final section = currentStep['section'] as Section;
+    
+    final sectionStartIndex = _calculateSectionStartIndex(currentCourse!, section);
+    final relativeStepIndex = index - sectionStartIndex;
+    
+    widget.onSectionProgressUpdate(
+      relativeStepIndex,
+      section.steps.length,
+      true
+    );
   }
+
+  scrollCount++;
+  
+  Posthog().capture(
+    eventName: 'short_scroll',
+    properties: {
+      'scroll_count': scrollCount,
+      'course_id': currentCourse?.id ?? 'no_course',
+      'video_index': index,
+    },
+  );
 }
 
 void _manageAdjacentControllers(int currentIndex) {
@@ -436,7 +440,8 @@ void dispose() {
       onPageChanged: widget.onPageChanged,
       videoTitle: videoTitle,
       course: course,
-      onStartCourse: (course, section) => startCourse(course, selectedSection: section),
+      onStartCourse: (course, section, {int? initialStepIndex}) => 
+          startCourse(course, selectedSection: section, initialStepIndex: initialStepIndex),
       isInCourse: isInCourseMode,
       currentSection: currentSection,
     );
@@ -495,23 +500,18 @@ void dispose() {
   }
 
   // Ottimizziamo startCourse
-  Future<void> startCourse(Course? course, {Section? selectedSection}) async {
-    if (!mounted) return;
-
-    if (course == null) {
-      setState(() {
-        isInCourseMode = false;
-        currentCourse = null;
-        currentSection = null;
-        currentStepIndex = 0;
-      });
-      
-      widget.onSectionProgressUpdate(0, 0, false);
-      await _loadCourses();
-      return;
-    }
-
+  Future<void> startCourse(Course? course, {Section? selectedSection, int? initialStepIndex}) async {
     try {
+      if (course == null) {
+        setState(() {
+          isInCourseMode = false;
+          currentCourse = null;
+          widget.onSectionProgressUpdate(0, 0, false);
+        });
+        _loadCourses();
+        return;
+      }
+
       setState(() {
         isInCourseMode = true;
         currentCourse = course;
@@ -522,7 +522,16 @@ void dispose() {
       if (selectedSection != null) {
         _updateCurrentSection(selectedSection, forceUpdate: true);
         final startIndex = _calculateSectionStartIndex(course, selectedSection);
-        _pageController.jumpToPage(startIndex);
+        final targetIndex = startIndex + (initialStepIndex ?? 0);
+        
+        // Aggiorna il conteggio degli step
+        widget.onSectionProgressUpdate(
+          initialStepIndex ?? 0,  // step corrente
+          selectedSection.steps.length,  // totale step della sezione
+          true  // siamo in modalità corso
+        );
+        
+        _pageController.jumpToPage(targetIndex);
       } else {
         final lastProgressIndex = await _loadLastProgress(course);
         _pageController.jumpToPage(lastProgressIndex);
@@ -531,7 +540,6 @@ void dispose() {
       _initializeControllers();
     } catch (e) {
       print('Error starting course: $e');
-      // Qui potresti aggiungere una gestione degli errori più sofisticata
     }
   }
 

@@ -418,8 +418,12 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
                           builder: (context) => SectionSelectionSheet(
                             course: widget.course!,
                             currentSection: widget.currentSection,
-                            onSelectSection: (selectedSection) {
-                              widget.controller.onStartCourse(widget.course, selectedSection);
+                            onSelectSection: (selectedSection, stepIndex) {
+                              widget.controller.onStartCourse(
+                                widget.course, 
+                                selectedSection,
+                                initialStepIndex: stepIndex,
+                              );
                             },
                           ),
                         );

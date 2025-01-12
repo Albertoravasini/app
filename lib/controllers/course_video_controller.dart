@@ -10,7 +10,7 @@ import 'package:Just_Learn/services/firebase_service.dart';
 class CourseVideoController {
   final VideoPlayerManager videoManager;
   final Course? course;
-  final Function(Course?, Section?) onStartCourse;
+  final Function(Course?, Section?, {int? initialStepIndex}) onStartCourse;
   final Function(bool) onUnlockOptionsChanged;
   final Function(int) onCoinsUpdate;
   final FirebaseService _firebaseService = FirebaseService();

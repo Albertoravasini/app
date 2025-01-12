@@ -29,7 +29,7 @@ class VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
   final Course? course;
   final bool isInCourse;
-  final Function(Course?, Section?) onStartCourse;
+  final Function(Course?, Section?, {int? initialStepIndex}) onStartCourse;
   final bool autoPlay;
   final Function(bool)? onReady;
   final Function(int) onCoinsUpdate;
@@ -125,24 +125,23 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
   }
 
   Future<void> _handleVideoCompletion() async {
+    if (_completionHandled) return;
     _completionHandled = true;
     
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // Aggiorna il documento dell'utente
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final userDoc = await userRef.get();
+      final userModel = UserModel.fromMap(userDoc.data()!);
       
-      await userRef.update({
-        'WatchedVideos.${widget.topic}': FieldValue.arrayUnion([{
-          'videoId': widget.videoUrl,
-          'title': widget.videoTitle ?? '',
-          'watchedAt': DateTime.now().toIso8601String(),
-          'completed': true,
-        }])
-      });
-
+      // Controlla se il video è già stato completato
+      final watchedVideos = userModel.WatchedVideos[widget.topic] ?? [];
+      final videoAlreadyCompleted = watchedVideos.any((video) => 
+        video.videoId.contains(widget.videoUrl.split('?')[0]) && 
+        video.completed
+      );
       // Aggiorna l'UI per mostrare il video come completato
       setState(() {
         // Qui puoi aggiungere logica per mostrare un indicatore di completamento
@@ -157,7 +156,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
           
         },
       );
-
+      
+      if (!videoAlreadyCompleted) {
+        await userRef.update({
+          'WatchedVideos.${widget.topic}': FieldValue.arrayUnion([{
+            'videoId': widget.videoUrl,
+            'title': widget.videoTitle ?? '',
+            'watchedAt': DateTime.now().toIso8601String(),
+            'completed': true,
+          }])
+        });
+      }
     } catch (e) {
       print('Error marking video as completed: $e');
     }

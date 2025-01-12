@@ -19,7 +19,7 @@ class PageViewContainer extends StatefulWidget {
   final Function(int)? onPageChanged;
   final String videoTitle;
   final Course course;
-  final Function(Course?, Section?) onStartCourse;
+  final Function(Course?, Section?, {int? initialStepIndex}) onStartCourse;
   final bool isInCourse;
   final Section? currentSection;
 

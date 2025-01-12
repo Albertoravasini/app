@@ -1,6 +1,7 @@
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
+import 'package:posthog_flutter/posthog_flutter.dart';
 import '../models/course.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,7 +12,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 class SectionSelectionSheet extends StatefulWidget {
   final Course course;
   final Section? currentSection;
-  final Function(Section) onSelectSection;
+  final Function(Section, int) onSelectSection;
 
   const SectionSelectionSheet({
     Key? key,
@@ -47,12 +48,12 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     super.dispose();
   }
 
-  void _handleSectionSelection(Section section) {
+  void _handleSectionSelection(Section section, int stepIndex) {
     // Aggiorna il currentStep nel database per la nuova sezione
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'currentSteps.${section.title}': 0
+        'currentSteps.${section.title}': stepIndex
       });
     }
     
@@ -62,7 +63,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     }
     
     // Riavvia il corso con la sezione selezionata
-    widget.onSelectSection(section);
+    widget.onSelectSection(section, stepIndex);
   }
 
   @override
@@ -503,8 +504,33 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
   }
 
   void _handleStepSelection(Section section, int stepIndex) {
-    _handleSectionSelection(section);
-    // Implementa la logica per saltare direttamente allo step selezionato
+    // Aggiorna il currentStep nel database per la nuova sezione
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'currentSteps.${section.title}': stepIndex
+      });
+    }
+    
+    // Chiudi il bottom sheet solo su mobile
+    if (!kIsWeb) {
+      Navigator.pop(context);
+    }
+    
+    // Passa la sezione e l'indice dello step selezionato
+    setState(() {
+      _selectedSection = section;
+    });
+    widget.onSelectSection(section, stepIndex);
+    
+    // Invia l'evento a Posthog
+    Posthog().capture(
+      eventName: 'step_selected',
+      properties: {
+        'section': section.title,
+        'stepIndex': stepIndex,
+      },
+    );
   }
 
   int _calculateTotalTime(Section section) {

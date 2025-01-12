@@ -67,15 +67,10 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
             child: SectionSelectionSheet(
               course: currentCourse!,
               currentSection: currentSection,
-              onSelectSection: (section) {
+              onSelectSection: (section, stepIndex) {
                 setState(() {
                   currentSection = section;
-                  int startIndex = 0;
-                  for (var s in currentCourse!.sections) {
-                    if (s.title == section.title) break;
-                    startIndex += s.steps.length;
-                  }
-                  currentVideoIndex = startIndex;
+                  currentVideoIndex = stepIndex;
                 });
                 
                 if (_shortsScreenKey.currentState != null) {
