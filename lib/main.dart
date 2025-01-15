@@ -27,6 +27,7 @@ import 'screens/profile_screen.dart'; // Importa la schermata del profilo insegn
 import 'web/screens/web_home_screen.dart';
 import 'screens/NotificationsScreen.dart';
 import 'web/screens/web_landing_screen.dart';
+import 'screens/courses_list_screen.dart';
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -210,7 +211,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final List<Widget> _screens = [
       const CourseScreen(),
-      const QuizScreen(),
+      const CoursesListScreen(),
       const HomeScreen(),
       const NotificationsScreen(),
       SettingsScreen(currentUser: widget.userModel),
