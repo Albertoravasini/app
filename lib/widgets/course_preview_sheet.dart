@@ -1,3 +1,4 @@
+import 'package:Just_Learn/main.dart';
 import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/home_screen.dart';
@@ -195,6 +196,36 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _handleStartCourse() async {
+    // Chiudi il bottom sheet
+    Navigator.pop(context);
+    
+    // Ottieni l'utente corrente
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(FirebaseAuth.instance.currentUser?.uid)
+        .get();
+    
+    if (!userDoc.exists) return;
+    
+    final currentUser = UserModel.fromMap(userDoc.data()!);
+    
+    // Naviga alla MainScreen con il corso selezionato
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MainScreen(
+          userModel: currentUser,
+          initialIndex: 2, // L'indice che corrisponde alla HomeScreen
+          initialCourseData: {
+            'course': widget.course,
+            'section': widget.course.sections.first, // Inizia dalla prima sezione
+          },
+        ),
       ),
     );
   }
@@ -848,7 +879,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         ),
       CourseState.unlocked => _ButtonConfig(
           text: 'Start Course',
-          onPressed: () => Navigator.pop(context),
+          onPressed: _handleStartCourse,
         ),
       _ => _ButtonConfig(
           text: 'Loading...',

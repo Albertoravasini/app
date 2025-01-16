@@ -257,6 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
             showSavedVideos: showSavedVideos,
             onPageChanged: _onPageChanged,
             onSectionProgressUpdate: updateSectionProgress,
+            initialCourseData: widget.initialCourseData,
           ),
           SafeArea(
             child: Padding(

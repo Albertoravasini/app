@@ -27,6 +27,7 @@ class ShortsScreen extends StatefulWidget {
   final Course? initialCourse;
   final Section? initialSection;
   final bool isInCourse;
+  final Map<String, dynamic>? initialCourseData;
 
   const ShortsScreen({
     Key? key,
@@ -40,6 +41,7 @@ class ShortsScreen extends StatefulWidget {
     this.initialCourse,
     this.initialSection,
     this.isInCourse = false,
+    this.initialCourseData,
   }) : super(key: key);
 
   @override
@@ -79,13 +81,17 @@ class ShortsScreenState extends State<ShortsScreen> {
   void initState() {
     super.initState();
     
-    // Inizializza il corso se fornito
-    if (widget.initialCourse != null && widget.initialSection != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _initializeCourse(widget.initialCourse!, widget.initialSection!);
+    // Se ci sono dati iniziali del corso, avvialo
+    if (widget.initialCourseData != null) {
+      final course = widget.initialCourseData!['course'] as Course;
+      final section = widget.initialCourseData!['section'] as Section;
+      
+      // Avvia il corso dopo un breve delay per permettere l'inizializzazione
+      Future.delayed(Duration(milliseconds: 100), () {
+        _initializeCourse(course, section);
       });
     } else {
-      // Carica i corsi normalmente se non siamo in modalità corso
+      // Carica i corsi normalmente se non ci sono dati iniziali
       _loadCourses();
     }
   }

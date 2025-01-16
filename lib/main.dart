@@ -184,8 +184,14 @@ class MyApp extends StatelessWidget {
 class MainScreen extends StatefulWidget {
   final UserModel userModel;
   final int initialIndex;
+  final Map<String, dynamic>? initialCourseData;
 
-  const MainScreen({super.key, required this.userModel, this.initialIndex = 1});
+  const MainScreen({
+    super.key, 
+    required this.userModel, 
+    this.initialIndex = 1,
+    this.initialCourseData,
+  });
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -212,7 +218,7 @@ class _MainScreenState extends State<MainScreen> {
     final List<Widget> _screens = [
       const CourseScreen(),
       const CoursesListScreen(),
-      const HomeScreen(),
+      HomeScreen(initialCourseData: widget.initialCourseData),
       const NotificationsScreen(),
       SettingsScreen(currentUser: widget.userModel),
     ];
