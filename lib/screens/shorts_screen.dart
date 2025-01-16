@@ -81,14 +81,21 @@ class ShortsScreenState extends State<ShortsScreen> {
   void initState() {
     super.initState();
     
-    // Se ci sono dati iniziali del corso, avvialo
+    // Se ci sono dati iniziali del corso o un corso iniziale, avvialo
     if (widget.initialCourseData != null) {
       final course = widget.initialCourseData!['course'] as Course;
       final section = widget.initialCourseData!['section'] as Section;
       
-      // Avvia il corso dopo un breve delay per permettere l'inizializzazione
       Future.delayed(Duration(milliseconds: 100), () {
         _initializeCourse(course, section);
+      });
+    } else if (widget.initialCourse != null) {
+      // Gestione per il caso web quando viene selezionato un corso
+      final course = widget.initialCourse!;
+      final section = widget.initialSection ?? course.sections.first;
+      
+      Future.delayed(Duration(milliseconds: 100), () {
+        startCourse(course, selectedSection: section);
       });
     } else {
       // Carica i corsi normalmente se non ci sono dati iniziali
@@ -507,43 +514,38 @@ void dispose() {
 
   // Ottimizziamo startCourse
   Future<void> startCourse(Course? course, {Section? selectedSection, int? initialStepIndex}) async {
-    try {
-      if (course == null) {
+    if (course == null) {
+      if (mounted) {
         setState(() {
           isInCourseMode = false;
           currentCourse = null;
-          widget.onSectionProgressUpdate(0, 0, false);
+          currentSection = null;
         });
         _loadCourses();
         return;
       }
+    }
 
+    try {
       setState(() {
         isInCourseMode = true;
         currentCourse = course;
-        allShortSteps = _createCourseSteps(course);
       });
 
-      // Gestisci la sezione iniziale
-      if (selectedSection != null) {
-        _updateCurrentSection(selectedSection, forceUpdate: true);
-        final startIndex = _calculateSectionStartIndex(course, selectedSection);
-        final targetIndex = startIndex + (initialStepIndex ?? 0);
-        
-        // Aggiorna il conteggio degli step
-        widget.onSectionProgressUpdate(
-          initialStepIndex ?? 0,  // step corrente
-          selectedSection.steps.length,  // totale step della sezione
-          true  // siamo in modalità corso
-        );
-        
-        _pageController.jumpToPage(targetIndex);
-      } else {
-        final lastProgressIndex = await _loadLastProgress(course);
-        _pageController.jumpToPage(lastProgressIndex);
-      }
+      // Crea tutti gli step del corso
+      allShortSteps = _createCourseSteps(course!);
+      
+      // Carica l'ultimo progresso se non è specificato un indice iniziale
+      final targetIndex = initialStepIndex ?? await _loadLastProgress(course);
 
-      _initializeControllers();
+      if (mounted) {
+        setState(() {
+          _initializeControllers();
+        });
+        
+        // Salta alla pagina corretta
+        _pageController.jumpToPage(targetIndex);
+      }
     } catch (e) {
       print('Error starting course: $e');
     }
@@ -607,20 +609,22 @@ void dispose() {
         return 0;
       }
 
-      final userData = userDoc.data() as Map<String, dynamic>;
-      final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+      final userData = UserModel.fromMap(userDoc.data()!);
+      final currentSteps = userData.currentSteps;
       
       // Trova l'ultima sezione con progresso
       for (var section in course.sections.reversed) {
-        final stepIndex = currentSteps[section.title] as int? ?? -1;
-        if (stepIndex >= 0) {
-          int globalIndex = _calculateSectionStartIndex(course, section);
-          _updateCurrentSection(section, forceUpdate: true);
-          return globalIndex + stepIndex;
+        if (currentSteps.containsKey(section.title)) {
+          final stepIndex = currentSteps[section.title] ?? 0;
+          if (stepIndex >= 0) {
+            int globalIndex = _calculateSectionStartIndex(course, section);
+            _updateCurrentSection(section, forceUpdate: true);
+            return globalIndex + stepIndex;
+          }
         }
       }
 
-      // Fallback alla prima sezione
+      // Se non troviamo progressi, inizia dalla prima sezione
       _updateCurrentSection(course.sections.first, forceUpdate: true);
       return 0;
     } catch (e) {
