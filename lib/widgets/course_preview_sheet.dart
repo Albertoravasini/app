@@ -214,7 +214,27 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     
     final currentUser = UserModel.fromMap(userDoc.data()!);
     
-    // Naviga alla MainScreen con il corso selezionato
+    // Ottieni l'ultimo progresso dell'utente per questo corso
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+    
+    // Trova l'ultima sezione con progresso
+    Section? lastSection;
+    int? lastStepIndex;
+    
+    for (var section in widget.course.sections.reversed) {
+      final stepIndex = currentSteps[section.title] as int? ?? -1;
+      if (stepIndex >= 0) {
+        lastSection = section;
+        lastStepIndex = stepIndex;
+        break;
+      }
+    }
+    
+    // Se non c'è progresso precedente, usa la prima sezione
+    lastSection ??= widget.course.sections.first;
+    
+    // Naviga alla MainScreen con il corso e il progresso
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -223,7 +243,8 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
           initialIndex: 2, // L'indice che corrisponde alla HomeScreen
           initialCourseData: {
             'course': widget.course,
-            'section': widget.course.sections.first, // Inizia dalla prima sezione
+            'section': lastSection,
+            'initialStepIndex': lastStepIndex, // Aggiungi l'indice dello step
           },
         ),
       ),
