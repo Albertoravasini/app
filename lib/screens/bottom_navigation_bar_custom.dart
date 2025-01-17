@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:Just_Learn/models/user.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class BottomNavigationBarCustom extends StatefulWidget {
   final UserModel? currentUser;
@@ -28,8 +28,6 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
     bool isQuizFree = widget.currentUser!.dailyVideosCompleted >= 
         (3 + (widget.currentUser!.dailyQuizFreeUses * 5));
     bool showQuizDot = isQuizFree && widget.currentUser!.dailyVideosCompleted >= 3;
-
-    // Controlla se ci sono notifiche non lette
     bool hasUnreadNotifications = widget.currentUser!.notifications
         .where((notification) => !notification.isRead)
         .isNotEmpty;
@@ -43,100 +41,83 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Icona Corsi
-          GestureDetector(
+          // Icona Insegnanti - MODIFICATA
+          _buildNavItem(
+            FontAwesomeIcons.chalkboardUser,
+            widget.selectedIndex == 0,
             onTap: () => widget.onItemTapped(0),
-            child: _buildNavItem(
-              'assets/fluent_hat-graduation-sparkle-24-filled.svg',
-              widget.selectedIndex == 0,
-            ),
           ),
 
-          // Icona Quiz
-          GestureDetector(
+          // Icona Corsi
+          _buildNavItem(
+            FontAwesomeIcons.graduationCap,
+            widget.selectedIndex == 1,
             onTap: () => widget.onItemTapped(1),
-            child: Stack(
-              children: [
-                _buildNavItem(
-                  'assets/ic_round-quiz.svg',
-                  widget.selectedIndex == 1,
-                ),
-                if (showQuizDot)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.yellowAccent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            showDot: showQuizDot,
+            dotColor: Colors.yellowAccent,
           ),
 
-          // Icona Home (centro)
-          GestureDetector(
+          // Icona Home
+          _buildNavItem(
+            FontAwesomeIcons.house,
+            widget.selectedIndex == 2,
             onTap: () => widget.onItemTapped(2),
-            child: _buildNavItem(
-              'assets/ph_castle-turret-fill.svg',
-              widget.selectedIndex == 2,
-            ),
           ),
 
-          // Icona Messaggi
-          GestureDetector(
+          // Icona Chat/Notifiche
+          _buildNavItem(
+            FontAwesomeIcons.solidComments,
+            widget.selectedIndex == 3,
             onTap: () => widget.onItemTapped(3),
-            child: Stack(
-              children: [
-                _buildNavItem(
-                  'assets/jam_messages-alt-f.svg', // Assicurati di avere questa icona
-                  widget.selectedIndex == 3,
-                ),
-                if (hasUnreadNotifications)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
+            showDot: hasUnreadNotifications,
+            dotColor: Colors.redAccent,
           ),
 
           // Icona Profilo
-          GestureDetector(
+          _buildNavItem(
+            FontAwesomeIcons.solidUser,
+            widget.selectedIndex == 4,
             onTap: () => widget.onItemTapped(4),
-            child: _buildNavItem(
-              'assets/iconamoon_profile-fill.svg',
-              widget.selectedIndex == 4,
-            ),
           ),
         ],
       ),
     );
   }
 
-  // Metodo per costruire un elemento della barra di navigazione
-  Widget _buildNavItem(String assetPath, bool isSelected) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SvgPicture.asset(
-          assetPath,
-          color: isSelected ? Colors.white : const Color(0xFF434348),
-        ),
-      ],
+  Widget _buildNavItem(
+    IconData icon,
+    bool isSelected, {
+    required VoidCallback onTap,
+    bool showDot = false,
+    Color dotColor = Colors.yellowAccent,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            child: FaIcon(
+              icon,
+              color: isSelected ? Colors.white : const Color(0xFF434348),
+              size: 22,
+            ),
+          ),
+          if (showDot)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

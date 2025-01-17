@@ -25,6 +25,8 @@ import '../widgets/experience_manager.dart';
 import '../widgets/certification_manager.dart';
 import '../widgets/social_contacts_manager.dart';
 import '../widgets/review_manager.dart';
+import '../widgets/calendar_tab.dart';
+import '../widgets/event_manager.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserModel currentUser;
@@ -53,7 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _nameController.text = widget.currentUser.name;
     _bioController.text = widget.currentUser.bio ?? 'No bio yet';
     _usernameController.text = widget.currentUser.username ?? 'username';
@@ -1193,6 +1195,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         Tab(text: 'Feed'),
                         Tab(text: 'Chat'),
                         Tab(text: 'About'),
+                        Tab(text: 'Calendar'),
                       ],
                     ),
                   ),
@@ -1211,6 +1214,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   currentUser: FirebaseAuth.instance.currentUser!,
                 ),
                 AboutTab(
+                  profileUser: widget.currentUser,
+                  currentUser: FirebaseAuth.instance.currentUser!,
+                ),
+                CalendarTab(
                   profileUser: widget.currentUser,
                   currentUser: FirebaseAuth.instance.currentUser!,
                 ),
@@ -1332,6 +1339,29 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                             builder: (context) => TeacherDashboardScreen(
                                               teacherId: widget.currentUser.uid,
                                             ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    ListTile(
+                                      leading: const Icon(Icons.event, color: Colors.white),
+                                      title: const Text(
+                                        'Gestisci Eventi',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        showModalBottomSheet(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (context) => Container(
+                                            height: MediaQuery.of(context).size.height * 0.9,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF1E1E1E),
+                                              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                            ),
+                                            child: EventManager(userId: widget.currentUser.uid),
                                           ),
                                         );
                                       },
