@@ -385,10 +385,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                       stepNumber: stepIndex + 1,
                       isCurrentStep: stepIndex == completedSteps,
                       isCompleted: isStepCompleted,
-                      onTap: () {
-                        Navigator.pop(context);
-                        widget.onSelectSection(section, stepIndex);
-                      },
+                      onTap: () => _handleStepSelection(section, stepIndex),
                     );
                   },
                 );
@@ -506,35 +503,47 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     return '';
   }
 
-  void _handleStepSelection(Section section, int stepIndex) {
-    // Aggiorna il currentStep nel database per la nuova sezione
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-        'currentSteps.${section.title}': stepIndex
-      });
-    }
-    
-    // Chiudi il bottom sheet solo su mobile
-    if (!kIsWeb) {
-      Navigator.pop(context);
-    }
-    
-    // Passa la sezione e l'indice dello step selezionato
-    setState(() {
-      _selectedSection = section;
+void _handleStepSelection(Section section, int stepIndex) {
+  // Aggiorna il currentStep nel database per la nuova sezione
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      'currentSteps.${section.title}': stepIndex
     });
-    widget.onSelectSection(section, stepIndex);
-    
-    // Invia l'evento a Posthog
-    Posthog().capture(
-      eventName: 'step_selected',
-      properties: {
-        'section': section.title,
-        'stepIndex': stepIndex,
-      },
-    );
   }
+
+  int indexForNavigation = stepIndex; // Valore di default: indice locale
+
+  if (kIsWeb) {
+    // Calcola l'indice globale per la piattaforma web
+    int globalIndex = 0;
+    for (var s in widget.course.sections) {
+      if (s.title == section.title) {
+        globalIndex += stepIndex;
+        break;
+      }
+      globalIndex += s.steps.length;
+    }
+    indexForNavigation = globalIndex;
+  } else {
+    // Su mobile, chiudi il bottom sheet prima della navigazione
+    Navigator.pop(context);
+  }
+
+  // Utilizza l'indice appropriato per la navigazione
+  widget.onSelectSection(section, indexForNavigation);
+
+  // Invia l'evento a Posthog
+  Posthog().capture(
+    eventName: 'step_selected',
+    properties: {
+      'section': section.title,
+      'stepIndex': stepIndex,
+      'usedIndex': indexForNavigation,
+      'platform': kIsWeb ? 'web' : 'mobile'
+    },
+  );
+}
 
   int _calculateTotalTime(Section section) {
     int totalVideos = section.steps.where((step) => step.type == 'video').length;
