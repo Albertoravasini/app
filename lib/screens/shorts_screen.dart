@@ -52,7 +52,7 @@ class ShortsScreenState extends State<ShortsScreen> {
   final ShortsController _shortsController = ShortsController();
   final CourseService _courseService = CourseService();
   List<Map<String, dynamic>> allShortSteps = [];
-  final PageController _pageController = PageController();
+  final PageController _pageController = PageController(initialPage: 0, keepPage: true);
   List<YoutubePlayerController> _youtubeControllers = [];
   String? selectedChoice;
   bool hasSwiped = false;
@@ -113,23 +113,54 @@ class ShortsScreenState extends State<ShortsScreen> {
       // Crea tutti gli step del corso
       allShortSteps = _createCourseSteps(course);
       
-      // Calcola l'indice di partenza per la sezione selezionata
-      final startIndex = _calculateSectionStartIndex(course, section);
+      // Recupera l'indice globale dai dati iniziali se disponibili
+      int targetIndex = 0;
+      if (widget.initialCourseData != null && widget.initialCourseData!.containsKey('stepIndex')) {
+        targetIndex = widget.initialCourseData!['stepIndex'] as int;
+        print('DEBUG - Using initial stepIndex: $targetIndex');
+      } else {
+        // Altrimenti calcola l'indice dall'ultimo progresso
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+          
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+            
+            for (var s in course.sections.reversed) {
+              if (currentSteps.containsKey(s.title)) {
+                section = s;
+                final stepIndex = currentSteps[s.title] as int;
+                targetIndex = _calculateGlobalIndex(course, section, stepIndex);
+                print('DEBUG - Calculated global index: $targetIndex');
+                break;
+              }
+            }
+          }
+        }
+      }
       
-      // Carica l'ultimo progresso
-      final lastProgressIndex = await _loadLastProgress(course);
-      
-      // Usa l'indice di progresso se esiste, altrimenti usa l'indice della sezione
-      final targetIndex = lastProgressIndex > 0 ? lastProgressIndex : startIndex;
+      // Inizializza i controller prima di impostare la pagina
+      await _initializeControllers();
       
       if (mounted) {
         setState(() {
           _updateCurrentSection(section, forceUpdate: true);
-          _initializeControllers();
         });
         
-        // Salta alla pagina corretta
-        _pageController.jumpToPage(targetIndex);
+        // Usa WidgetsBinding per assicurarsi che il PageView sia costruito
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          print('DEBUG - Jumping to page: $targetIndex');
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(targetIndex);
+          } else {
+            print('DEBUG - PageController has no clients yet');
+          }
+        });
       }
     } catch (e) {
       print('Error initializing course: $e');

@@ -201,54 +201,72 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
   }
 
   void _handleStartCourse() async {
-    // Chiudi il bottom sheet
     Navigator.pop(context);
     
-    // Ottieni l'utente corrente
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     final userDoc = await FirebaseFirestore.instance
         .collection('users')
-        .doc(FirebaseAuth.instance.currentUser?.uid)
+        .doc(user.uid)
         .get();
     
     if (!userDoc.exists) return;
     
-    final currentUser = UserModel.fromMap(userDoc.data()!);
-    
-    // Ottieni l'ultimo progresso dell'utente per questo corso
     final userData = userDoc.data() as Map<String, dynamic>;
     final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
     
     // Trova l'ultima sezione con progresso
     Section? lastSection;
-    int? lastStepIndex;
+    int sectionStepIndex = 0;
+    int globalStepIndex = 0;
     
+    // Prima calcola l'indice globale per ogni sezione
+    Map<String, int> sectionStartIndices = {};
+    int runningIndex = 0;
+    
+    for (var section in widget.course.sections) {
+      sectionStartIndices[section.title] = runningIndex;
+      runningIndex += section.steps.length;
+    }
+    
+    // Trova l'ultima sezione con progresso
     for (var section in widget.course.sections.reversed) {
-      final stepIndex = currentSteps[section.title] as int? ?? -1;
-      if (stepIndex >= 0) {
+      if (currentSteps.containsKey(section.title)) {
         lastSection = section;
-        lastStepIndex = stepIndex;
+        sectionStepIndex = currentSteps[section.title] as int;
+        globalStepIndex = sectionStartIndices[section.title]! + sectionStepIndex;
+        print('DEBUG - Found last progress in section: ${section.title}');
+        print('DEBUG - Section step index: $sectionStepIndex');
+        print('DEBUG - Global step index: $globalStepIndex');
         break;
       }
     }
-    
-    // Se non c'è progresso precedente, usa la prima sezione
-    lastSection ??= widget.course.sections.first;
-    
-    // Naviga alla MainScreen con il corso e il progresso
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => MainScreen(
-          userModel: currentUser,
-          initialIndex: 2, // L'indice che corrisponde alla HomeScreen
-          initialCourseData: {
-            'course': widget.course,
-            'section': lastSection,
-            'initialStepIndex': lastStepIndex, // Aggiungi l'indice dello step
-          },
+
+    // Se non trova progresso, usa la prima sezione
+    if (lastSection == null) {
+      lastSection = widget.course.sections.first;
+      print('DEBUG - No progress found, using first section');
+    }
+
+    Future.microtask(() {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MainScreen(
+            userModel: UserModel.fromMap(userData),
+            initialIndex: 2,
+            initialCourseData: {
+              'course': widget.course,
+              'section': lastSection,
+              'stepIndex': globalStepIndex,
+              'sectionStepIndex': sectionStepIndex,
+              'isResuming': true,
+            },
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   @override
