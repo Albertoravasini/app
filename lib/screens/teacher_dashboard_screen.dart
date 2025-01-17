@@ -1,3 +1,5 @@
+import 'package:Just_Learn/screens/teacher_courses_screen.dart';
+import 'package:Just_Learn/screens/teacher_students_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Just_Learn/models/course.dart';
@@ -41,10 +43,10 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           .where('following', arrayContains: userId)
           .get();
       
-      // 2. Ottieni le subscription attive (correzione qui)
+      // 2. Ottieni le subscription attive
       final subscribersSnapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('subscribedTo', arrayContains: userId)
+          .where('subscriptions', arrayContains: userId)
           .get();
 
       // 3. Ottieni i corsi dell'insegnante
@@ -55,13 +57,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       
       _courses = coursesSnapshot.docs.map((doc) => Course.fromFirestore(doc)).toList();
 
-      // 4. Calcola revenue
+      // 4. Ottieni il prezzo della subscription dell'insegnante
+      final teacherDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      
+      final subscriptionPrice = (teacherDoc.data()?['subscriptionPrice'] as num?)?.toDouble() ?? 0.0;
+      
+      // 5. Calcola revenue
       double totalRevenue = 0;
-      double monthlyRevenue = 0;
-      final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1);
+      double monthlyRevenue = subscriptionPrice * subscribersSnapshot.docs.length; // Revenue mensile dalle subscription
 
-      // Revenue da acquisti diretti
+      // Revenue da acquisti diretti (resta invariata)
       final purchasesSnapshot = await FirebaseFirestore.instance
           .collection('purchases')
           .where('teacherId', isEqualTo: userId)
@@ -69,23 +77,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
       for (var purchase in purchasesSnapshot.docs) {
         final purchaseData = purchase.data();
-        final purchaseDate = (purchaseData['timestamp'] as Timestamp).toDate();
         final amount = (purchaseData['amount'] as num).toDouble();
-
         totalRevenue += amount;
-        if (purchaseDate.isAfter(startOfMonth)) {
-          monthlyRevenue += amount;
-        }
       }
 
-      // Revenue da subscription
-      for (var subscriber in subscribersSnapshot.docs) {
-        final userData = subscriber.data();
-        final subscriptionPrice = userData['subscriptionPrice'] ?? 0.0;
-        
-        totalRevenue += subscriptionPrice;
-        monthlyRevenue += subscriptionPrice;
-      }
+      // Aggiungi anche la revenue totale dalle subscription
+      totalRevenue += monthlyRevenue;
 
       setState(() {
         _stats = {
@@ -278,21 +275,51 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        color: Colors.yellowAccent,
-        backgroundColor: const Color(0xFF282828),
-        onRefresh: _loadTeacherStats,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildOverviewCards(),
-              const SizedBox(height: 32),
-              _buildCoursesSection(),
-            ],
-          ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildOverviewCards(),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildNavigationCard(
+                    title: 'Students',
+                    subtitle: '${_stats['followers']} followers\n${_stats['subscriptions']} subscribers',
+                    icon: Icons.people_alt_rounded,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TeacherStudentsScreen(teacherId: widget.teacherId),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildNavigationCard(
+                    title: 'Courses',
+                    subtitle: '${_courses.length} corsi pubblicati',
+                    icon: Icons.school_rounded,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TeacherCoursesScreen(
+                            teacherId: widget.teacherId,
+                            courses: _courses,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -312,7 +339,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         padding: const EdgeInsets.all(16),
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 1.5,
+        childAspectRatio: 1.3,
         children: [
           _buildStatCard(
             'Follower',
@@ -350,18 +377,21 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white10),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: color, size: 32),
+          Icon(icon, color: color, size: 28),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -369,212 +399,59 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             title,
             style: TextStyle(
               color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
+              fontSize: 13,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCoursesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildNavigationCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 160,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF282828),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'I tuoi corsi',
-              style: TextStyle(
+            Icon(icon, color: Colors.yellowAccent, size: 28),
+            const Spacer(),
+            Text(
+              title,
+              style: const TextStyle(
                 color: Colors.white,
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 4),
             Text(
-              '${_courses.length} corsi',
+              subtitle,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.7),
-                fontSize: 14,
+                fontSize: 13,
+                height: 1.4,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _courses.length,
-          itemBuilder: (context, index) {
-            final course = _courses[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF282828),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  title: Text(
-                    course.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  children: [
-                    FutureBuilder<Map<String, dynamic>>(
-                      future: _getCourseStats(course.id),
-                      builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
-                              ),
-                            ),
-                          );
-                        }
-
-                        final stats = snapshot.data!;
-                        return Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              _buildCourseStats(stats),
-                              const SizedBox(height: 24),
-                              _buildProgressChart(stats['progressDistribution']),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCourseStats(Map<String, dynamic> stats) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        children: [
-          _buildCourseStatRow(
-            'Studenti Totali',
-            stats['totalStudents'].toString(),
-            Icons.school_rounded,
-          ),
-          const Divider(color: Colors.white10),
-          _buildCourseStatRow(
-            'Acquistati con Coins',
-            stats['purchasedWithCoins'].toString(),
-            Icons.monetization_on_rounded,
-          ),
-          const Divider(color: Colors.white10),
-          _buildCourseStatRow(
-            'Completamento Medio',
-            '${stats['averageCompletion'].toStringAsFixed(1)}%',
-            Icons.trending_up_rounded,
-          ),
-          const Divider(color: Colors.white10),
-          _buildCourseStatRow(
-            'Tasso di Completamento',
-            '${stats['completionRate'].toStringAsFixed(1)}%',
-            Icons.check_circle_outline_rounded,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCourseStatRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.yellowAccent, size: 20),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressChart(Map<String, int> distribution) {
-    return Container(
-      height: 200,
-      padding: const EdgeInsets.all(8),
-      child: BarChart(
-        BarChartData(
-          alignment: BarChartAlignment.spaceAround,
-          maxY: distribution.values.reduce((a, b) => a > b ? a : b).toDouble(),
-          barGroups: [
-            _buildBarGroup(0, '0-20%', distribution['0-20'] ?? 0),
-            _buildBarGroup(1, '21-40%', distribution['21-40'] ?? 0),
-            _buildBarGroup(2, '41-60%', distribution['41-60'] ?? 0),
-            _buildBarGroup(3, '61-80%', distribution['61-80'] ?? 0),
-            _buildBarGroup(4, '81-100%', distribution['81-100'] ?? 0),
-          ],
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (value, meta) => Text(
-                  ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'][value.toInt()],
-                  style: const TextStyle(color: Colors.white70, fontSize: 10),
-                ),
-              ),
-            ),
-          ),
-          gridData: FlGridData(show: false),
-          borderData: FlBorderData(show: false),
-        ),
-      ),
-    );
-  }
-
-  BarChartGroupData _buildBarGroup(int x, String label, int value) {
-    return BarChartGroupData(
-      x: x,
-      barRods: [
-        BarChartRodData(
-          toY: value.toDouble(),
-          color: Colors.yellowAccent,
-          width: 20,
-          borderRadius: BorderRadius.circular(4),
-        ),
-      ],
     );
   }
 } 
