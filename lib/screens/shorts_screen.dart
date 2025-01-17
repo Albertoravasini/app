@@ -535,15 +535,23 @@ void dispose() {
       // Crea tutti gli step del corso
       allShortSteps = _createCourseSteps(course!);
       
-      // Carica l'ultimo progresso se non è specificato un indice iniziale
-      final targetIndex = initialStepIndex ?? await _loadLastProgress(course);
-
-      if (mounted) {
-        setState(() {
-          _initializeControllers();
-        });
+      // Se abbiamo una sezione e uno step specifico selezionati
+      if (selectedSection != null && initialStepIndex != null) {
+        int globalIndex = _calculateGlobalIndex(course, selectedSection, initialStepIndex);
+        _updateCurrentSection(selectedSection, forceUpdate: true);
         
-        // Salta alla pagina corretta
+        // Assicurati che i controller siano inizializzati prima di saltare
+        await _initializeControllers();
+        if (mounted) {
+          _pageController.jumpToPage(globalIndex);
+        }
+        return;
+      }
+
+      // Altrimenti carica l'ultimo progresso
+      final targetIndex = await _loadLastProgress(course);
+      await _initializeControllers();
+      if (mounted) {
         _pageController.jumpToPage(targetIndex);
       }
     } catch (e) {
@@ -668,35 +676,13 @@ void dispose() {
     _loadCourses(); // Ricarica i primi video di ogni corso
   }
 
-  void _initializeControllers() {
-    // Disponi i controller esistenti
-    for (var controller in _youtubeControllers) {
-      if (controller.initialVideoId.isNotEmpty) {
-        controller.dispose();
-      }
+  Future<void> _initializeControllers() {
+    // Inizializza i controller necessari
+    if (allShortSteps.isNotEmpty) {
+      _ensureControllerExists(0);
+      _preloadAdjacentPages(0);
     }
-
-    // Inizializza i nuovi controller
-    _youtubeControllers = allShortSteps.map((step) {
-      final videoId = (step['step'] as LevelStep).content;
-      return YoutubePlayerController(
-        initialVideoId: videoId,
-        flags: const YoutubePlayerFlags(
-          autoPlay: false,
-          mute: true,
-          disableDragSeek: true,
-          hideControls: true,
-          hideThumbnail: true,
-          forceHD: false,
-        ),
-      );
-    }).toList();
-
-    // Precarica il primo video
-    if (_youtubeControllers.isNotEmpty) {
-      _youtubeControllers.first.unMute();
-      _youtubeControllers.first.play();
-    }
+    return Future.value();
   }
 
   void _handleQuitCourse() {
@@ -903,5 +889,19 @@ Widget build(BuildContext context) {
       }
     }
     return '';
+  }
+
+  // Aggiungi questo nuovo metodo per calcolare l'indice globale
+  int _calculateGlobalIndex(Course course, Section targetSection, int stepIndex) {
+    int globalIndex = 0;
+    
+    for (var section in course.sections) {
+      if (section.title == targetSection.title) {
+        return globalIndex + stepIndex;
+      }
+      globalIndex += section.steps.length;
+    }
+    
+    return 0; // Fallback al primo step se non trova la sezione
   }
 }

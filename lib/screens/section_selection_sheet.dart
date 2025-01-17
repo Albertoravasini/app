@@ -385,7 +385,10 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                       stepNumber: stepIndex + 1,
                       isCurrentStep: stepIndex == completedSteps,
                       isCompleted: isStepCompleted,
-                      onTap: () => _handleStepSelection(section, stepIndex),
+                      onTap: () {
+                        Navigator.pop(context);
+                        widget.onSelectSection(section, stepIndex);
+                      },
                     );
                   },
                 );
