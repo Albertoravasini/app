@@ -535,15 +535,9 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
           ),
           _buildVerticalDivider(),
           _buildStat(
-            widget.course.isSubscriptionRequired 
-                ? Icons.workspace_premium_rounded 
-                : Icons.stars_rounded,
-            widget.course.isSubscriptionRequired 
-                ? 'Premium' 
-                : '${widget.course.cost}',
-            widget.course.isSubscriptionRequired 
-                ? 'Subscription' 
-                : 'Cost',
+            Icons.timer_outlined,
+            '${_calculateTotalDuration(widget.course)} min',
+            'Duration',
           ),
         ],
       ),
@@ -613,12 +607,23 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     );
   }
 
+  int _calculateTotalDuration(Course course) {
+    return course.sections.fold(0, (total, section) {
+      int totalVideos = section.steps.where((step) => step.type == 'video').length;
+      int totalQuestions = section.steps.where((step) => step.type == 'question').length;
+      double totalTime = totalVideos * 1 + totalQuestions * 0.5;
+      return total + totalTime.ceil();
+    });
+  }
+
   Widget _buildSectionCard(Section section) {
     return FutureBuilder<Map<String, dynamic>>(
       future: _getSectionProgress(section),
       builder: (context, snapshot) {
         final isCompleted = snapshot.data?['isCompleted'] ?? false;
-        final totalSteps = section.steps.length;
+        final completedSteps = snapshot.data?['currentStep'] ?? 0;
+        final totalSteps = snapshot.data?['totalSteps'] ?? section.steps.length;
+        final progress = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
         
         return Container(
           margin: const EdgeInsets.only(bottom: 16),
@@ -668,6 +673,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                   const SizedBox(height: 15),
                   _buildSectionDetails(section),
                   const SizedBox(height: 15),
+                  // Progress bar con steps individuali
                   Container(
                     height: 4,
                     decoration: BoxDecoration(
@@ -681,7 +687,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 1),
                             decoration: BoxDecoration(
-                              color: isCompleted 
+                              color: index < completedSteps
                                 ? Colors.yellowAccent
                                 : Colors.yellowAccent.withOpacity(0.3),
                               borderRadius: BorderRadius.circular(2),
@@ -702,7 +708,16 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                     ),
                   ),
                   child: Column(
-                    children: section.steps.map((step) => _buildStepItem(step)).toList(),
+                    children: section.steps.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final step = entry.value;
+                      final isStepCompleted = index < completedSteps;
+                      
+                      return _buildStepItem(
+                        step,
+                        isCompleted: isStepCompleted,
+                      );
+                    }).toList(),
                   ),
                 ),
               ],
@@ -729,22 +744,19 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     );
   }
 
-  Widget _buildStepItem(LevelStep step) {
+  Widget _buildStepItem(LevelStep step, {required bool isCompleted}) {
     IconData icon;
-    Color iconColor;
+    Color iconColor = isCompleted ? Colors.yellowAccent : Colors.yellowAccent.withOpacity(0.3);
     
     switch (step.type) {
       case 'video':
         icon = Icons.play_circle_outline_rounded;
-        iconColor = Colors.yellowAccent;
         break;
       case 'question':
         icon = Icons.quiz_rounded;
-        iconColor = Colors.yellowAccent;
         break;
       default:
         icon = Icons.article_rounded;
-        iconColor = Colors.yellowAccent;
     }
 
     return Container(
@@ -764,12 +776,18 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
             child: Text(
               step.content,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: isCompleted ? Colors.white : Colors.white.withOpacity(0.7),
                 fontSize: 14,
                 height: 1.5,
               ),
             ),
           ),
+          if (isCompleted)
+            Icon(
+              Icons.check_circle_rounded,
+              color: Colors.yellowAccent,
+              size: 20,
+            ),
         ],
       ),
     );
@@ -870,7 +888,10 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
   Future<Map<String, dynamic>> _getSectionProgress(Section section) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return {'currentStep': 0, 'isCompleted': false};
+      return {
+        'currentStep': 0,
+        'isCompleted': false,
+      };
     }
 
     final userDoc = await FirebaseFirestore.instance
@@ -879,20 +900,47 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         .get();
 
     if (!userDoc.exists) {
-      return {'currentStep': 0, 'isCompleted': false};
+      return {
+        'currentStep': 0,
+        'isCompleted': false,
+      };
     }
 
     final userData = userDoc.data() as Map<String, dynamic>;
-    final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
-    final completedSections = List<String>.from(userData['completedSections'] ?? []);
+    final userModel = UserModel.fromMap(userData);
+    
+    // Ottieni i video completati per il topic del corso
+    final watchedVideos = userModel.WatchedVideos[widget.course.topic] ?? [];
+    // Ottieni le domande risposte per il topic del corso
+    final answeredQuestions = userModel.answeredQuestions[widget.course.topic] ?? [];
 
-    final currentStep = (currentSteps[section.title] ?? 0) + 1;
-    final isCompleted = completedSections.contains(section.title) || 
-                       currentStep >= section.steps.length;
+    int completedSteps = 0;
+    int totalSteps = section.steps.length;
+
+    // Controlla ogni step della sezione
+    for (var step in section.steps) {
+      bool isStepCompleted = false;
+
+      if (step.type == 'video') {
+        final videoId = step.videoUrl ?? step.content;
+        isStepCompleted = watchedVideos.any((video) => 
+          video.videoId == videoId && 
+          video.completed
+        );
+      } else if (step.type == 'question') {
+        // Verifica se la domanda è stata risposta
+        isStepCompleted = answeredQuestions.contains(step.content);
+      }
+
+      if (isStepCompleted) {
+        completedSteps++;
+      }
+    }
 
     return {
-      'currentStep': isCompleted ? section.steps.length : currentStep,
-      'isCompleted': isCompleted,
+      'currentStep': completedSteps,
+      'totalSteps': totalSteps,
+      'isCompleted': completedSteps == totalSteps
     };
   }
 
