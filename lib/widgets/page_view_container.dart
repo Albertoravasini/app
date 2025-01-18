@@ -1,6 +1,7 @@
 // Crea un nuovo file lib/widgets/page_view_container.dart
 
 import 'package:Just_Learn/models/course.dart';
+import 'package:Just_Learn/utils/platform_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import '../screens/Articles_screen.dart';
@@ -9,6 +10,7 @@ import '../widgets/video_player_widget.dart';
 import '../models/level.dart';
 import '../widgets/course_video/course_info_overlay.dart';
 import '../screens/comments_screen.dart';
+import 'package:flutter/foundation.dart';
 
 class PageViewContainer extends StatefulWidget {
   final String videoId;
@@ -59,7 +61,9 @@ class _PageViewContainerState extends State<PageViewContainer> {
   Widget build(BuildContext context) {
     return PageView(
       controller: _pageController,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: PlatformHelper.isWeb 
+        ? const NeverScrollableScrollPhysics()
+        : const PageScrollPhysics(),
       onPageChanged: _onPageChanged,
       children: [
         ArticlesWidget(
@@ -69,8 +73,18 @@ class _PageViewContainerState extends State<PageViewContainer> {
         VideoPlayerWidget(
           videoUrl: widget.videoUrl,
           course: widget.course,
-          onShowArticles: (_) => _pageController.animateToPage(0, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-          onShowNotes: (_) => _pageController.animateToPage(2, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
+          onShowArticles: (show) {
+            _pageController.animateToPage(0, 
+              duration: const Duration(milliseconds: 300), 
+              curve: Curves.easeInOut
+            );
+          },
+          onShowNotes: (show) {
+            _pageController.animateToPage(2, 
+              duration: const Duration(milliseconds: 300), 
+              curve: Curves.easeInOut
+            );
+          },
           openComments: (_) => showModalBottomSheet(
             context: context,
             isScrollControlled: true,
