@@ -70,47 +70,20 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         return;
       }
 
-      final userData = UserModel.fromMap(userDoc.data()!);
-      _courseState.value = userData.unlockedCourses.contains(widget.course.id) 
+      // Se il corso è free, è sempre sbloccato
+      if (!widget.course.isSubscriptionRequired) {
+        _courseState.value = CourseState.unlocked;
+        return;
+      }
+
+      // Se richiede subscription, controlla se l'utente è abbonato
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+      _courseState.value = subscriptions.contains(widget.course.authorId)
           ? CourseState.unlocked 
           : CourseState.locked;
     } catch (e) {
       _courseState.value = CourseState.error;
-    }
-  }
-
-  // Gestisce l'acquisto con coins
-  Future<void> _unlockWithCoins(UserModel userData) async {
-    try {
-      if (userData.coins < widget.course.cost) {
-        _showError('Insufficient Coins!');
-        return;
-      }
-
-      // Aggiorna immediatamente l'UI
-      _courseState.value = CourseState.unlocked;
-      
-      // Chiude il bottom sheet delle opzioni
-      Navigator.pop(context);
-
-      // Aggiorna il database in background
-      await FirebaseFirestore.instance.runTransaction((transaction) async {
-        final userRef = FirebaseFirestore.instance
-            .collection('users')
-            .doc(userData.uid);
-            
-        // Aggiorna atomicamente coins e corsi sbloccati
-        transaction.update(userRef, {
-          'coins': userData.coins - widget.course.cost,
-          'unlockedCourses': [...userData.unlockedCourses, widget.course.id],
-        });
-      });
-
-      _showSuccess('Course unlocked successfully!');
-    } catch (e) {
-      // In caso di errore, ripristina lo stato precedente
-      _courseState.value = CourseState.locked;
-      _showError('Error unlocking course');
     }
   }
 
@@ -130,34 +103,14 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    
-    if (!userDoc.exists || !mounted) return;
-    
-    final userData = UserModel.fromMap(userDoc.data()!);
-    final subscriptions = userData.subscriptions ?? [];
-
-    // Se l'utente è iscritto al creatore, il corso è automaticamente sbloccato
-    if (subscriptions.contains(widget.course.authorId)) {
-      setState(() {
-        _courseState.value = CourseState.unlocked;
-      });
-      _showSuccess('Course available with your subscription');
-      return;
-    }
-
-    // Se il corso richiede subscription e l'utente non ce l'ha
-    if (widget.course.isSubscriptionRequired && !subscriptions.contains(widget.course.authorId)) {
+    if (widget.course.isSubscriptionRequired) {
       showModalBottomSheet(
         context: context,
         backgroundColor: Colors.transparent,
         builder: (context) => Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -166,10 +119,10 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
               _buildOptionButton(
                 icon: Icons.workspace_premium_rounded,
                 title: 'Subscribe to ${widget.course.authorName}',
-                subtitle: 'Access all courses from this creator',
+                subtitle: 'Access all premium courses from this creator',
                 onTap: () {
-                  Navigator.pop(context); // Chiude il bottom sheet delle opzioni
-                  Navigator.pop(context); // Torna al profilo
+                  Navigator.pop(context); // Chiude il bottom sheet
+                  Navigator.pop(context); // Torna alla schermata precedente
                   // Qui puoi aggiungere la navigazione alla schermata di subscription
                 },
               ),
@@ -177,59 +130,10 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
           ),
         ),
       );
-      return;
+    } else {
+      // Se il corso è free, avvialo direttamente
+      _handleStartCourse();
     }
-
-    // Mostra le opzioni normali per i corsi non-subscription
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ValueListenableBuilder<CourseState>(
-        valueListenable: _courseState,
-        builder: (context, state, child) {
-          return Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (state == CourseState.locked) ...[
-                  _buildOptionButton(
-                    icon: Icons.stars_rounded,
-                    title: 'Unlock with ${widget.course.cost} coins',
-                    subtitle: 'You have ${userData.coins} coins available',
-                    onTap: () => _unlockWithCoins(userData),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildOptionButton(
-                    icon: Icons.workspace_premium_rounded,
-                    title: 'Premium Subscription',
-                    subtitle: 'Access all courses without limits',
-                    onTap: () {
-                      Navigator.pop(context); // Chiude il bottom sheet delle opzioni
-                      Navigator.pop(context); // Torna al profilo
-                    },
-                  ),
-                ] else if (state == CourseState.unlocked) ...[
-                  _buildOptionButton(
-                    icon: Icons.play_circle_filled,
-                    title: 'Start Course',
-                    subtitle: 'Course is unlocked',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      ),
-    );
   }
 
   void _handleStartCourse() async {
@@ -973,7 +877,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
   Widget _buildStartButton(CourseState state) {
     final buttonConfig = switch (state) {
       CourseState.locked => _ButtonConfig(
-          text: 'Unlock Course',
+          text: 'Subscribe to Start',
           onPressed: _showStartCourseOptions,
         ),
       CourseState.unlocked => _ButtonConfig(

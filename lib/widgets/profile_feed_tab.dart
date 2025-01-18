@@ -216,49 +216,90 @@ class ProfileFeedTab extends StatelessWidget {
     return FutureBuilder<bool>(
       future: _isCourseUnlocked(courseId),
       builder: (context, snapshot) {
-        final isUnlocked = snapshot.data ?? false;
+        final isAccessible = snapshot.data ?? false;
         final course = _visibleCourses.firstWhere((c) => c.id == courseId);
 
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: course.isSubscriptionRequired
-                  ? Colors.purpleAccent.withOpacity(0.3)
-                  : Colors.yellowAccent.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                course.isSubscriptionRequired
-                    ? Icons.workspace_premium
-                    : (isUnlocked ? Icons.lock_open : Icons.stars_rounded),
-                size: 16,
-                color: course.isSubscriptionRequired
-                    ? Colors.purpleAccent
-                    : Colors.yellowAccent,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                course.isSubscriptionRequired
-                    ? 'Premium'
-                    : (isUnlocked ? 'Unlocked' : '$cost'),
-                style: TextStyle(
-                  color: course.isSubscriptionRequired
-                      ? Colors.purpleAccent
-                      : Colors.yellowAccent,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        );
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          return FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get(),
+            builder: (context, userSnapshot) {
+              if (userSnapshot.hasData && userSnapshot.data != null) {
+                final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+                final startedCourses = List<Map<String, dynamic>>.from(
+                    userData['startedCourses'] ?? []);
+                final hasStarted = startedCourses
+                    .any((c) => c['courseId'] == course.id);
+
+                // Definisci colori e stili in base allo stato
+                Color borderColor;
+                Color iconColor;
+                Color textColor;
+                IconData icon;
+                String text;
+
+                if (course.isSubscriptionRequired) {
+                  // Premium courses
+                  borderColor = Colors.yellowAccent.withOpacity(0.5);
+                  iconColor = Colors.yellowAccent;
+                  textColor = Colors.yellowAccent;
+                  icon = Icons.workspace_premium;
+                  text = 'Premium';
+                } else if (hasStarted) {
+                  // Started courses
+                  borderColor = Colors.white.withOpacity(0.3);
+                  iconColor = Colors.white;
+                  textColor = Colors.white;
+                  icon = Icons.play_circle_filled;
+                  text = 'Continue';
+                } else {
+                  // Available to enroll
+                  borderColor = Colors.yellowAccent.withOpacity(0.3);
+                  iconColor = Colors.yellowAccent;
+                  textColor = Colors.yellowAccent;
+                  icon = Icons.school;
+                  text = 'Enroll';
+                }
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: borderColor,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 16,
+                        color: iconColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        text,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox();
+            },
+          );
+        }
+        return const SizedBox();
       },
     );
   }
@@ -454,22 +495,18 @@ Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
 
     if (!userDoc.exists) return false;
 
-    // Ottieni i dati del corso
-    final courseDoc = await FirebaseFirestore.instance
-        .collection('courses')
-        .doc(courseId)
-        .get();
-
-    final userData = userDoc.data() as Map<String, dynamic>;
-    final unlockedCourses = List<String>.from(userData['unlockedCourses'] ?? []);
-    final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+    // Trova il corso
+    final course = _visibleCourses.firstWhere((c) => c.id == courseId);
     
-    // Controlla se l'utente ha una subscription al creatore del corso
-    if (courseDoc.exists && subscriptions.contains(courseDoc.get('authorId'))) {
+    // Se il corso non richiede subscription, è sempre accessibile
+    if (!course.isSubscriptionRequired) {
       return true;
     }
-    
-    return unlockedCourses.contains(courseId);
+
+    // Se richiede subscription, controlla se l'utente è abbonato
+    final userData = userDoc.data() as Map<String, dynamic>;
+    final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+    return subscriptions.contains(course.authorId);
   }
 
 Future<int> _getStudentsCount(String courseId) async {
