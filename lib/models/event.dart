@@ -34,6 +34,14 @@ class Event {
   });
 
   factory Event.fromMap(Map<String, dynamic> data, String id) {
+    List<String> parseParticipants(dynamic participantsData) {
+      if (participantsData == null) return [];
+      if (participantsData is List) {
+        return participantsData.map((e) => e.toString()).toList();
+      }
+      return [];
+    }
+
     return Event(
       id: id,
       title: data['title'] ?? '',
@@ -42,7 +50,7 @@ class Event {
       endDate: (data['endDate'] as Timestamp).toDate(),
       teacherId: data['teacherId'] ?? '',
       maxParticipants: data['maxParticipants'] ?? 0,
-      participants: List<String>.from(data['participants'] ?? []),
+      participants: parseParticipants(data['participants']),
       isOnline: data['isOnline'] ?? false,
       meetingLink: data['meetingLink'],
       location: data['location'],
@@ -68,5 +76,13 @@ class Event {
       'imageUrl': imageUrl,
       'isSubscriptionRequired': isSubscriptionRequired,
     };
+  }
+
+  bool hasParticipant(String userId) {
+    return participants.contains(userId);
+  }
+
+  bool get isFull {
+    return participants.length >= maxParticipants;
   }
 } 

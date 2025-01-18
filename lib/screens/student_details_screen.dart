@@ -46,14 +46,7 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
           .toList();
 
       // 2. Carica gli eventi a cui ha partecipato
-      final eventsSnapshot = await FirebaseFirestore.instance
-          .collection('events')
-          .where('attendees', arrayContains: widget.student.uid)
-          .get();
-
-      _attendedEvents = eventsSnapshot.docs
-          .map((doc) => Event.fromMap(doc.data(), doc.id))
-          .toList();
+      await _loadAttendedEvents();
 
       // 3. Carica i passi completati per ogni corso
       for (var topic in widget.student.WatchedVideos.keys) {
@@ -72,6 +65,27 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
     } catch (e) {
       print('Errore nel caricamento dei dati: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadAttendedEvents() async {
+    try {
+      // Modifichiamo la query per ottenere gli eventi dove l'utente è tra i partecipanti
+      final eventsSnapshot = await FirebaseFirestore.instance
+          .collection('events')
+          .where('participants', arrayContains: widget.student.uid)
+          .get();
+
+      setState(() {
+        _attendedEvents = eventsSnapshot.docs
+            .map((doc) => Event.fromMap(doc.data(), doc.id))
+            .toList();
+      });
+    } catch (e) {
+      print('Errore nel caricamento degli eventi: $e');
+      setState(() {
+        _attendedEvents = [];
+      });
     }
   }
 
@@ -690,6 +704,7 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
       return _buildEmptyState(
         'Nessun evento frequentato',
         Icons.event_outlined,
+        'Lo studente non ha ancora partecipato a nessun evento',
       );
     }
 
