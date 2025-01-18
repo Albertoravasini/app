@@ -34,6 +34,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   List<Section> _sections = [];
   bool _isEditing = false;
   String? _coverImageUrl;
+   Course? _course;  // Aggiungi quest
 
   // Nuovi campi per fonti, ringraziamenti e approfondimenti
   List<String> _sources = [];
@@ -162,6 +163,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
 
   Widget _buildBasicInfoStep() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Card(
           color: const Color(0xFF282828),
@@ -259,6 +261,31 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                   keyboardType: TextInputType.number,
                   onChanged: (value) => _courseCost = int.tryParse(value),
                 ),
+                const SizedBox(height: 16),
+                
+                // Aggiungi lo switch per la subscription
+                SwitchListTile(
+                  title: const Text(
+                    'Subscription Required',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  subtitle: const Text(
+                    'Only subscribers can access this course',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  value: _course?.isSubscriptionRequired ?? false,
+                  onChanged: (bool value) {
+                    setState(() {
+                      if (_course != null) {
+                        _course!.isSubscriptionRequired = value;
+                      }
+                    });
+                  },
+                  activeColor: Colors.purpleAccent,
+                  inactiveTrackColor: Colors.white24,
+                ),
+                
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -572,6 +599,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   @override
   void initState() {
     super.initState();
+    _course = widget.course;  // Inizializza con il corso passato come parametro
     _loadTopics();
 
     if (widget.course != null) {
@@ -1369,92 +1397,38 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     );
   }
 
-void _saveCourse() async {
-  if (_formKey.currentState != null && _formKey.currentState!.validate()) {
-    _formKey.currentState!.save();
-    
-    // Ottieni i dati dell'utente corrente
-    final currentUser = FirebaseAuth.instance.currentUser;
-    if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: User not authenticated')),
-      );
-      return;
-    }
-
-    // Recupera i dati dell'autore da Firestore
-    final authorDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
-
-    if (!authorDoc.exists) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: User data not found')),
-      );
-      return;
-    }
-
-    final authorData = authorDoc.data()!;
-      
-    final course = Course(
-      id: widget.course?.id ?? '',
-      title: _courseTitle ?? '',
-      description: _courseDescription ?? '',
-      cost: _courseCost ?? 0,
-      visible: true,
-      sections: _sections,
-      topic: _selectedTopic ?? '',
-      subtopic: '',
-      thumbnailUrl: widget.course?.thumbnailUrl ?? '',
-      coverImageUrl: _coverImageUrl ?? widget.course?.coverImageUrl ?? '',
-      sources: _sources,
-      acknowledgments: _acknowledgments,
-      recommendedBooks: _recommendedBooks,
-      recommendedPodcasts: _recommendedPodcasts,
-      recommendedWebsites: _recommendedWebsites,
-      rating: widget.course?.rating ?? 0.0,
-      totalRatings: widget.course?.totalRatings ?? 0,
-      // Aggiorna i dati dell'autore
-      authorId: currentUser.uid,
-      authorName: authorData['name'] ?? 'Anonymous User',
-      authorProfileUrl: authorData['profileImageUrl'] ?? '',
-    );
+  Future<void> _saveCourse() async {
+    if (!_formKey.currentState!.validate()) return;
 
     try {
-      if (widget.course != null) {
-        // Aggiorna il corso esistente
+      final courseData = {
+        'title': _courseTitle,
+        'description': _courseDescription,
+        'cost': _courseCost,
+        'topic': _selectedTopic,
+        'sections': _sections.map((s) => s.toMap()).toList(),
+        'visible': true,
+        'authorId': FirebaseAuth.instance.currentUser?.uid,
+        'coverImageUrl': _coverImageUrl,
+        'isSubscriptionRequired': _course?.isSubscriptionRequired ?? false,
+      };
+
+      if (_isEditing && _course != null) {
         await FirebaseFirestore.instance
             .collection('courses')
-            .doc(widget.course!.id)
-            .update(course.toMap());
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Course updated successfully')),
-        );
+            .doc(_course!.id)
+            .update(courseData);
       } else {
-        // Crea un nuovo corso
         await FirebaseFirestore.instance
             .collection('courses')
-            .add(course.toMap());
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('New course created successfully')),
-        );
+            .add(courseData);
       }
-      
-      Navigator.pop(context);
+
+      if (mounted) Navigator.pop(context);
     } catch (e) {
-      print('Errore durante il salvataggio: $e'); // Per debug
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Errore durante il salvataggio: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('Error saving course: $e');
     }
   }
-}
 
   // Aggiungi questa funzione per migrare i corsi esistenti
   Future<void> migrateExistingCourses() async {

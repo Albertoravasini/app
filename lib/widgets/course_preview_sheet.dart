@@ -149,6 +149,38 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
       return;
     }
 
+    // Se il corso richiede subscription e l'utente non ce l'ha
+    if (widget.course.isSubscriptionRequired && !subscriptions.contains(widget.course.authorId)) {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (context) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E1E),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildOptionButton(
+                icon: Icons.workspace_premium_rounded,
+                title: 'Subscribe to ${widget.course.authorName}',
+                subtitle: 'Access all courses from this creator',
+                onTap: () {
+                  Navigator.pop(context); // Chiude il bottom sheet delle opzioni
+                  Navigator.pop(context); // Torna al profilo
+                  // Qui puoi aggiungere la navigazione alla schermata di subscription
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Mostra le opzioni normali per i corsi non-subscription
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -580,7 +612,17 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
             },
           ),
           _buildVerticalDivider(),
-          _buildStat(Icons.stars_rounded, '${widget.course.cost}', 'Cost'),
+          _buildStat(
+            widget.course.isSubscriptionRequired 
+                ? Icons.workspace_premium_rounded 
+                : Icons.stars_rounded,
+            widget.course.isSubscriptionRequired 
+                ? 'Premium' 
+                : '${widget.course.cost}',
+            widget.course.isSubscriptionRequired 
+                ? 'Subscription' 
+                : 'Cost',
+          ),
         ],
       ),
     );

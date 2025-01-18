@@ -217,17 +217,16 @@ class ProfileFeedTab extends StatelessWidget {
       future: _isCourseUnlocked(courseId),
       builder: (context, snapshot) {
         final isUnlocked = snapshot.data ?? false;
+        final course = _visibleCourses.firstWhere((c) => c.id == courseId);
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: isUnlocked 
-                ? Colors.black.withOpacity(0.7)
-                : Colors.black.withOpacity(0.7),
+            color: Colors.black.withOpacity(0.7),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: isUnlocked 
-                  ? Colors.yellowAccent.withOpacity(0.3)
+              color: course.isSubscriptionRequired
+                  ? Colors.purpleAccent.withOpacity(0.3)
                   : Colors.yellowAccent.withOpacity(0.3),
               width: 1,
             ),
@@ -236,15 +235,23 @@ class ProfileFeedTab extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isUnlocked ? Icons.lock_open : Icons.stars_rounded,
+                course.isSubscriptionRequired
+                    ? Icons.workspace_premium
+                    : (isUnlocked ? Icons.lock_open : Icons.stars_rounded),
                 size: 16,
-                color: Colors.yellowAccent,
+                color: course.isSubscriptionRequired
+                    ? Colors.purpleAccent
+                    : Colors.yellowAccent,
               ),
               const SizedBox(width: 4),
               Text(
-                isUnlocked ? 'Unlocked' : '$cost',
-                style: const TextStyle(
-                  color: Colors.yellowAccent,
+                course.isSubscriptionRequired
+                    ? 'Premium'
+                    : (isUnlocked ? 'Unlocked' : '$cost'),
+                style: TextStyle(
+                  color: course.isSubscriptionRequired
+                      ? Colors.purpleAccent
+                      : Colors.yellowAccent,
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                 ),

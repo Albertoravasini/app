@@ -14,6 +14,7 @@ class Course {
   String subtopic;
   String? thumbnailUrl;
   String? coverImageUrl;
+  bool isSubscriptionRequired;
 
   // Additional fields
   List<String> sources;
@@ -51,6 +52,7 @@ class Course {
     required this.authorId,
     required this.authorName,
     this.authorProfileUrl,
+    this.isSubscriptionRequired = false,
   });
 
   factory Course.fromFirestore(DocumentSnapshot doc) {
@@ -88,6 +90,7 @@ class Course {
       authorId: data['authorId'] ?? '',
       authorName: data['authorName'] ?? 'Unknown Author',
       authorProfileUrl: data['authorProfileUrl'],
+      isSubscriptionRequired: data['isSubscriptionRequired'] ?? false,
     );
   }
 
@@ -112,6 +115,7 @@ class Course {
       'authorId': authorId,
       'authorName': authorName,
       'authorProfileUrl': authorProfileUrl,
+      'isSubscriptionRequired': isSubscriptionRequired,
     };
   }
 
