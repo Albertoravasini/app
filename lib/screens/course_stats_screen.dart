@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/course.dart';
 import '../models/user.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CourseStatsScreen extends StatefulWidget {
   final Course course;
@@ -15,6 +16,62 @@ class CourseStatsScreen extends StatefulWidget {
 }
 
 class _CourseStatsScreenState extends State<CourseStatsScreen> {
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _students = [];
+  int _totalStudents = 0;
+  int _totalCompletedSteps = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCourseStats();
+  }
+
+  Future<void> _loadCourseStats() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Carica gli studenti che hanno iniziato il corso
+      final studentsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('startedCourses', arrayContains: widget.course.id)
+          .get();
+
+      final List<Map<String, dynamic>> students = [];
+      int completedSteps = 0;
+
+      for (var doc in studentsSnapshot.docs) {
+        final userData = doc.data();
+        final enrollments = userData['courseEnrollments'] as Map<String, dynamic>;
+        final courseData = enrollments[widget.course.id];
+
+        if (courseData != null) {
+          students.add({
+            'name': userData['name'],
+            'startDate': (courseData['enrollmentDate'] as Timestamp).toDate(),
+            'completedSteps': (courseData['completedSteps'] as List).length,
+          });
+
+          completedSteps += (courseData['completedSteps'] as List).length;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _students = students;
+          _totalStudents = students.length;
+          _totalCompletedSteps = completedSteps;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading course stats: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -44,19 +101,27 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
   }
 
   Widget _buildGeneralTab() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           _buildStatCard(
             'Totale Studenti',
-            '0', // Questo sarà dinamico
+            _totalStudents.toString(),
             Icons.people,
           ),
           const SizedBox(height: 16),
           _buildStatCard(
             'Step Completati',
-            '0', // Questo sarà dinamico
+            _totalCompletedSteps.toString(),
             Icons.check_circle,
           ),
         ],
@@ -116,16 +181,18 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
   }
 
   Widget _buildStudentsTab() {
-    // Lista di esempio, sarà dinamica
-    final List<Map<String, dynamic>> students = [
-      {'name': 'Mario Rossi', 'startDate': DateTime.now()},
-      {'name': 'Luigi Verdi', 'startDate': DateTime.now().subtract(const Duration(days: 2))},
-    ];
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+        ),
+      );
+    }
 
     return ListView.builder(
-      itemCount: students.length,
+      itemCount: _students.length,
       itemBuilder: (context, index) {
-        final student = students[index];
+        final student = _students[index];
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(

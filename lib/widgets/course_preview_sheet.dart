@@ -233,55 +233,64 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
   }
 
   void _handleStartCourse() async {
-    Navigator.pop(context);
-    
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-    
-    if (!userDoc.exists) return;
-    
-    final userData = userDoc.data() as Map<String, dynamic>;
-    final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
-    
-    // Trova l'ultima sezione con progresso
-    Section? lastSection;
-    int sectionStepIndex = 0;
-    int globalStepIndex = 0;
-    
-    // Prima calcola l'indice globale per ogni sezione
-    Map<String, int> sectionStartIndices = {};
-    int runningIndex = 0;
-    
-    for (var section in widget.course.sections) {
-      sectionStartIndices[section.title] = runningIndex;
-      runningIndex += section.steps.length;
-    }
-    
-    // Trova l'ultima sezione con progresso
-    for (var section in widget.course.sections.reversed) {
-      if (currentSteps.containsKey(section.title)) {
-        lastSection = section;
-        sectionStepIndex = currentSteps[section.title] as int;
-        globalStepIndex = sectionStartIndices[section.title]! + sectionStepIndex;
-        print('DEBUG - Found last progress in section: ${section.title}');
-        print('DEBUG - Section step index: $sectionStepIndex');
-        print('DEBUG - Global step index: $globalStepIndex');
-        break;
+    try {
+      // Prima registra il corso come iniziato
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final userDoc = await userRef.get();
+      final startedCourses = List<Map<String, dynamic>>.from(
+        (userDoc.data()?['startedCourses'] ?? [])
+      );
+
+      // Verifica se il corso è già stato iniziato
+      if (!startedCourses.any((course) => course['courseId'] == widget.course.id)) {
+        // Aggiorna startedCourses nell'utente
+        await userRef.update({
+          'startedCourses': FieldValue.arrayUnion([
+            {
+              'courseId': widget.course.id,
+              'startDate': Timestamp.now(),
+              'completed': false
+            }
+          ])
+        });
+
+        // Aggiorna anche enrolledStudents nel corso
+        await widget.course.enrollStudent(user.uid);
       }
-    }
 
-    // Se non trova progresso, usa la prima sezione
-    if (lastSection == null) {
-      lastSection = widget.course.sections.first;
-      print('DEBUG - No progress found, using first section');
-    }
+      // Poi procedi con la navigazione esistente
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
+      
+      // Trova l'ultima sezione con progresso
+      Section? lastSection;
+      int sectionStepIndex = 0;
+      int globalStepIndex = 0;
+      
+      Map<String, int> sectionStartIndices = {};
+      int runningIndex = 0;
+      
+      for (var section in widget.course.sections) {
+        sectionStartIndices[section.title] = runningIndex;
+        runningIndex += section.steps.length;
+      }
+      
+      for (var section in widget.course.sections.reversed) {
+        if (currentSteps.containsKey(section.title)) {
+          lastSection = section;
+          sectionStepIndex = currentSteps[section.title] as int;
+          globalStepIndex = sectionStartIndices[section.title]! + sectionStepIndex;
+          break;
+        }
+      }
 
-    Future.microtask(() {
+      if (lastSection == null) {
+        lastSection = widget.course.sections.first;
+      }
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -298,7 +307,16 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
           ),
         ),
       );
-    });
+
+    } catch (e) {
+      print('Error starting course: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Errore nell\'avvio del corso. Riprova.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override

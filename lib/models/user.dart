@@ -31,6 +31,7 @@ class UserModel {
   final String subscriptionDescription2;
   final String subscriptionDescription3;
   final String? location;
+  final List<StartedCourse> startedCourses;
 
   UserModel({
     required this.uid,
@@ -62,6 +63,7 @@ class UserModel {
     this.subscriptionDescription2 = 'Full access to this user\'s content',
     this.subscriptionDescription3 = 'Full access to this user\'s content',
     this.location,
+    this.startedCourses = const [],
   }) ;
  
 
@@ -123,6 +125,9 @@ class UserModel {
       subscriptionDescription2: data['subscriptionDescription2'] ?? 'Full access to this user\'s content',
       subscriptionDescription3: data['subscriptionDescription3'] ?? 'Full access to this user\'s content',
       location: data['location'],
+      startedCourses: (data['startedCourses'] as List<dynamic>?)
+          ?.map((course) => StartedCourse.fromMap(course))
+          .toList() ?? [],
     );
   }
 
@@ -158,6 +163,7 @@ class UserModel {
       'subscriptionDescription2': subscriptionDescription2,
       'subscriptionDescription3': subscriptionDescription3,
       'location': location,
+      'startedCourses': startedCourses.map((course) => course.toMap()).toList(),
     };
   }
 }
@@ -328,6 +334,34 @@ class Comment {
       'timestamp': timestamp.toIso8601String(),
       'likeCount': likeCount,
       'replies': replies.map((reply) => reply.toMap()).toList(),
+    };
+  }
+}
+
+class StartedCourse {
+  final String courseId;
+  final DateTime startDate;
+  final bool completed;
+
+  StartedCourse({
+    required this.courseId,
+    required this.startDate,
+    this.completed = false,
+  });
+
+  factory StartedCourse.fromMap(Map<String, dynamic> data) {
+    return StartedCourse(
+      courseId: data['courseId'] ?? '',
+      startDate: (data['startDate'] as Timestamp).toDate(),
+      completed: data['completed'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'courseId': courseId,
+      'startDate': Timestamp.fromDate(startDate),
+      'completed': completed,
     };
   }
 }

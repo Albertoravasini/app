@@ -31,6 +31,8 @@ class Course {
   // Cache statica condivisa tra tutte le istanze
   static final Map<String, int> _studentsCache = {};
 
+  Map<String, DateTime> enrolledStudents; // Map di userID -> data di iscrizione
+
   Course({
     required this.id,
     required this.title,
@@ -53,6 +55,7 @@ class Course {
     required this.authorName,
     this.authorProfileUrl,
     this.isSubscriptionRequired = false,
+    this.enrolledStudents = const {},
   });
 
   factory Course.fromFirestore(DocumentSnapshot doc) {
@@ -62,6 +65,13 @@ class Course {
 
   // Add the fromMap constructor here
   factory Course.fromMap(Map<String, dynamic> data) {
+    Map<String, DateTime> enrolledStudentsMap = {};
+    if (data['enrolledStudents'] != null) {
+      (data['enrolledStudents'] as Map<String, dynamic>).forEach((key, value) {
+        enrolledStudentsMap[key] = (value as Timestamp).toDate();
+      });
+    }
+
     return Course(
       id: data['id'] ?? '', // Use empty string as default if ID is not provided
       title: data['title'] ?? '',
@@ -91,6 +101,7 @@ class Course {
       authorName: data['authorName'] ?? 'Unknown Author',
       authorProfileUrl: data['authorProfileUrl'],
       isSubscriptionRequired: data['isSubscriptionRequired'] ?? false,
+      enrolledStudents: enrolledStudentsMap,
     );
   }
 
@@ -116,6 +127,8 @@ class Course {
       'authorName': authorName,
       'authorProfileUrl': authorProfileUrl,
       'isSubscriptionRequired': isSubscriptionRequired,
+      'enrolledStudents': enrolledStudents.map((key, value) => 
+          MapEntry(key, Timestamp.fromDate(value))),
     };
   }
 
@@ -154,6 +167,16 @@ class Course {
       print('Error getting students count: $e');
       return 0;
     }
+  }
+
+  Future<void> enrollStudent(String userId) async {
+    enrolledStudents[userId] = DateTime.now();
+    await FirebaseFirestore.instance
+        .collection('courses')
+        .doc(id)
+        .update({
+          'enrolledStudents.$userId': Timestamp.fromDate(DateTime.now())
+        });
   }
 }
 

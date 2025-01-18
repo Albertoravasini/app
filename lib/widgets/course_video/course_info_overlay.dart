@@ -18,7 +18,6 @@ class CourseInfoOverlay extends StatefulWidget {
   final CourseVideoController controller;
   final Section? currentSection;
   final String topic;
-  final Function(int) onCoinsUpdate;
   final String videoTitle;
   final Function(String)? onTopicChanged;
   final List<String> allTopics;
@@ -33,7 +32,6 @@ class CourseInfoOverlay extends StatefulWidget {
     required this.controller,
     this.currentSection,
     required this.topic,
-    required this.onCoinsUpdate,
     required this.videoTitle,
     this.onTopicChanged,
     this.allTopics = const [],
@@ -87,65 +85,24 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
   }
 
   Widget _buildUnlockOptions() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Container(
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.yellowAccent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: TextButton(
-              onPressed: _handleSubscribe,
-              child: const Text(
-                'Subscribe',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 14,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.purpleAccent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: TextButton(
+        onPressed: _handleSubscribe,
+        child: const Text(
+          'Subscribe to Access',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Container(
-            height: 38,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.yellowAccent.withOpacity(0.5),
-                width: 1,
-              ),
-            ),
-            child: TextButton(
-              onPressed: _handleUnlockCourse,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.stars_rounded, color: Colors.yellowAccent, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${widget.course!.cost}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -206,58 +163,67 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
     return false;
   }
 
-  void _handleStartCourse() {
+  void _handleStartCourse() async {
     if (widget.course != null) {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        widget.controller.hasSubscription(widget.course!.authorId).then((hasSubscription) async {
-          // Controlla se l'utente ha già iniziato il corso
+        try {
+          final hasSubscription = await widget.controller.hasSubscription(widget.course!.authorId);
           final hasProgress = await _hasCourseProgress();
           
-          // Traccia l'evento con PostHog
+          if (widget.course!.isSubscriptionRequired && !hasSubscription) {
+            setState(() {
+              _showUnlockOptions = true;
+            });
+            return;
+          }
+
+          // Prima registra il corso come iniziato
+          final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+          final userDoc = await userRef.get();
+          final startedCourses = List<Map<String, dynamic>>.from(
+            (userDoc.data()?['startedCourses'] ?? [])
+          );
+
+          // Verifica se il corso è già stato iniziato
+          if (!startedCourses.any((course) => course['courseId'] == widget.course!.id)) {
+            // Aggiorna startedCourses nell'utente
+            await userRef.update({
+              'startedCourses': FieldValue.arrayUnion([
+                {
+                  'courseId': widget.course!.id,
+                  'startDate': Timestamp.now(),
+                  'completed': false
+                }
+              ])
+            });
+
+            // Aggiorna anche enrolledStudents nel corso
+            await widget.course!.enrollStudent(user.uid);
+          }
+
+          // Poi avvia il corso
+          widget.controller.onStartCourse(widget.course, null);
+          
           Posthog().capture(
             eventName: hasProgress ? 'continue_course' : 'start_course',
             properties: {
               'course_id': widget.course!.id,
               'course_title': widget.course!.title,
               'author_id': widget.course!.authorId,
-              'author_name': widget.course!.authorName,
-              'video_title': widget.videoTitle,
-              'has_subscription': hasSubscription,
+              'enrollment_date': DateTime.now().toIso8601String(),
             },
           );
 
-          if (hasSubscription) {
-            widget.controller.onStartCourse(widget.course, null);
-          } else {
-            FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get()
-                .then((doc) {
-              if (doc.exists) {
-                final userData = UserModel.fromMap(doc.data()!);
-                if (userData.unlockedCourses.contains(widget.course!.id)) {
-                  widget.controller.onStartCourse(widget.course, null);
-                } else {
-                  Posthog().capture(
-                    eventName: 'initial_subscribe_click',
-                    properties: {
-                      'course_id': widget.course!.id,
-                      'course_title': widget.course!.title,
-                      'author_id': widget.course!.authorId,
-                      'author_name': widget.course!.authorName,
-                      'video_title': widget.videoTitle,
-                    },
-                  );
-                  setState(() {
-                    _showUnlockOptions = true;
-                  });
-                }
-              }
-            });
-          }
-        });
+        } catch (e) {
+          print('Error starting course: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Errore nell\'avvio del corso. Riprova.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -292,51 +258,6 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
         builder: (context) => ProfileScreen(currentUser: author),
       ),
     );
-  }
-
-  Future<void> _handleUnlockCourse() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final doc = await docRef.get();
-      
-      if (doc.exists) {
-        final userData = UserModel.fromMap(doc.data()!);
-        
-        if (userData.coins >= widget.course!.cost) {
-          Posthog().capture(
-            eventName: 'unlock_with_coins_click',
-            properties: {
-              'course_id': widget.course!.id,
-              'course_title': widget.course!.title,
-              'author_id': widget.course!.authorId,
-              'author_name': widget.course!.authorName,
-              'video_title': widget.videoTitle,
-              'unlock_option': 'coins',
-              'coins_cost': widget.course!.cost,
-              'user_coins_before': userData.coins,
-            },
-          );
-
-          await docRef.update({
-            'coins': userData.coins - widget.course!.cost,
-            'unlockedCourses': [...userData.unlockedCourses, widget.course!.id],
-          });
-
-          widget.onCoinsUpdate(userData.coins - widget.course!.cost);
-          widget.controller.onStartCourse(widget.course, null);
-          
-          setState(() {
-            _showUnlockOptions = false;
-            _isAnimating = false;
-          });
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Non hai abbastanza coins')),
-          );
-        }
-      }
-    }
   }
 
   Future<void> _handleAuthorTap() async {

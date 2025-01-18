@@ -385,7 +385,6 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
               ),
               currentSection: widget.currentSection,
               topic: widget.topic,
-              onCoinsUpdate: widget.onCoinsUpdate,
             ),
           
           Positioned(
