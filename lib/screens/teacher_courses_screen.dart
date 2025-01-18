@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/course.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/course_preview_sheet.dart';
+import '../screens/course_stats_screen.dart';
 
 class TeacherCoursesScreen extends StatefulWidget {
   final String teacherId;
@@ -94,11 +95,11 @@ class _TeacherCoursesScreenState extends State<TeacherCoursesScreen> {
                   ),
                   child: InkWell(
                     onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.transparent,
-                        isScrollControlled: true,
-                        builder: (context) => CoursePreviewSheet(course: course),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CourseStatsScreen(course: course),
+                        ),
                       );
                     },
                     child: Column(
