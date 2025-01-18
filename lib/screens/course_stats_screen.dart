@@ -31,36 +31,72 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Carica gli studenti che hanno iniziato il corso
-      final studentsSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('startedCourses', arrayContains: widget.course.id)
-          .get();
-
+      final userRef = FirebaseFirestore.instance.collection('users');
+      final usersSnapshot = await userRef.get();
+      
       final List<Map<String, dynamic>> students = [];
-      int completedSteps = 0;
+      int totalCompletedSteps = 0;
 
-      for (var doc in studentsSnapshot.docs) {
-        final userData = doc.data();
-        final enrollments = userData['courseEnrollments'] as Map<String, dynamic>;
-        final courseData = enrollments[widget.course.id];
+      for (var userDoc in usersSnapshot.docs) {
+        final userData = userDoc.data();
+        final startedCourses = List<Map<String, dynamic>>.from(
+          userData['startedCourses'] ?? []
+        );
+        
+        // Cerca il corso specifico nei corsi iniziati
+        final courseData = startedCourses.firstWhere(
+          (course) => course['courseId'] == widget.course.id,
+          orElse: () => <String, dynamic>{},
+        );
 
-        if (courseData != null) {
+        if (courseData.isNotEmpty) {
+          // Ottieni i video guardati e le domande risposte
+          final watchedVideos = List<Map<String, dynamic>>.from(
+            (userData['WatchedVideos'] ?? {})[widget.course.topic] ?? []
+          );
+          final answeredQuestions = List<String>.from(
+            (userData['answeredQuestions'] ?? {})[widget.course.topic] ?? []
+          );
+          
+          // Conta gli step completati per questo studente
+          int completedStepsCount = 0;
+          
+          for (var section in widget.course.sections) {
+            for (var step in section.steps) {
+              if (step.videoUrl != null) {
+                // Controlla se il video è stato completato
+                if (watchedVideos.any((v) => 
+                    v['videoId'] == step.videoUrl && v['completed'] == true)) {
+                  completedStepsCount++;
+                }
+              } else if (step.content != null) {
+                // Controlla se la domanda è stata risposta
+                if (answeredQuestions.contains(step.content)) {
+                  completedStepsCount++;
+                }
+              }
+            }
+          }
+
           students.add({
-            'name': userData['name'],
-            'startDate': (courseData['enrollmentDate'] as Timestamp).toDate(),
-            'completedSteps': (courseData['completedSteps'] as List).length,
+            'name': userData['name'] ?? 'Unknown',
+            'startDate': courseData['startDate'] as Timestamp,
+            'completedSteps': completedStepsCount,
           });
 
-          completedSteps += (courseData['completedSteps'] as List).length;
+          totalCompletedSteps += completedStepsCount;
         }
       }
+
+      // Ordina gli studenti per data di inizio (più recenti prima)
+      students.sort((a, b) => (b['startDate'] as Timestamp)
+          .compareTo(a['startDate'] as Timestamp));
 
       if (mounted) {
         setState(() {
           _students = students;
           _totalStudents = students.length;
-          _totalCompletedSteps = completedSteps;
+          _totalCompletedSteps = totalCompletedSteps;
           _isLoading = false;
         });
       }
@@ -189,10 +225,36 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
       );
     }
 
+    if (_students.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.people_outline,
+              size: 64,
+              color: Colors.white.withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No students yet',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       itemCount: _students.length,
       itemBuilder: (context, index) {
         final student = _students[index];
+        final startDate = (student['startDate'] as Timestamp).toDate();
+        
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -210,8 +272,8 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            leading: Text(
-              _formatDate(student['startDate']),
+            subtitle: Text(
+              'Started ${_formatDate(startDate)} • ${student['completedSteps']} steps completed',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.7),
                 fontSize: 14,

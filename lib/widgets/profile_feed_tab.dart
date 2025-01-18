@@ -510,7 +510,29 @@ Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
   }
 
 Future<int> _getStudentsCount(String courseId) async {
-  final course = _visibleCourses.firstWhere((c) => c.id == courseId);
-  return course.getStudentsCount();
+  try {
+    final courseRef = FirebaseFirestore.instance.collection('courses').doc(courseId);
+    final userRef = FirebaseFirestore.instance.collection('users');
+    
+    // Ottieni tutti gli utenti
+    final usersSnapshot = await userRef.get();
+    
+    // Conta gli utenti che hanno questo corso in startedCourses
+    int count = 0;
+    for (var userDoc in usersSnapshot.docs) {
+      final startedCourses = List<Map<String, dynamic>>.from(
+        userDoc.data()['startedCourses'] ?? []
+      );
+      
+      if (startedCourses.any((course) => course['courseId'] == courseId)) {
+        count++;
+      }
+    }
+    
+    return count;
+  } catch (e) {
+    print('Error getting students count: $e');
+    return 0;
+  }
 }
 } 
