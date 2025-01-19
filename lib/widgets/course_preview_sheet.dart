@@ -150,7 +150,6 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
 
       // Verifica se il corso è già stato iniziato
       if (!startedCourses.any((course) => course['courseId'] == widget.course.id)) {
-        // Aggiorna startedCourses nell'utente
         await userRef.update({
           'startedCourses': FieldValue.arrayUnion([
             {
@@ -161,15 +160,12 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
           ])
         });
 
-        // Aggiorna anche enrolledStudents nel corso
         await widget.course.enrollStudent(user.uid);
       }
 
-      // Poi procedi con la navigazione esistente
       final userData = userDoc.data() as Map<String, dynamic>;
       final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
       
-      // Trova l'ultima sezione con progresso
       Section? lastSection;
       int sectionStepIndex = 0;
       int globalStepIndex = 0;
@@ -195,7 +191,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         lastSection = widget.course.sections.first;
       }
 
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => MainScreen(
@@ -210,6 +206,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
             },
           ),
         ),
+        (route) => false,
       );
 
     } catch (e) {

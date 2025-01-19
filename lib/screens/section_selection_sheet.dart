@@ -249,17 +249,24 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.08),
+          color: isCompleted ? Colors.yellowAccent.withOpacity(0.3) : Colors.white.withOpacity(0.08),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          childrenPadding: EdgeInsets.only(left: 16, right: 16, bottom: 12),
+          tilePadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          childrenPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           backgroundColor: Colors.transparent,
           collapsedBackgroundColor: Colors.transparent,
           trailing: Row(
@@ -286,12 +293,22 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
             children: [
               Row(
                 children: [
-                  Text(
-                    '${index + 1}.',
-                    style: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.yellowAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: Colors.yellowAccent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(width: 8),
@@ -406,8 +423,14 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
   }) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        margin: EdgeInsets.symmetric(vertical: 4),
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isCurrentStep ? Colors.yellowAccent.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           children: [
             Container(
@@ -421,12 +444,27 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
               ),
             ),
             SizedBox(width: 16),
-            Icon(
-              _getStepIcon(step.type, isCompleted),
-              color: isCompleted 
-                  ? Colors.yellowAccent
-                  : Colors.grey[400],
-              size: 14,
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isCompleted 
+                    ? Colors.yellowAccent.withOpacity(0.15)
+                    : Colors.grey[800]!.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    step.type == 'video' ? FontAwesomeIcons.play : FontAwesomeIcons.question,
+                    color: isCompleted 
+                        ? Colors.yellowAccent
+                        : Colors.grey[400],
+                    size: 14,
+                  ),
+                 
+                ],
+              ),
             ),
             SizedBox(width: 12),
             Expanded(
@@ -473,16 +511,12 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
 
   // Helper methods
   IconData _getStepIcon(String type, bool isCompleted) {
-    if (isCompleted) return FontAwesomeIcons.checkCircle;
-    
-    switch (type) {
-      case 'video':
-        return FontAwesomeIcons.play;
-      case 'question':
-        return FontAwesomeIcons.question;
-      default:
-        return FontAwesomeIcons.circle;
+    if (type == 'video') {
+      return isCompleted ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.play;
+    } else if (type == 'question') {
+      return isCompleted ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.question;
     }
+    return FontAwesomeIcons.circle;
   }
 
   String _getStepTitle(LevelStep step) {

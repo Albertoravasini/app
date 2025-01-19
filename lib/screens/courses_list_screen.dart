@@ -185,12 +185,13 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
             )
           : CustomScrollView(
               slivers: [
-                // AppBar con comportamento floating
+                // AppBar personalizzata senza back button
                 SliverAppBar(
-                  floating: true, // Scompare/riappare con lo scroll
-                  snap: true,     // Snap animation quando riappare
-                  pinned: false,  // Non rimane visibile
+                  floating: true,
+                  snap: true,
+                  pinned: false,
                   backgroundColor: const Color(0xFF121212),
+                  automaticallyImplyLeading: false, // Rimuove il tasto indietro
                   toolbarHeight: 80,
                   flexibleSpace: FlexibleSpaceBar(
                     titlePadding: const EdgeInsets.all(16),
@@ -220,7 +221,6 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
   /// SearchField con bordi arrotondati e icona
   Widget _buildSearchField() {
     return Container(
-      margin: const EdgeInsets.only(right: 16), // per allinearlo bene
       child: Material(
         color: Colors.grey[900],
         borderRadius: BorderRadius.circular(24),

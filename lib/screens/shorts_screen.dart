@@ -268,18 +268,36 @@ void _preloadNextVideo(int index, String videoId) {
 void _onPageChanged(int index) {
   if (!mounted) return;
 
+  // Aggiorna il titolo della sezione se siamo in modalità corso
   if (isInCourseMode && currentCourse != null) {
-    final currentStep = allShortSteps[index];
-    final section = currentStep['section'] as Section;
+    // Trova la sezione corrente in base all'indice
+    int stepCount = 0;
+    Section? newSection;
+    int currentStepInSection = 0;
     
-    final sectionStartIndex = _calculateSectionStartIndex(currentCourse!, section);
-    final relativeStepIndex = index - sectionStartIndex;
-    
-    widget.onSectionProgressUpdate(
-      relativeStepIndex,
-      section.steps.length,
-      true
-    );
+    for (var section in currentCourse!.sections) {
+      if (index >= stepCount && index < stepCount + section.steps.length) {
+        newSection = section;
+        currentStepInSection = index - stepCount;
+        break;
+      }
+      stepCount += section.steps.length;
+    }
+
+    // Aggiorna lo stato e notifica il parent dello stato degli step
+    if (newSection != null) {
+      setState(() {
+        currentSection = newSection;
+        currentStepIndex = index;
+      });
+      
+      // Notifica il parent del progresso della sezione
+      widget.onSectionProgressUpdate(
+        currentStepInSection,
+        newSection.steps.length,
+        true
+      );
+    }
   }
 
   scrollCount++;

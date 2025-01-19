@@ -312,6 +312,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    print('DEBUG: VideoPlayerWidget - videoTitle: ${widget.videoTitle}');
     return Stack(
       children: [
         PlatformHelper.isWeb 
