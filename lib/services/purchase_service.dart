@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 class PurchaseService {
-  // Chiave API di RevenueCat
-  static const String _apiKey = 'appl_BnISKxsimQBUpioTfnyWehngrIE';
+  // Chiavi API di RevenueCat
+  static const String _apiKeyIOS = 'appl_BnISKxsimQBUpioTfnyWehngrIE';
+  static const String _apiKeyAndroid = 'goog_IyJwhhhXOkFDEtzACKvyWROhxzn';
   
   // ID dei prodotti RevenueCat (aggiornati in base ai log)
   static const String _monthlyId = '\$rc_monthly';
@@ -17,14 +19,17 @@ class PurchaseService {
       await Purchases.setLogLevel(LogLevel.verbose);
       print('DEBUG: Inizializzazione RevenueCat...');
       
-      final configuration = PurchasesConfiguration(_apiKey);
+      // Seleziona la chiave API corretta in base alla piattaforma
+      final apiKey = Platform.isIOS ? _apiKeyIOS : _apiKeyAndroid;
+      
+      final configuration = PurchasesConfiguration(apiKey);
       await Purchases.configure(configuration);
-      print('DEBUG: RevenueCat configurato con successo');
+      print('DEBUG: RevenueCat configurato con successo per ${Platform.isIOS ? 'iOS' : 'Android'}');
       
       // Test della configurazione
       final offerings = await Purchases.getOfferings();
       print('DEBUG: Test configurazione:');
-      print('- API Key: $_apiKey');
+      print('- API Key: $apiKey');
       print('- Offerings disponibili: ${offerings.all.length}');
       print('- Current offering: ${offerings.current?.identifier}');
       
@@ -81,10 +86,7 @@ class PurchaseService {
       }
 
       // Tenta l'acquisto
-      final purchaseResult = await Purchases.purchasePackage(
-        package,
-        googleProductChangeInfo: null, // Solo per Android
-      );
+      final purchaseResult = await Purchases.purchasePackage(package);
       
       print('DEBUG: Acquisto completato con successo');
       print('DEBUG: Entitlements attivi: ${purchaseResult.entitlements.active.keys}');
