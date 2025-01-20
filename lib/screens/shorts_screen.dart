@@ -15,6 +15,7 @@ import 'package:Just_Learn/models/level.dart';
 import 'package:Just_Learn/widgets/page_view_container.dart';
 import '../services/course_service.dart';
 import 'package:Just_Learn/screens/section_selection_sheet.dart';
+import 'package:Just_Learn/controllers/video_player_manager.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -77,6 +78,8 @@ class ShortsScreenState extends State<ShortsScreen> {
   
   int scrollCount = 0;
   
+  final VideoPlayerManager _videoManager = VideoPlayerManager();
+  
   @override
   void initState() {
     super.initState();
@@ -113,8 +116,19 @@ class ShortsScreenState extends State<ShortsScreen> {
       // Crea tutti gli step del corso
       allShortSteps = _createCourseSteps(course);
       
+      // Verifica se l'utente può accedere all'indice richiesto
+      final totalSteps = course.sections.fold<int>(
+        0, (sum, section) => sum + section.steps.length);
+      final lockIndex = (totalSteps * 0.3).floor();
+      
+      int targetIndex = await _loadLastProgress(course);
+      
+      // Se l'indice target è oltre il paywall e l'utente non è abbonato
+      if (targetIndex >= lockIndex && !await _isUserSubscribed()) {
+        targetIndex = lockIndex - 1; // Torna all'ultimo step disponibile
+      }
+      
       // Recupera l'indice globale dai dati iniziali se disponibili
-      int targetIndex = 0;
       if (widget.initialCourseData != null && widget.initialCourseData!.containsKey('stepIndex')) {
         targetIndex = widget.initialCourseData!['stepIndex'] as int;
         print('DEBUG - Using initial stepIndex: $targetIndex');
@@ -265,8 +279,37 @@ void _preloadNextVideo(int index, String videoId) {
   }
 }
 
-void _onPageChanged(int index) {
+void _onPageChanged(int index) async {
   if (!mounted) return;
+
+  // Verifica il paywall solo se siamo in modalità corso e l'utente non è Pro
+  if (isInCourseMode && currentCourse != null) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      final userData = UserModel.fromMap(userDoc.data()!);
+      if (!userData.isPro) {  // Controlla solo se l'utente non è Pro
+        final totalSteps = currentCourse!.sections.fold<int>(
+          0, (sum, section) => sum + section.steps.length);
+        final lockIndex = (totalSteps * 0.3).ceil();
+
+        if (index >= lockIndex && !await _isUserSubscribed()) {
+          _videoManager.pauseCurrentVideo();
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(lockIndex - 1);
+          }
+          if (mounted) {
+            Navigator.pushNamed(context, '/subscription');
+          }
+          return;
+        }
+      }
+    }
+  }
 
   // Aggiorna il titolo della sezione se siamo in modalità corso
   if (isInCourseMode && currentCourse != null) {
@@ -952,5 +995,21 @@ Widget build(BuildContext context) {
     }
     
     return 0; // Fallback al primo step se non trova la sezione
+  }
+
+  Future<bool> _isUserSubscribed() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && currentCourse != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (userDoc.exists) {
+        final userData = UserModel.fromMap(userDoc.data()!);
+        return userData.subscriptions.contains(currentCourse!.authorId);
+      }
+    }
+    return false;
   }
 }
