@@ -35,25 +35,35 @@ Future<void> _navigateToNextScreen() async {
   try {
     await Future.delayed(const Duration(seconds: 1));
 
-    // Verifica lo stato dell'abbonamento
-    final customerInfo = await PurchaseService.getCustomerInfo();
-    final isPro = PurchaseService.isProUser(customerInfo);
+    // Verifica lo stato dell'abbonamento in modo diverso per web e mobile
+    bool isPro = false;
+    if (kIsWeb) {
+      // Su web, verifica lo stato Pro da Firestore
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        isPro = doc.data()?['isPro'] ?? false;
+      }
+    } else {
+      // Su mobile, usa RevenueCat
+      final customerInfo = await PurchaseService.getCustomerInfo();
+      isPro = PurchaseService.isProUser(customerInfo);
+    }
     print('DEBUG: Utente Pro: $isPro');
 
     if (kIsWeb) {
       final user = FirebaseAuth.instance.currentUser;
-      
       if (user != null) {
-        // Se l'utente è autenticato, vai al layout principale con ExploreScreen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => WebMainLayout(
-            ),
+            builder: (_) => WebMainLayout(),
           ),
         );
       } else {
-        // Se l'utente non è autenticato, vai alla landing page
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => WebLandingScreen()),

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:Just_Learn/main.dart';  // Importa il main per accedere al navigatorKey
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -33,6 +34,13 @@ class NotificationService {
 
     try {
       print('Inizializzazione NotificationService...');
+      
+      // Skip l'inizializzazione delle notifiche su web
+      if (kIsWeb) {
+        print('DEBUG: Notifiche non supportate su web, skip inizializzazione');
+        _isInitialized = true;
+        return;
+      }
       
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       
@@ -62,13 +70,14 @@ class NotificationService {
       _isInitialized = true;
       print('NotificationService inizializzato con successo');
     } catch (e) {
-      print('Errore inizializzazione NotificationService: $e');
-      rethrow;
+      print('DEBUG: Errore inizializzazione NotificationService (ignorato su web): $e');
+      // Non rilanciare l'errore su web
+      if (!kIsWeb) rethrow;
     }
   }
 
   Future<void> getAndUpdateToken() async {
-    if (_lastAccessUpdated) return;
+    if (_lastAccessUpdated || kIsWeb) return;
     
     final String? token = await _firebaseMessaging.getToken();
     if (token != null) {
