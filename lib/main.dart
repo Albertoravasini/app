@@ -5,6 +5,7 @@ import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
 import 'package:Just_Learn/screens/access/splash_screen.dart';
 import 'package:Just_Learn/screens/course_screen.dart';
 import 'package:Just_Learn/screens/quiz_screen.dart';
+import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:Just_Learn/services/notification_service.dart';
 import 'package:Just_Learn/services/auth_service.dart';
 import 'package:Just_Learn/models/user.dart';
@@ -52,6 +53,7 @@ Future<void> main() async {
   
   // Inizializza RevenueCat
   await PurchaseService.init();
+  await PurchaseService.setupSubscriptionMonitoring();
   
   try {
     await Firebase.initializeApp(
@@ -175,6 +177,7 @@ class MyApp extends StatelessWidget {
             '/admin': (context) => const AdminPanelScreen(),
             '/privacy-policy': (context) => const PrivacyPolicyScreen(),
             '/support': (context) => const SupportScreen(),
+            '/subscription': (context) => const SubscriptionScreen(),
             '/profile': (context) => ProfileScreen(
               currentUser: ModalRoute.of(context)!.settings.arguments as UserModel
             ),

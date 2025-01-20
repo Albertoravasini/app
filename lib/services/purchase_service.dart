@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class PurchaseService {
   // Chiavi API di RevenueCat
@@ -126,6 +129,38 @@ class PurchaseService {
     } catch (e) {
       print('DEBUG: Errore nella selezione del pacchetto: $e');
       return null;
+    }
+  }
+
+  static Future<bool> checkSubscriptionStatus() async {
+    try {
+      final customerInfo = await Purchases.getCustomerInfo();
+      return isProUser(customerInfo);
+    } catch (e) {
+      print('DEBUG: Errore verifica abbonamento: $e');
+      return false;
+    }
+  }
+
+  static Future<void> setupSubscriptionMonitoring() async {
+    try {
+      // Verifica se Firebase è già inizializzato
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp();
+      }
+      
+      Purchases.addCustomerInfoUpdateListener((customerInfo) async {
+        final isPro = isProUser(customerInfo);
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({'isPro': isPro});
+        }
+      });
+    } catch (e) {
+      print('DEBUG: Errore setup monitoraggio: $e');
     }
   }
 } 

@@ -186,54 +186,62 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
 
     final userData = userDoc.data() as Map<String, dynamic>;
     final userModel = UserModel.fromMap(userData);
+    final isPro = userData['isPro'] ?? false;
     
-    // Ottieni i video completati per il topic del corso
-    final watchedVideos = userModel.WatchedVideos[widget.course.topic] ?? [];
-    // Ottieni le domande risposte per il topic del corso
-    final answeredQuestions = userModel.answeredQuestions[widget.course.topic] ?? [];
+    // Calcola il numero totale di step nel corso
+    final totalSteps = widget.course.sections
+        .map((s) => s.steps.length)
+        .reduce((a, b) => a + b);
+    
+    // Calcola il punto di blocco (30% del totale)
+    final unlockLimit = (totalSteps * 0.3).round();
+    var stepCounter = 0;
+    
+    print('DEBUG: Stato Pro: $isPro');
+    print('DEBUG: Totale step corso: $totalSteps');
+    print('DEBUG: Limite sblocco (30%): $unlockLimit');
 
     return Future.wait(
       widget.course.sections.map((section) async {
         int completedSteps = 0;
-        int totalSteps = section.steps.length;
-
-        // Controlla ogni step della sezione
-        for (var step in section.steps) {
+        List<bool> stepsCompleted = [];
+        
+        // Verifica se questa sezione contiene step oltre il limite del 30%
+        bool containsLockedSteps = !isPro && stepCounter + section.steps.length > unlockLimit;
+        int lockIndex = containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length;
+        
+        print('DEBUG: Sezione ${section.title} - Start at: $stepCounter, Lock at: $lockIndex');
+        
+        for (var i = 0; i < section.steps.length; i++) {
+          final step = section.steps[i];
           bool isStepCompleted = false;
+          bool isStepLocked = !isPro && i >= lockIndex;
 
-          if (step.type == 'video') {
-            final videoId = step.videoUrl ?? step.content;
-            print('\n=== DEBUG VIDEO MATCHING ===');
-            print('Step video URL/content: $videoId');
-            print('\nVideo salvati:');
-            watchedVideos.forEach((video) {
-              print('\nVideo salvato:');
-              print('- videoId: ${video.videoId}');
-              print('- completed: ${video.completed}');
-              // Aggiungi altri campi disponibili nella classe VideoWatched
-            });
-            
-            final isCompleted = watchedVideos.any((video) => 
-              video.videoId == videoId && 
-              video.completed
-            );
-            print('\nRisultato matching: ${isCompleted ? "TROVATO" : "NON TROVATO"}');
-            print('============================\n');
-            isStepCompleted = isCompleted;
-          } else if (step.type == 'question') {
-            // Verifica se la domanda è stata risposta
-            isStepCompleted = answeredQuestions.contains(step.content);
+          if (!isStepLocked) {
+            if (step.type == 'video') {
+              final videoId = step.videoUrl ?? step.content;
+              isStepCompleted = userModel.WatchedVideos[widget.course.topic]?.any((video) => 
+                video.videoId == videoId && 
+                video.completed
+              ) ?? false;
+            } else if (step.type == 'question') {
+              isStepCompleted = userModel.answeredQuestions[widget.course.topic]?.contains(step.content) ?? false;
+            }
           }
 
-          if (isStepCompleted) {
-            completedSteps++;
-          }
+          stepsCompleted.add(isStepCompleted);
+          if (isStepCompleted) completedSteps++;
         }
+
+        stepCounter += section.steps.length;
 
         return {
           'currentStep': completedSteps,
-          'totalSteps': totalSteps,
-          'isCompleted': completedSteps == totalSteps
+          'totalSteps': section.steps.length,
+          'isCompleted': completedSteps == section.steps.length,
+          'stepsCompleted': stepsCompleted,
+          'lockIndex': lockIndex,
+          'containsLockedSteps': containsLockedSteps
         };
       }),
     );
@@ -242,8 +250,21 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
   Widget _buildSectionCard(Section section, Map<String, dynamic> progressData, int index) {
     final completedSteps = progressData['currentStep'] as int;
     final totalSteps = progressData['totalSteps'] as int;
-    final isCompleted = progressData['isCompleted'] as bool;
+    final isSectionCompleted = progressData['isCompleted'] as bool;
+    final stepsCompleted = progressData['stepsCompleted'] as List<bool>;
     final progress = completedSteps / totalSteps;
+    final lockIndex = progressData['lockIndex'] as int;
+    final containsLockedSteps = progressData['containsLockedSteps'] as bool;
+    
+    // Calcola il numero totale di step nel corso
+    int totalCourseSteps = widget.course.sections.fold(0, (sum, section) => sum + section.steps.length);
+    final lockedStepIndex = (totalCourseSteps * 0.3).floor();
+    
+    // Calcola l'indice globale del primo step di questa sezione
+    int globalStartIndex = 0;
+    for (var i = 0; i < index; i++) {
+      globalStartIndex += widget.course.sections[i].steps.length;
+    }
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -251,7 +272,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         color: Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isCompleted ? Colors.yellowAccent.withOpacity(0.3) : Colors.white.withOpacity(0.08),
+          color: isSectionCompleted ? Colors.yellowAccent.withOpacity(0.3) : Colors.white.withOpacity(0.08),
           width: 1,
         ),
         boxShadow: [
@@ -263,7 +284,12 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         ],
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          listTileTheme: ListTileThemeData(
+            dense: true,
+          ),
+        ),
         child: ExpansionTile(
           tilePadding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           childrenPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -365,14 +391,14 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                       value: progress,
                       backgroundColor: Color(0xFF2D2D2D),
                       valueColor: AlwaysStoppedAnimation(
-                        isCompleted 
+                        isSectionCompleted 
                             ? Colors.yellowAccent 
                             : Colors.yellowAccent.withOpacity(0.7),
                       ),
                       minHeight: 3,
                     ),
                   ),
-                  if (isCompleted)
+                  if (isSectionCompleted)
                     Positioned(
                       right: 0,
                       top: -8,
@@ -393,17 +419,24 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
               itemCount: section.steps.length,
               itemBuilder: (context, stepIndex) {
                 final step = section.steps[stepIndex];
-                return FutureBuilder<bool>(
-                  future: _isStepCompleted(step),
-                  builder: (context, snapshot) {
-                    final isStepCompleted = snapshot.data ?? false;
-                    return _buildStepItem(
-                      step: step,
-                      stepNumber: stepIndex + 1,
-                      isCurrentStep: stepIndex == completedSteps,
-                      isCompleted: isStepCompleted,
-                      onTap: () => _handleStepSelection(section, stepIndex),
-                    );
+                final isStepCompleted = stepsCompleted[stepIndex];
+                final lockIndex = progressData['lockIndex'] as int;
+                final isLocked = progressData['containsLockedSteps'] as bool && stepIndex >= lockIndex;
+                
+                return _buildStepItem(
+                  step: step,
+                  stepNumber: stepIndex + 1,
+                  isCurrentStep: stepIndex == completedSteps,
+                  isCompleted: isStepCompleted,
+                  isLocked: isLocked,
+                  onTap: () {
+                    if (!isLocked) {
+                      _handleStepSelection(section, stepIndex);
+                    } else {
+                      // Naviga direttamente alla schermata di abbonamento
+                      if (!kIsWeb) Navigator.pop(context);
+                      Navigator.pushNamed(context, '/subscription');
+                    }
                   },
                 );
               },
@@ -420,7 +453,15 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     required bool isCurrentStep,
     required bool isCompleted,
     required VoidCallback onTap,
+    required bool isLocked,
   }) {
+    // Determina il colore base in base allo stato
+    final Color baseColor = isLocked 
+        ? Colors.grey[600]! 
+        : (isCompleted 
+            ? Colors.yellowAccent 
+            : Colors.white);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -447,22 +488,23 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
             Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: isCompleted 
-                    ? Colors.yellowAccent.withOpacity(0.15)
-                    : Colors.grey[800]!.withOpacity(0.3),
+                color: isLocked 
+                    ? Colors.grey[800]!.withOpacity(0.15)
+                    : (isCompleted 
+                        ? Colors.yellowAccent.withOpacity(0.15)
+                        : Colors.grey[800]!.withOpacity(0.3)),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    step.type == 'video' ? FontAwesomeIcons.play : FontAwesomeIcons.question,
-                    color: isCompleted 
-                        ? Colors.yellowAccent
-                        : Colors.grey[400],
+                    isLocked 
+                        ? Icons.lock
+                        : (step.type == 'video' ? FontAwesomeIcons.play : FontAwesomeIcons.question),
+                    color: baseColor,
                     size: 14,
                   ),
-                 
                 ],
               ),
             ),
@@ -471,13 +513,14 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
               child: Text(
                 _getStepTitle(step),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(
-                    isCurrentStep ? 1 : 0.7,
-                  ),
+                  color: isLocked 
+                      ? Colors.white.withOpacity(0.3)
+                      : baseColor,
                   fontSize: 14,
                   fontWeight: isCurrentStep 
                       ? FontWeight.w500 
                       : FontWeight.normal,
+                  decoration: isLocked ? TextDecoration.lineThrough : null,
                 ),
               ),
             ),
@@ -485,11 +528,13 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
               Text(
                 '${step.duration} min',
                 style: TextStyle(
-                  color: Colors.grey[500],
+                  color: isLocked 
+                      ? Colors.grey[700] 
+                      : (isCompleted ? Colors.yellowAccent : Colors.grey[500]),
                   fontSize: 12,
                 ),
               ),
-            if (isCompleted)
+            if (isCompleted && !isLocked)
               Container(
                 margin: EdgeInsets.only(left: 8),
                 padding: EdgeInsets.all(4),
@@ -537,47 +582,47 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     return '';
   }
 
-void _handleStepSelection(Section section, int stepIndex) {
-  // Aggiorna il currentStep nel database per la nuova sezione
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-      'currentSteps.${section.title}': stepIndex
-    });
-  }
-
-  int indexForNavigation = stepIndex; // Valore di default: indice locale
-
-  if (kIsWeb) {
-    // Calcola l'indice globale per la piattaforma web
-    int globalIndex = 0;
-    for (var s in widget.course.sections) {
-      if (s.title == section.title) {
-        globalIndex += stepIndex;
-        break;
-      }
-      globalIndex += s.steps.length;
+  void _handleStepSelection(Section section, int stepIndex) {
+    // Aggiorna il currentStep nel database per la nuova sezione
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'currentSteps.${section.title}': stepIndex
+      });
     }
-    indexForNavigation = globalIndex;
-  } else {
-    // Su mobile, chiudi il bottom sheet prima della navigazione
-    Navigator.pop(context);
+
+    int indexForNavigation = stepIndex; // Valore di default: indice locale
+
+    if (kIsWeb) {
+      // Calcola l'indice globale per la piattaforma web
+      int globalIndex = 0;
+      for (var s in widget.course.sections) {
+        if (s.title == section.title) {
+          globalIndex += stepIndex;
+          break;
+        }
+        globalIndex += s.steps.length;
+      }
+      indexForNavigation = globalIndex;
+    } else {
+      // Su mobile, chiudi il bottom sheet prima della navigazione
+      Navigator.pop(context);
+    }
+
+    // Utilizza l'indice appropriato per la navigazione
+    widget.onSelectSection(section, indexForNavigation);
+
+    // Invia l'evento a Posthog
+    Posthog().capture(
+      eventName: 'step_selected',
+      properties: {
+        'section': section.title,
+        'stepIndex': stepIndex,
+        'usedIndex': indexForNavigation,
+        'platform': kIsWeb ? 'web' : 'mobile'
+      },
+    );
   }
-
-  // Utilizza l'indice appropriato per la navigazione
-  widget.onSelectSection(section, indexForNavigation);
-
-  // Invia l'evento a Posthog
-  Posthog().capture(
-    eventName: 'step_selected',
-    properties: {
-      'section': section.title,
-      'stepIndex': stepIndex,
-      'usedIndex': indexForNavigation,
-      'platform': kIsWeb ? 'web' : 'mobile'
-    },
-  );
-}
 
   int _calculateTotalTime(Section section) {
     int totalVideos = section.steps.where((step) => step.type == 'video').length;
@@ -630,4 +675,6 @@ void _handleStepSelection(Section section, int stepIndex) {
     final match = regex.firstMatch(url);
     return match?.group(1) ?? url;
   }
+
+
 } 
