@@ -1,3 +1,4 @@
+import 'package:Just_Learn/web/layout/web_main_layout.dart';
 import 'package:Just_Learn/web/screens/web_home_screen.dart';
 import 'package:Just_Learn/web/screens/web_onboarding_screen.dart';
 import 'package:flutter/material.dart';
@@ -209,7 +210,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
                 );
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => WebHomeScreen()),
+                  MaterialPageRoute(builder: (context) => WebMainLayout()),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -463,7 +464,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => WebHomeScreen()),
+          MaterialPageRoute(builder: (context) => WebMainLayout()),
         );
       }
     } catch (e) {
@@ -492,7 +493,7 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       } else {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => WebHomeScreen()),
+          MaterialPageRoute(builder: (context) => WebMainLayout()),
         );
       }
     } catch (e) {
