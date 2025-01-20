@@ -13,6 +13,7 @@ import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:Just_Learn/main.dart';
 import 'package:Just_Learn/services/notification_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:Just_Learn/services/purchase_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -33,6 +34,11 @@ class _SplashScreenState extends State<SplashScreen> {
 Future<void> _navigateToNextScreen() async {
   try {
     await Future.delayed(const Duration(seconds: 1));
+
+    // Verifica lo stato dell'abbonamento
+    final customerInfo = await PurchaseService.getCustomerInfo();
+    final isPro = PurchaseService.isProUser(customerInfo);
+    print('DEBUG: Utente Pro: $isPro');
 
     if (kIsWeb) {
       final user = FirebaseAuth.instance.currentUser;
@@ -120,6 +126,12 @@ Future<void> _navigateToNextScreen() async {
         await notificationService.getAndUpdateToken();
       }
       
+      // Aggiorna lo stato premium dell'utente in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userModel.uid)
+          .update({'isPro': isPro});
+
       _navigateToMainScreen(userModel);
     } else {
       print('DEBUG: No user model found');

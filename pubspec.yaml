@@ -44,6 +44,7 @@ dependencies:
   video_player: ^2.9.2
   table_calendar: ^3.0.9
   add_2_calendar: ^2.2.4
+  purchases_flutter: ^8.4.1
 
 dev_dependencies:
   flutter_test:

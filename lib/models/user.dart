@@ -32,6 +32,7 @@ class UserModel {
   final String subscriptionDescription3;
   final String? location;
   final List<StartedCourse> startedCourses;
+  final bool isPro;
 
   UserModel({
     required this.uid,
@@ -64,6 +65,7 @@ class UserModel {
     this.subscriptionDescription3 = 'Full access to this user\'s content',
     this.location,
     this.startedCourses = const [],
+    this.isPro = false,
   }) ;
  
 
@@ -128,6 +130,7 @@ class UserModel {
       startedCourses: (data['startedCourses'] as List<dynamic>?)
           ?.map((course) => StartedCourse.fromMap(course))
           .toList() ?? [],
+      isPro: data['isPro'] ?? false,
     );
   }
 
@@ -164,6 +167,7 @@ class UserModel {
       'subscriptionDescription3': subscriptionDescription3,
       'location': location,
       'startedCourses': startedCourses.map((course) => course.toMap()).toList(),
+      'isPro': isPro,
     };
   }
 }

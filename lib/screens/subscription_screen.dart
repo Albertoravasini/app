@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import '../services/purchase_service.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({Key? key}) : super(key: key);
@@ -17,6 +19,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
   late AnimationController _pulseController;
   late ScrollController _scrollController;
   double _opacity = 1.0;
+  List<Offering>? _offerings;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -28,6 +32,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
         final opacity = (1 - (offset / 100).clamp(0, 1)).toDouble();
         setState(() => _opacity = opacity);
       });
+    _loadOfferings();
     Posthog().screen(
       screenName: 'Subscription Screen',
       properties: {
@@ -70,8 +75,32 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     }
   }
 
+  Future<void> _loadOfferings() async {
+    try {
+      final offerings = await Purchases.getOfferings();
+      final offering = offerings.getOffering("premium"); // Usa l'ID dell'offering configurato
+      
+      print('DEBUG: Offering trovato: ${offering?.identifier}');
+      print('DEBUG: Pacchetti disponibili: ${offering?.availablePackages.length}');
+      
+      setState(() {
+        _offerings = offering != null ? [offering] : [];
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Errore nel caricamento delle offerte: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
       body: CustomScrollView(
@@ -487,28 +516,86 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
   }
 
   Future<void> _handleSubscribe() async {
-    await _incrementClickCount();
-    
-    // Tracciamento migliorato con Posthog
-    Posthog().capture(
-      eventName: 'subscription_purchase_attempted',
-      properties: {
-        'plan_type': selectedPlan,
-        'price': selectedPlan == 'annual' ? 29.99 : 9.99,
-        'currency': 'USD',
-        'timestamp': DateTime.now().toIso8601String(),
-        'screen': 'subscription_screen',
-        'button_clicked': 'start_premium_now'
-      },
-    );
+    try {
+      setState(() => _isLoading = true);
+      
+      final offerings = await PurchaseService.getOfferings();
+      if (offerings.isEmpty) {
+        throw 'Nessuna offerta disponibile';
+      }
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('The premium version will be available soon!'),
-        duration: Duration(seconds: 3),
-      ),
-    );
+      final offering = offerings.first;
+      final package = PurchaseService.getPackageForPlan(offering, selectedPlan);
+      
+      if (package == null) {
+        throw 'Pacchetto non trovato';
+      }
+
+      print('DEBUG: Tentativo di acquisto pacchetto: ${package.identifier}');
+      
+      // Mostra un indicatore di caricamento
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      final customerInfo = await PurchaseService.purchasePackage(package);
+      
+      // Chiudi il dialog di caricamento
+      Navigator.of(context).pop();
+      
+      if (PurchaseService.isProUser(customerInfo)) {
+        // Traccia l'evento con Posthog
+        Posthog().capture(
+          eventName: 'subscription_purchased',
+          properties: {
+            'plan_type': selectedPlan,
+            'package_id': package.identifier,
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+        );
+
+        await _incrementClickCount();
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Abbonamento attivato con successo!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Chiudi la schermata di abbonamento
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      // Chiudi il dialog di caricamento se è aperto
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+      
+      // Mostra un messaggio di errore appropriato
+      String errorMessage = 'Errore durante l\'acquisto';
+      if (e.toString().contains('cancellato')) {
+        errorMessage = 'Acquisto cancellato';
+      } else if (e.toString().contains('non consentiti')) {
+        errorMessage = 'Acquisti non consentiti su questo dispositivo';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Widget _buildAnimatedBackground() {

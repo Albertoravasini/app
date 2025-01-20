@@ -28,6 +28,7 @@ import 'web/screens/web_home_screen.dart';
 import 'screens/NotificationsScreen.dart';
 import 'web/screens/web_landing_screen.dart';
 import 'screens/courses_list_screen.dart';
+import 'services/purchase_service.dart';
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -48,6 +49,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inizializza RevenueCat
+  await PurchaseService.init();
   
   try {
     await Firebase.initializeApp(

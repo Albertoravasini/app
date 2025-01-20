@@ -88,5 +88,23 @@
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<key>StoreKit</key>
+	<dict>
+		<key>DefaultStoreKitConfigurationName</key>
+		<string>Configuration</string>
+	</dict>
+
+    <!-- Configurazione RevenueCat -->
+    <key>RevenueCat</key>
+    <dict>
+        <key>APIKey</key>
+        <string>appl_BnISKxsimQBUpioTfnyWehngrIE</string>
+    </dict>
+
+    <!-- Permessi per gli acquisti in-app -->
+    <key>com.apple.developer.in-app-payments</key>
+    <array>
+        <string>merchant.com.yourapp.payments</string>
+    </array>
 </dict>
 </plist>
