@@ -149,17 +149,8 @@ class _WebHomeScreenState extends State<WebHomeScreen> {
         // CommentsScreen (a destra)
         Container(
           width: 400,
-          height: double.infinity,
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            border: Border(
-              left: BorderSide(
-                color: Colors.white.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-            
-            
+            color: Color(0xFF111111),
           ),
           child: ClipRRect(
             child: CommentsScreen(

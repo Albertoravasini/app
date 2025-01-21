@@ -4,6 +4,7 @@ import '../widgets/web_sidebar.dart';
 import '../widgets/web_header.dart';
 import '../screens/web_explore_screen.dart';
 import '../screens/web_home_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class WebMainLayout extends StatefulWidget {
   const WebMainLayout({Key? key}) : super(key: key);
@@ -17,6 +18,7 @@ class _WebMainLayoutState extends State<WebMainLayout> {
   Course? _selectedCourse;
   Section? _selectedSection;
   late final List<Widget> _screens;
+  bool _isSidebarExpanded = true;
 
   @override
   void initState() {
@@ -56,27 +58,30 @@ class _WebMainLayoutState extends State<WebMainLayout> {
         : _screens[_currentIndex];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: const Color(0xFF111111),
       body: Column(
         children: [
-          WebHeader(),
+          WebHeader(
+            isAuthenticated: FirebaseAuth.instance.currentUser != null,
+            onMenuPressed: () {
+              setState(() {
+                _isSidebarExpanded = !_isSidebarExpanded;
+              });
+            },
+          ),
           Expanded(
             child: Row(
               children: [
-                Container(
-                  width: 240,
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  width: _isSidebarExpanded ? 240 : 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    border: Border(
-                      right: BorderSide(
-                        color: Colors.white.withOpacity(0.1),
-                        width: 1,
-                      ),
-                    ),
+                    color: const Color(0xFF111111),
                   ),
                   child: WebSidebar(
                     currentIndex: _currentIndex,
                     onNavigate: onNavigate,
+                    isExpanded: _isSidebarExpanded,
                   ),
                 ),
                 Expanded(

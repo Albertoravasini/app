@@ -292,18 +292,25 @@ void _onPageChanged(int index) async {
           .get();
       
       final userData = UserModel.fromMap(userDoc.data()!);
-      if (!userData.isPro) {  // Controlla solo se l'utente non è Pro
+      
+      // Verifica solo se l'utente NON è pro
+      if (!userData.isPro) {
         final totalSteps = currentCourse!.sections.fold<int>(
           0, (sum, section) => sum + section.steps.length);
         final lockIndex = (totalSteps * 0.3).ceil();
 
-        if (index >= lockIndex && !await _isUserSubscribed()) {
+        if (index >= lockIndex) {
+          // Pausa il video e mostra il paywall immediatamente
           _videoManager.pauseCurrentVideo();
+          
           if (_pageController.hasClients) {
+            // Usa jumpToPage invece di animateToPage per una risposta immediata
             _pageController.jumpToPage(lockIndex - 1);
-          }
-          if (mounted) {
-            Navigator.pushNamed(context, '/subscription');
+            
+            // Mostra immediatamente la schermata di abbonamento
+            if (mounted) {
+              await Navigator.of(context).pushNamed('/subscription');
+            }
           }
           return;
         }
@@ -998,8 +1005,10 @@ Widget build(BuildContext context) {
   }
 
   Future<bool> _isUserSubscribed() async {
+    print('DEBUG: Inizio verifica sottoscrizione');
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && currentCourse != null) {
+      print('DEBUG: Verifico sottoscrizione per utente: ${user.uid} e corso: ${currentCourse!.id}');
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -1007,9 +1016,14 @@ Widget build(BuildContext context) {
       
       if (userDoc.exists) {
         final userData = UserModel.fromMap(userDoc.data()!);
-        return userData.subscriptions.contains(currentCourse!.authorId);
+        final isSubscribed = userData.subscriptions.contains(currentCourse!.authorId);
+        print('DEBUG: Sottoscrizioni utente: ${userData.subscriptions}');
+        print('DEBUG: Author ID corso: ${currentCourse!.authorId}');
+        print('DEBUG: Risultato verifica sottoscrizione: $isSubscribed');
+        return isSubscribed || userData.isPro;
       }
     }
+    print('DEBUG: Utente non sottoscritto (default false)');
     return false;
   }
 }

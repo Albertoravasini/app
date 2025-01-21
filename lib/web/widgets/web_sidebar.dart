@@ -5,18 +5,20 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 class WebSidebar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onNavigate;
+  final bool isExpanded;
 
   const WebSidebar({
     Key? key,
     required this.currentIndex,
     required this.onNavigate,
+    this.isExpanded = true,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 240,
-      color: const Color(0xFF1A1A1A),
+      width: isExpanded ? 240 : 80,
+      color: Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -29,18 +31,21 @@ class WebSidebar extends StatelessWidget {
               label: 'Home',
               isSelected: currentIndex == 0,
               onTap: () => onNavigate(0),
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.compass,
-              label: 'Explore',
+              label: 'Courses',
               isSelected: currentIndex == 1,
               onTap: () => onNavigate(1),
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.play,
               label: 'Shorts',
               badge: '9+',
               onTap: () {},
+              showLabel: isExpanded,
             ),
           ]),
 
@@ -51,21 +56,25 @@ class WebSidebar extends StatelessWidget {
               icon: FontAwesomeIcons.book,
               label: 'My Courses',
               onTap: () {},
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.clock,
               label: 'Watch Later',
               onTap: () {},
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.heart,
               label: 'Liked',
               onTap: () {},
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.clockRotateLeft,
               label: 'History',
               onTap: () {},
+              showLabel: isExpanded,
             ),
           ]),
 
@@ -77,11 +86,13 @@ class WebSidebar extends StatelessWidget {
               label: 'Top Teachers',
               badge: 'NEW',
               onTap: () {},
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.users,
               label: 'Communities',
               onTap: () {},
+              showLabel: isExpanded,
             ),
           ]),
 
@@ -93,11 +104,13 @@ class WebSidebar extends StatelessWidget {
               icon: FontAwesomeIcons.gear,
               label: 'Settings',
               onTap: () {},
+              showLabel: isExpanded,
             ),
             _NavItem(
               icon: FontAwesomeIcons.circleQuestion,
               label: 'Help Center',
               onTap: () {},
+              showLabel: isExpanded,
             ),
           ]),
         ],
@@ -107,7 +120,7 @@ class WebSidebar extends StatelessWidget {
 
   Widget _buildSection(List<Widget> items) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: items,
@@ -137,6 +150,7 @@ class _NavItem extends StatelessWidget {
   final bool isSelected;
   final String? badge;
   final VoidCallback onTap;
+  final bool showLabel;
 
   const _NavItem({
     required this.icon,
@@ -144,12 +158,13 @@ class _NavItem extends StatelessWidget {
     this.isSelected = false,
     this.badge,
     required this.onTap,
+    this.showLabel = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(12),
@@ -158,45 +173,51 @@ class _NavItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           hoverColor: Colors.white.withOpacity(0.05),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
             ),
             child: Row(
+              mainAxisSize: showLabel ? MainAxisSize.max : MainAxisSize.min,
               children: [
                 Icon(
                   icon,
                   size: 20,
                   color: isSelected ? Colors.yellowAccent : Colors.grey[400],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: GoogleFonts.inter(
-                      color: isSelected ? Colors.white : Colors.grey[400],
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-                if (badge != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.yellowAccent.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                if (showLabel) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Text(
-                      badge!,
+                      label,
                       style: GoogleFonts.inter(
-                        color: Colors.yellowAccent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.white : Colors.grey[400],
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
                   ),
+                  if (badge != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        badge!,
+                        style: GoogleFonts.inter(
+                          color: Colors.yellowAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           ),

@@ -7,18 +7,21 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/user.dart';
 
 class WebHeader extends StatelessWidget {
+  final bool isAuthenticated;
+  final VoidCallback? onMenuPressed;
+
+  const WebHeader({
+    Key? key,
+    this.isAuthenticated = false,
+    this.onMenuPressed,
+  }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 120, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.8),
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
-        ),
+        color: Color(0xFF111111),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -26,9 +29,17 @@ class WebHeader extends StatelessWidget {
           // Logo e navigazione principale
           Row(
             children: [
+              if (isAuthenticated) 
+                IconButton(
+                  icon: Icon(Icons.menu, color: Colors.white),
+                  onPressed: onMenuPressed,
+                ),
+              SizedBox(width: 16),
               Image.asset('assets/Just_Learn.png', height: 32),
-              SizedBox(width: 48),
-              _buildNavLinks(),
+              if (!isAuthenticated) ...[
+                SizedBox(width: 48),
+                _buildNavLinks(),
+              ],
             ],
           ),
 
