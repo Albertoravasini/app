@@ -2,6 +2,7 @@ import 'package:Just_Learn/models/user.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../models/course.dart';
 import '../services/course_service.dart';
@@ -555,7 +556,6 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
 
   /// Card generica per un corso, con qualche tocco di UI e ombre
   Widget _buildCourseCard(Course course) {
-    // Calcolo del progresso e durata
     int totalSteps = 0;
     int completedStepsCount = 0;
     int totalDuration = _calculateTotalDuration(course);
@@ -573,30 +573,35 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
     
     final progress = totalSteps > 0 ? completedStepsCount / totalSteps : 0.0;
     final remainingMinutes = (totalDuration * (1 - progress)).round();
+    final isStarted = _userStartedCourses.contains(course);
 
     return Container(
-      width: 260,
-      height: _userStartedCourses.contains(course) ? 300 : 260,
+      width: 280,
+      height: isStarted ? 320 : 280,
       margin: const EdgeInsets.symmetric(horizontal: 8),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         onTap: () => _showCoursePreview(course),
         child: Card(
           color: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.white.withOpacity(0.05),
+              width: 1,
+            ),
           ),
           elevation: 8,
           shadowColor: Colors.black45,
           child: Column(
             children: [
-              // Immagine con rating sovrapposto
+              // Immagine con overlay
               Stack(
                 children: [
                   SizedBox(
-                    height: 140,
+                    height: 160,
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                       child: Hero(
                         tag: 'course-${course.id}',
                         child: Image.network(
@@ -604,10 +609,10 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                           width: double.infinity,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[800],
+                            color: Colors.grey[900],
                             child: Icon(
                               Icons.school,
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withOpacity(0.2),
                               size: 48,
                             ),
                           ),
@@ -615,35 +620,80 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                       ),
                     ),
                   ),
-                  // Rating overlay
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  // Overlay scuro sfumato
+                  Positioned.fill(
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.6),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            color: Colors.yellowAccent,
-                            size: 18,
+                    ),
+                  ),
+                  // Rating e durata
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            course.rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Colors.yellowAccent,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                course.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                FontAwesomeIcons.clock,
+                                color: Colors.white70,
+                                size: 12,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$totalDuration min',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -662,41 +712,44 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.bold,
                           height: 1.2,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: Text(
-                          course.description,
-                          maxLines: _userStartedCourses.contains(course) ? 2 : 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 13,
+                      if (!isStarted) ...[
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: Text(
+                            course.description,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
                           ),
                         ),
-                      ),
-                      if (_userStartedCourses.contains(course)) ...[
-                        const SizedBox(height: 12),
+                      ] else ...[
+                        const Spacer(),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Text(
-                                '${(progress * 100).round()}% completato',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                ),
+                            Text(
+                              '${(progress * 100).round()}% completato',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
                               '$remainingMinutes min rimanenti',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.5),
-                                fontSize: 12,
+                                fontSize: 13,
                               ),
                             ),
                           ],

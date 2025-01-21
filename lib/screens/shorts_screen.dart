@@ -562,7 +562,7 @@ void dispose() {
   Widget _buildQuestionCard(LevelStep step, Level level) {
     return Container(
       padding: const EdgeInsets.only(top: 80, right: 16, left: 16),
-      alignment: Alignment.center, // Centra il contenuto verticalmente
+      alignment: Alignment.center,
       child: CourseQuestionCard(
         step: step,
         onAnswered: (isCorrect) {
@@ -573,7 +573,10 @@ void dispose() {
         onCompleteStep: () {
           // Manteniamo vuoto questo callback come prima
         },
-        topic: widget.selectedTopic ?? 'Just Learn',
+        // Usa il topic del corso corrente se siamo in modalità corso
+        topic: isInCourseMode && currentCourse != null 
+            ? currentCourse!.topic 
+            : (widget.selectedTopic ?? 'Just Learn'),
       ),
     );
   }

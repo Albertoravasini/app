@@ -44,9 +44,35 @@ class CourseInfoOverlay extends StatefulWidget {
   _CourseInfoOverlayState createState() => _CourseInfoOverlayState();
 }
 
-class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
+class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTickerProviderStateMixin {
+  late AnimationController _buttonController;
+  late Animation<double> _scaleAnimation;
   bool _showUnlockOptions = false;
   bool _isAnimating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _buttonController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(
+      CurvedAnimation(
+        parent: _buttonController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _buttonController.dispose();
+    super.dispose();
+  }
 
   Widget _buildPlaceholder(bool isLoading) {
     return Container(
@@ -61,26 +87,69 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
   }
 
   Widget _buildStartCourseButton() {
-    return Hero(
-      tag: 'startCourse${widget.course!.id}',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: double.infinity,
-        height: 38,
-        decoration: BoxDecoration(
-          color: _showUnlockOptions ? Colors.transparent : const Color(0xFFFFFF28),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: _showUnlockOptions ? null : _handleStartCourse,
-            child: _showUnlockOptions
-                ? _buildUnlockOptions()
-                : _buildDefaultStartButton(),
+    return FutureBuilder<bool>(
+      future: _isCourseStarted(),
+      builder: (context, snapshot) {
+        final bool isStarted = snapshot.data ?? false;
+        
+        return Hero(
+          tag: 'startCourse${widget.course!.id}',
+          child: GestureDetector(
+            onTapDown: (_) => _buttonController.forward(),
+            onTapUp: (_) {
+              _buttonController.reverse();
+              if (!_showUnlockOptions) _handleStartCourse();
+            },
+            onTapCancel: () => _buttonController.reverse(),
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: double.infinity,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: _showUnlockOptions 
+                    ? Colors.transparent 
+                    : isStarted 
+                      ? const Color(0xFFFFFF28).withOpacity(0.15)
+                      : const Color(0xFFFFFF28),
+                  borderRadius: BorderRadius.circular(8),
+                  border: isStarted 
+                    ? Border.all(
+                        color: const Color(0xFFFFFF28),
+                        width: 2,
+                      ) 
+                    : null,
+                ),
+                child: _showUnlockOptions
+                  ? _buildUnlockOptions()
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isStarted ? 'Continue' : 'Start Course',
+                            style: TextStyle(
+                              color: isStarted ? const Color(0xFFFFFF28) : Colors.black,
+                              fontSize: 14,
+                              fontFamily: 'Montserrat',
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: isStarted ? const Color(0xFFFFFF28) : Colors.black,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
@@ -106,61 +175,29 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
     );
   }
 
-  Widget _buildDefaultStartButton() {
-    return FutureBuilder<bool>(
-      future: _hasCourseProgress(),
-      builder: (context, snapshot) {
-        final hasProgress = snapshot.data ?? false;
-        
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Padding(
-              padding: EdgeInsets.only(left: 16),
-              child: Text(
-                hasProgress ? 'Continue' : 'Start Course',
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 14,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.black),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<bool> _hasCourseProgress() async {
+  Future<bool> _isCourseStarted() async {
     if (widget.course == null) return false;
     
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
-    if (!userDoc.exists) return false;
+      if (!userDoc.exists) return false;
 
-    final userData = userDoc.data() as Map<String, dynamic>;
-    final currentSteps = Map<String, dynamic>.from(userData['currentSteps'] ?? {});
-    
-    // Controlla se c'è progresso in qualsiasi sezione del corso
-    for (var section in widget.course!.sections) {
-      if (currentSteps.containsKey(section.title)) {
-        return true;
-      }
+      final startedCourses = List<Map<String, dynamic>>.from(
+        userDoc.data()?['startedCourses'] ?? []
+      );
+
+      return startedCourses.any((course) => course['courseId'] == widget.course!.id);
+    } catch (e) {
+      print('Error checking if course is started: $e');
+      return false;
     }
-
-    return false;
   }
 
   void _handleStartCourse() async {
@@ -169,7 +206,6 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
       if (user != null) {
         try {
           final hasSubscription = await widget.controller.hasSubscription(widget.course!.authorId);
-          final hasProgress = await _hasCourseProgress();
           
           if (widget.course!.isSubscriptionRequired && !hasSubscription) {
             setState(() {
@@ -178,17 +214,55 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
             return;
           }
 
-          // Prima registra il corso come iniziato
-          final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-          final userDoc = await userRef.get();
+          // Recupera i dati dell'utente
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+              
+          if (!userDoc.exists) return;
+          
+          final userModel = UserModel.fromMap(userDoc.data()!);
+          
+          // Trova l'ultimo step completato
+          int lastCompletedSectionIndex = 0;
+          int lastCompletedStepIndex = 0;
+          bool foundLastCompleted = false;
+
+          // Itera attraverso le sezioni e gli step per trovare l'ultimo completato
+          for (int sectionIndex = 0; sectionIndex < widget.course!.sections.length; sectionIndex++) {
+            final section = widget.course!.sections[sectionIndex];
+            
+            for (int stepIndex = 0; stepIndex < section.steps.length; stepIndex++) {
+              final step = section.steps[stepIndex];
+              bool isCompleted = false;
+
+              if (step.type == 'video') {
+                // Controlla se il video è stato completato
+                final videoId = step.videoUrl ?? step.content;
+                isCompleted = userModel.WatchedVideos[widget.course!.topic]?.any(
+                  (video) => video.videoId.contains(videoId) && video.completed
+                ) ?? false;
+              } else if (step.type == 'question') {
+                // Controlla se la domanda è stata risposta
+                isCompleted = userModel.answeredQuestions[widget.course!.topic]?.contains(step.content) ?? false;
+              }
+
+              if (isCompleted) {
+                lastCompletedSectionIndex = sectionIndex;
+                lastCompletedStepIndex = stepIndex + 1; // Punta al prossimo step
+                foundLastCompleted = true;
+              }
+            }
+          }
+
+          // Registra il corso come iniziato se non lo è già
           final startedCourses = List<Map<String, dynamic>>.from(
             (userDoc.data()?['startedCourses'] ?? [])
           );
 
-          // Verifica se il corso è già stato iniziato
           if (!startedCourses.any((course) => course['courseId'] == widget.course!.id)) {
-            // Aggiorna startedCourses nell'utente
-            await userRef.update({
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
               'startedCourses': FieldValue.arrayUnion([
                 {
                   'courseId': widget.course!.id,
@@ -198,15 +272,26 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> {
               ])
             });
 
-            // Aggiorna anche enrolledStudents nel corso
             await widget.course!.enrollStudent(user.uid);
           }
 
-          // Poi avvia il corso
-          widget.controller.onStartCourse(widget.course, null);
-          
+          // Avvia il corso dall'ultimo punto completato o dall'inizio
+          if (foundLastCompleted && 
+              lastCompletedSectionIndex < widget.course!.sections.length &&
+              lastCompletedStepIndex < widget.course!.sections[lastCompletedSectionIndex].steps.length) {
+            widget.controller.onStartCourse(
+              widget.course,
+              widget.course!.sections[lastCompletedSectionIndex],
+              initialStepIndex: lastCompletedStepIndex,
+            );
+          } else {
+            // Se non ci sono step completati o siamo alla fine, parti dall'inizio
+            widget.controller.onStartCourse(widget.course, null);
+          }
+
+          // Tracciamento analytics
           Posthog().capture(
-            eventName: hasProgress ? 'continue_course' : 'start_course',
+            eventName: foundLastCompleted ? 'continue_course' : 'start_course',
             properties: {
               'course_id': widget.course!.id,
               'course_title': widget.course!.title,

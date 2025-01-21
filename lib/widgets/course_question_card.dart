@@ -500,6 +500,7 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
   }
 
   Future<void> _saveAnsweredQuestion() async {
+    print('Saving question for topic: ${widget.topic}'); // Debug print
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -508,6 +509,8 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
         final userData = doc.data() as Map<String, dynamic>;
         final userModel = UserModel.fromMap(userData);
 
+        print('Current answered questions: ${userModel.answeredQuestions}'); // Debug print
+        
         // Verifica se esiste già una lista di domande risposte per il topic corrente
         userModel.answeredQuestions[widget.topic] ??= [];
 
@@ -518,6 +521,8 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
 
           // Aggiorna l'utente nel database con la nuova domanda risolta
           await docRef.update(userModel.toMap());
+          
+          print('Updated answered questions: ${userModel.answeredQuestions}'); // Debug print
         }
       }
     }

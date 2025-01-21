@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../models/course.dart';
 import '../models/event.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class StudentDetailsScreen extends StatefulWidget {
   final UserModel student;
@@ -33,23 +34,30 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Ottieni tutti i corsi su cui lo studente ha fatto progressi
+      // 1. Ottieni l'ID dell'utente corrente (l'insegnante)
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // 2. Ottieni tutti i corsi su cui lo studente ha fatto progressi
       final Set<String> courseTopics = widget.student.WatchedVideos.keys.toSet();
       
+      // 3. Modifica la query per ottenere solo i corsi creati dall'insegnante corrente
       final coursesSnapshot = await FirebaseFirestore.instance
           .collection('courses')
           .where('topic', whereIn: courseTopics.toList())
+          .where('authorId', isEqualTo: currentUser.uid)
           .get();
 
       _completedCourses = coursesSnapshot.docs
           .map((doc) => Course.fromFirestore(doc))
           .toList();
 
-      // 2. Carica gli eventi a cui ha partecipato
-      await _loadAttendedEvents();
-
-      // 3. Carica i passi completati per ogni corso
-      for (var topic in widget.student.WatchedVideos.keys) {
+      // 4. Carica i passi completati solo per i corsi filtrati
+      for (var course in _completedCourses) {
+        final topic = course.topic;
         final watchedVideos = widget.student.WatchedVideos[topic] ?? [];
         final answeredQuestions = widget.student.answeredQuestions[topic] ?? [];
         

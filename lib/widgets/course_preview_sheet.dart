@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:Just_Learn/screens/course_screen.dart';
 import 'package:Just_Learn/screens/profile_screen.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CoursePreviewSheet extends StatefulWidget {
   final Course course;
@@ -22,11 +23,14 @@ class CoursePreviewSheet extends StatefulWidget {
   State<CoursePreviewSheet> createState() => _CoursePreviewSheetState();
 }
 
-class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTickerProviderStateMixin {
+class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProviderStateMixin {
   late AnimationController _animationController;
+  late AnimationController _buttonController;
+  late Animation<double> _scaleAnimation;
   bool isExpanded = false;
   double _scrollOffset = 0;
   String _startButtonText = 'Start Course';
+  bool _showUnlockOptions = false;
 
   // Stato del corso con ValueNotifier per aggiornamenti reattivi
   late final ValueNotifier<CourseState> _courseState;
@@ -38,6 +42,19 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _buttonController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(
+      CurvedAnimation(
+        parent: _buttonController,
+        curve: Curves.easeInOut,
+      ),
+    );
     // Inizializza subito con locked per mostrare il testo
     _courseState = ValueNotifier<CourseState>(CourseState.locked);
     // Poi verifica lo stato reale
@@ -47,6 +64,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
   @override
   void dispose() {
     _animationController.dispose();
+    _buttonController.dispose();
     _courseState.dispose();
     super.dispose();
   }
@@ -141,14 +159,51 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     if (user == null) return;
 
     try {
-      // Prima registra il corso come iniziato
+      // Recupera i dati dell'utente
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
       final userDoc = await userRef.get();
+      
+      if (!userDoc.exists) return;
+      
+      final userModel = UserModel.fromMap(userDoc.data()!);
+      
+      // Trova l'ultimo step completato
+      int lastCompletedSectionIndex = 0;
+      int lastCompletedStepIndex = 0;
+      bool foundLastCompleted = false;
+
+      // Itera attraverso le sezioni e gli step per trovare l'ultimo completato
+      for (int sectionIndex = 0; sectionIndex < widget.course.sections.length; sectionIndex++) {
+        final section = widget.course.sections[sectionIndex];
+        
+        for (int stepIndex = 0; stepIndex < section.steps.length; stepIndex++) {
+          final step = section.steps[stepIndex];
+          bool isCompleted = false;
+
+          if (step.type == 'video') {
+            // Controlla se il video è stato completato
+            final videoId = step.videoUrl ?? step.content;
+            isCompleted = userModel.WatchedVideos[widget.course.topic]?.any(
+              (video) => video.videoId.contains(videoId) && video.completed
+            ) ?? false;
+          } else if (step.type == 'question') {
+            // Controlla se la domanda è stata risposta
+            isCompleted = userModel.answeredQuestions[widget.course.topic]?.contains(step.content) ?? false;
+          }
+
+          if (isCompleted) {
+            lastCompletedSectionIndex = sectionIndex;
+            lastCompletedStepIndex = stepIndex + 1; // Punta al prossimo step
+            foundLastCompleted = true;
+          }
+        }
+      }
+
+      // Registra il corso come iniziato se non lo è già
       final startedCourses = List<Map<String, dynamic>>.from(
-        (userDoc.data()?['startedCourses'] ?? [])
+        userDoc.data()?['startedCourses'] ?? []
       );
 
-      // Verifica se il corso è già stato iniziato
       if (!startedCourses.any((course) => course['courseId'] == widget.course.id)) {
         await userRef.update({
           'startedCourses': FieldValue.arrayUnion([
@@ -163,46 +218,35 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
         await widget.course.enrollStudent(user.uid);
       }
 
-      final userData = userDoc.data() as Map<String, dynamic>;
-      final currentSteps = userData['currentSteps'] as Map<String, dynamic>? ?? {};
-      
-      Section? lastSection;
-      int sectionStepIndex = 0;
-      int globalStepIndex = 0;
-      
-      Map<String, int> sectionStartIndices = {};
-      int runningIndex = 0;
-      
-      for (var section in widget.course.sections) {
-        sectionStartIndices[section.title] = runningIndex;
-        runningIndex += section.steps.length;
-      }
-      
-      for (var section in widget.course.sections.reversed) {
-        if (currentSteps.containsKey(section.title)) {
-          lastSection = section;
-          sectionStepIndex = currentSteps[section.title] as int;
-          globalStepIndex = sectionStartIndices[section.title]! + sectionStepIndex;
-          break;
-        }
-      }
+      // Avvia il corso dall'ultimo punto completato o dall'inizio
+      Section targetSection;
+      int targetStepIndex;
+      bool isResuming = false;
 
-      if (lastSection == null) {
-        lastSection = widget.course.sections.first;
+      if (foundLastCompleted && 
+          lastCompletedSectionIndex < widget.course.sections.length &&
+          lastCompletedStepIndex < widget.course.sections[lastCompletedSectionIndex].steps.length) {
+        targetSection = widget.course.sections[lastCompletedSectionIndex];
+        targetStepIndex = lastCompletedStepIndex;
+        isResuming = true;
+      } else {
+        targetSection = widget.course.sections.first;
+        targetStepIndex = 0;
+        isResuming = false;
       }
 
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => MainScreen(
-            userModel: UserModel.fromMap(userData),
+            userModel: userModel,
             initialIndex: 2,
             initialCourseData: {
               'course': widget.course,
-              'section': lastSection,
-              'stepIndex': globalStepIndex,
-              'sectionStepIndex': sectionStepIndex,
-              'isResuming': true,
+              'section': targetSection,
+              'stepIndex': targetStepIndex,
+              'sectionStepIndex': targetStepIndex,
+              'isResuming': isResuming,
             },
           ),
         ),
@@ -458,7 +502,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                 left: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
@@ -478,19 +522,8 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
                         children: [
                           Expanded(
                             flex: 2,
-                            child: ValueListenableBuilder<CourseState>(
-                              valueListenable: _courseState,
-                              builder: (context, state, child) {
-                                return Stack(
-                                  children: [
-                                    // ... resto del contenuto ...
-                                    _buildStartButton(state),
-                                  ],
-                                );
-                              },
-                            ),
+                            child: _buildStartButton(),
                           ),
-                          
                         ],
                       ),
                     ],
@@ -617,91 +650,137 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     return FutureBuilder<Map<String, dynamic>>(
       future: _getSectionProgress(section),
       builder: (context, snapshot) {
-        final isCompleted = snapshot.data?['isCompleted'] ?? false;
         final completedSteps = snapshot.data?['currentStep'] ?? 0;
         final totalSteps = snapshot.data?['totalSteps'] ?? section.steps.length;
+        final isCompleted = snapshot.data?['isCompleted'] ?? false;
         final progress = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
-        
+
         return Container(
-          margin: const EdgeInsets.only(bottom: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF181819),
-            borderRadius: BorderRadius.circular(20),
-            border: isCompleted 
-              ? Border.all(color: Colors.yellowAccent.withOpacity(0.3), width: 1.5)
-              : null,
+            color: const Color(0xFF1E1E1E),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isCompleted ? Colors.yellowAccent.withOpacity(0.3) : Colors.white.withOpacity(0.08),
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.2),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              tilePadding: const EdgeInsets.all(20),
-              childrenPadding: EdgeInsets.zero,
+              tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              childrenPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              backgroundColor: Colors.transparent,
+              collapsedBackgroundColor: Colors.transparent,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style: TextStyle(
+                      color: Colors.grey[400],
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Colors.grey[400],
+                    size: 20,
+                  ),
+                ],
+              ),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          section.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              section.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  FontAwesomeIcons.clock,
+                                  size: 10,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_calculateTotalTime(section)} min',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  '$completedSteps/$totalSteps lezioni',
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: const Color(0xFF2D2D2D),
+                          valueColor: AlwaysStoppedAnimation(
+                            isCompleted ? Colors.yellowAccent : Colors.yellowAccent.withOpacity(0.7),
                           ),
+                          minHeight: 3,
                         ),
                       ),
                       if (isCompleted)
-                        SvgPicture.asset(
-                          'assets/solar_verified-check-linear.svg',
-                          width: 24,
-                          height: 24,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  _buildSectionDetails(section),
-                  const SizedBox(height: 15),
-                  // Progress bar con steps individuali
-                  Container(
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                    child: Row(
-                      children: List.generate(
-                        totalSteps,
-                        (index) => Expanded(
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 1),
-                            decoration: BoxDecoration(
-                              color: index < completedSteps
-                                ? Colors.yellowAccent
-                                : Colors.yellowAccent.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                        const Positioned(
+                          right: 0,
+                          top: -8,
+                          child: Icon(
+                            FontAwesomeIcons.check,
+                            color: Colors.yellowAccent,
+                            size: 12,
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
               children: [
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.2),
+                    color: const Color(0xFF1E1E1E),
                     borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(20),
+                      bottom: Radius.circular(16),
                     ),
                   ),
                   child: Column(
@@ -725,88 +804,74 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     );
   }
 
-  Widget _buildSectionDetails(Section section) {
-    int totalVideos = section.steps.where((step) => step.type == 'video').length;
-    int totalQuestions = section.steps.where((step) => step.type == 'question').length;
-    int totalTime = _calculateTotalTime(section);
-
-    return Row(
-      children: [
-        _buildDetailIconText(Icons.timer, '$totalTime min'),
-        const SizedBox(width: 23),
-        _buildDetailIconText(Icons.video_collection, '$totalVideos video'),
-        const SizedBox(width: 23),
-        _buildDetailIconText(Icons.quiz, '$totalQuestions quiz'),
-      ],
-    );
-  }
-
   Widget _buildStepItem(LevelStep step, {required bool isCompleted}) {
     IconData icon;
-    Color iconColor = isCompleted ? Colors.yellowAccent : Colors.yellowAccent.withOpacity(0.3);
+    Color baseColor = isCompleted ? Colors.yellowAccent : Colors.white.withOpacity(0.7);
     
     switch (step.type) {
       case 'video':
-        icon = Icons.play_circle_outline_rounded;
+        icon = FontAwesomeIcons.play;
         break;
       case 'question':
-        icon = Icons.quiz_rounded;
+        icon = FontAwesomeIcons.question;
         break;
       default:
-        icon = Icons.article_rounded;
+        icon = FontAwesomeIcons.circle;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: isCompleted 
+                ? Colors.yellowAccent.withOpacity(0.15)
+                : Colors.grey[800]!.withOpacity(0.3),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(
+              icon,
+              color: baseColor,
+              size: 14,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               step.content,
               style: TextStyle(
-                color: isCompleted ? Colors.white : Colors.white.withOpacity(0.7),
+                color: baseColor,
                 fontSize: 14,
                 height: 1.5,
               ),
             ),
           ),
+          if (step.duration != null)
+            Text(
+              '${step.duration} min',
+              style: TextStyle(
+                color: isCompleted ? Colors.yellowAccent : Colors.grey[500],
+                fontSize: 12,
+              ),
+            ),
           if (isCompleted)
-            Icon(
-              Icons.check_circle_rounded,
-              color: Colors.yellowAccent,
-              size: 20,
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.yellowAccent.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                FontAwesomeIcons.check,
+                color: Colors.yellowAccent,
+                size: 12,
+              ),
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDetailIconText(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: Colors.white.withOpacity(0.5),
-          size: 16,
-        ),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 12,
-          ),
-        ),
-      ],
     );
   }
 
@@ -941,49 +1006,99 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
     };
   }
 
-  Widget _buildStartButton(CourseState state) {
-    final buttonConfig = switch (state) {
-      CourseState.locked => _ButtonConfig(
-          text: 'Subscribe to Start',
-          onPressed: _showStartCourseOptions,
-        ),
-      CourseState.unlocked => _ButtonConfig(
-          text: 'Start Course',
-          onPressed: _handleStartCourse,
-        ),
-      _ => _ButtonConfig(
-          text: 'Loading...',
-          onPressed: null,
-        ),
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: SizedBox(
-        height: 60,
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: buttonConfig.onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.yellowAccent,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 8,
-          ),
-          child: Text(
-            buttonConfig.text,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-      ),
+  Widget _buildStartButton() {
+    return ValueListenableBuilder<CourseState>(
+      valueListenable: _courseState,
+      builder: (context, state, child) {
+        return FutureBuilder<bool>(
+          future: _isCourseStarted(),
+          builder: (context, snapshot) {
+            final bool isStarted = snapshot.data ?? false;
+            
+            return GestureDetector(
+              onTapDown: (_) => _buttonController.forward(),
+              onTapUp: (_) {
+                _buttonController.reverse();
+                if (state == CourseState.unlocked) {
+                  _handleStartCourse();
+                } else if (state == CourseState.locked) {
+                  _showStartCourseOptions();
+                }
+              },
+              onTapCancel: () => _buttonController.reverse(),
+              child: ScaleTransition(
+                scale: _scaleAnimation,
+                child: Stack(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: state == CourseState.locked
+                            ? Colors.transparent
+                            : isStarted 
+                              ? const Color(0xFFFFFF28).withOpacity(0.15)
+                              : const Color(0xFFFFFF28),
+                        borderRadius: BorderRadius.circular(12),
+                        border: isStarted 
+                          ? Border.all(
+                              color: const Color(0xFFFFFF28),
+                              width: 2,
+                            ) 
+                          : null,
+                      ),
+                      child: state == CourseState.locked
+                          ? _buildOptionButton(
+                              icon: Icons.workspace_premium_rounded,
+                              title: 'Subscribe to ${widget.course.authorName}',
+                              subtitle: 'Access all premium courses from this creator',
+                              onTap: () {
+                                Navigator.pop(context);
+                                
+                              },
+                            )
+                          : Center(
+                              child: Text(
+                                isStarted ? 'Continue' : 'Start Course',
+                                style: TextStyle(
+                                  color: isStarted ? const Color(0xFFFFFF28) : Colors.black,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        );
+      },
     );
+  }
+
+  Future<bool> _isCourseStarted() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) return false;
+
+      final startedCourses = List<Map<String, dynamic>>.from(
+        userDoc.data()?['startedCourses'] ?? []
+      );
+
+      return startedCourses.any((course) => course['courseId'] == widget.course.id);
+    } catch (e) {
+      print('Error checking if course is started: $e');
+      return false;
+    }
   }
 
   Widget _buildOptionButton({
@@ -1043,10 +1158,3 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with SingleTick
 
 // Enums e classi di supporto
 enum CourseState { loading, locked, unlocked, error }
-
-class _ButtonConfig {
-  final String text;
-  final VoidCallback? onPressed;
-  
-  const _ButtonConfig({required this.text, this.onPressed});
-}

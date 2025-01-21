@@ -9,6 +9,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'dart:math';
 import 'notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:Just_Learn/services/purchase_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -41,6 +42,12 @@ class AuthService {
         email: email,
         password: password,
       );
+      
+      if (userCredential.user != null) {
+        // Configura l'identità dell'utente in RevenueCat
+        await PurchaseService.setupUserIdentity();
+      }
+      
       return userCredential.user;
     } catch (e) {
       print('Errore durante il login con email/password: $e');
@@ -99,6 +106,9 @@ class AuthService {
       final User? user = userCredential.user;
 
       if (user != null) {
+        // Configura l'identità dell'utente in RevenueCat
+        await PurchaseService.setupUserIdentity();
+        
         // Verifica se l'utente esiste in Firestore
         final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
@@ -191,6 +201,9 @@ class AuthService {
       final User? user = userCredential.user;
 
       if (user != null) {
+        // Configura l'identità dell'utente in RevenueCat
+        await PurchaseService.setupUserIdentity();
+        
         // Verifica se l'utente esiste in Firestore
         final userDoc = await _firestore.collection('users').doc(user.uid).get();
 

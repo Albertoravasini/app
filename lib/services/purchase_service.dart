@@ -76,10 +76,6 @@ class PurchaseService {
 
   static Future<CustomerInfo> purchasePackage(Package package) async {
     try {
-      print('DEBUG: Inizio processo di acquisto per pacchetto: ${package.identifier}');
-      print('DEBUG: Dettagli prodotto: ${package.storeProduct.identifier}');
-      
-      // Verifica se l'utente può effettuare acquisti
       final canMakePurchases = await Purchases.canMakePayments();
       if (!canMakePurchases) {
         throw PlatformException(
@@ -88,28 +84,14 @@ class PurchaseService {
         );
       }
 
-      // Tenta l'acquisto
       final purchaseResult = await Purchases.purchasePackage(package);
       
-      print('DEBUG: Acquisto completato con successo');
-      print('DEBUG: Entitlements attivi: ${purchaseResult.entitlements.active.keys}');
+      // Registra i dettagli dell'acquisto
+      await handlePurchaseIdentity(purchaseResult);
       
       return purchaseResult;
-    } on PlatformException catch (e) {
-      print('DEBUG: Dettagli errore PlatformException:');
-      print('- Codice: ${e.code}');
-      print('- Messaggio: ${e.message}');
-      print('- Dettagli: ${e.details}');
-      
-      if (e.details != null && e.details!['userCancelled'] == true) {
-        print('DEBUG: Acquisto cancellato dall\'utente');
-        throw Exception('Acquisto cancellato');
-      } else if (e.code == 'PAYMENTS_NOT_ALLOWED') {
-        throw Exception('Acquisti non consentiti su questo dispositivo');
-      }
-      rethrow;
     } catch (e) {
-      print('DEBUG: Errore generico durante l\'acquisto: $e');
+      print('DEBUG: Errore durante l\'acquisto: $e');
       rethrow;
     }
   }
@@ -161,6 +143,40 @@ class PurchaseService {
       });
     } catch (e) {
       print('DEBUG: Errore setup monitoraggio: $e');
+    }
+  }
+
+  static Future<void> setupUserIdentity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await Purchases.setAttributes({
+        'firebase_uid': user.uid,      // ID univoco Firebase
+        'auth_provider': user.providerData.first.providerId,  // 'password', 'google.com', 'apple.com'
+        'email': user.email ?? '',
+      });
+    }
+  }
+
+  static Future<void> handlePurchaseIdentity(CustomerInfo customerInfo) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('purchases')
+            .add({
+          'purchaseDate': DateTime.now().toIso8601String(),
+          'provider': customerInfo.originalPurchaseDate,
+          'productIdentifier': customerInfo.entitlements.active[_entitlementId]?.productIdentifier,
+          'willRenew': customerInfo.entitlements.active[_entitlementId]?.willRenew,
+          'expirationDate': customerInfo.entitlements.active[_entitlementId]?.expirationDate,
+          'authProvider': user.providerData.first.providerId,
+          'userEmail': user.email,
+        });
+      }
+    } catch (e) {
+      print('DEBUG: Errore registrazione acquisto: $e');
     }
   }
 } 
