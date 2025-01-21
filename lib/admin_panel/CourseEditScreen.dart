@@ -34,6 +34,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   List<Section> _sections = [];
   bool _isEditing = false;
   String? _coverImageUrl;
+  bool _isSubscriptionRequired = false;
    Course? _course;  // Aggiungi quest
 
   // Nuovi campi per fonti, ringraziamenti e approfondimenti
@@ -46,6 +47,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   final List<String> _stepTitles = ['Basic', 'Content', 'Resources', 'Summary'];
 
   int? _expandedStepIndex;
+  Map<int, double> _uploadProgress = {};  // Per tracciare il progresso di upload per ogni step
 
   @override
   Widget build(BuildContext context) {
@@ -210,21 +212,37 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                 const SizedBox(height: 24),
                 
                 // Form fields
-                DropdownButtonFormField<String>(
-                  value: _selectedTopic,
-                  decoration: _inputDecoration('Topic'),
-                  dropdownColor: const Color(0xFF282828),
-                  items: _topics.map((topic) => DropdownMenuItem(
-                    value: topic,
-                    child: Text(
-                      topic,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontFamily: 'Montserrat',
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedTopic,
+                    decoration: _inputDecoration('Topic').copyWith(
+                      suffixIcon: IconButton(
+                        icon: Icon(Icons.add, color: Colors.yellowAccent),
+                        onPressed: () => _showAddTopicDialog(context),
                       ),
                     ),
-                  )).toList(),
-                  onChanged: (value) => setState(() => _selectedTopic = value),
+                    dropdownColor: const Color(0xFF282828),
+                    items: [
+                      ..._topics.map((topic) => DropdownMenuItem(
+                        value: topic,
+                        child: Text(
+                          topic,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Montserrat',
+                          ),
+                        ),
+                      )).toList(),
+                    ],
+                    onChanged: (value) => setState(() => _selectedTopic = value),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 
@@ -273,9 +291,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                     'Only subscribers can access this course',
                     style: TextStyle(color: Colors.white70),
                   ),
-                  value: _course?.isSubscriptionRequired ?? false,
+                  value: _isSubscriptionRequired,
                   onChanged: (bool value) {
                     setState(() {
+                      _isSubscriptionRequired = value;
                       if (_course != null) {
                         _course!.isSubscriptionRequired = value;
                       }
@@ -291,6 +310,98 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _showAddTopicDialog(BuildContext context) async {
+    String? newTopic;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF282828),
+        title: Text(
+          'Add New Topic',
+          style: TextStyle(
+            color: Colors.white,
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: TextField(
+          style: TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Enter topic name',
+            hintStyle: TextStyle(color: Colors.white54),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.white24),
+            ),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.yellowAccent),
+            ),
+          ),
+          onChanged: (value) => newTopic = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (newTopic != null && newTopic!.isNotEmpty) {
+                try {
+                  // Aggiungi il nuovo topic a Firestore
+                  await FirebaseFirestore.instance
+                      .collection('topics')
+                      .doc(newTopic)
+                      .set({
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+
+                  // Aggiorna la lista locale dei topic
+                  setState(() {
+                    _topics.add(newTopic!);
+                    _selectedTopic = newTopic;
+                  });
+
+                  if (!mounted) return;
+                  Navigator.pop(context);
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Topic "$newTopic" added successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  print('Error adding topic: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error adding topic: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.yellowAccent,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: Text(
+              'Add',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -357,6 +468,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
 
   Widget _buildCompactStepCard(LevelStep step, int index, {Key? key}) {
     bool isExpanded = _expandedStepIndex == index;
+    bool isNewStep = step.content.isEmpty; // Verifica se è un nuovo step
     
     return Card(
       key: key,
@@ -365,194 +477,353 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
         side: BorderSide(
-          color: Colors.white.withOpacity(0.1),
+          color: isNewStep ? Colors.yellowAccent.withOpacity(0.3) : Colors.white.withOpacity(0.1),
           width: 1,
         ),
       ),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _expandedStepIndex = isExpanded ? null : index;
-          });
-        },
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 300),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header sempre visibile
-              Padding(
-                padding: EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.drag_handle,
-                      color: Colors.white54,
-                      size: 20,
-                    ),
-                    SizedBox(width: 12),
-                    Icon(
-                      step.type == 'video' ? Icons.play_circle_outline : Icons.quiz_outlined,
-                      color: Colors.yellowAccent,
-                      size: 20,
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        step.content,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      padding: EdgeInsets.zero,
-                      constraints: BoxConstraints(),
-                      icon: Icon(Icons.edit, color: Colors.white54, size: 18),
-                      onPressed: () => _editStepDialog(
-                        _selectedSection!, 
-                        _sections.indexOf(_selectedSection!), 
-                        step, 
-                        index
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: Colors.white54,
-                      size: 20,
-                    ),
-                  ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          ListTile(
+            leading: Icon(
+              Icons.drag_handle,
+              color: Colors.white54,
+              size: 20,
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  step.type == 'video' ? Icons.play_circle_outline : Icons.quiz_outlined,
+                  color: Colors.yellowAccent,
+                  size: 20,
                 ),
-              ),
-              
-              // Contenuto espanso
-              if (isExpanded) ...[
-                Divider(color: Colors.white.withOpacity(0.1)),
-                Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (step.type == 'video') ...[
-                        if (step.videoUrl != null)
-                          GestureDetector(
-                            onTap: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => VideoPlayerDialog(videoUrl: step.videoUrl!),
-                              );
-                            },
-                            child: Container(
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: Color(0xFF1E1E1E),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                children: [
-                                  SizedBox(width: 16),
-                                  Icon(
-                                    Icons.play_circle_outline,
-                                    color: Colors.yellowAccent,
-                                    size: 24,
-                                  ),
-                                  SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          'Play video',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        if (step.duration != null)
-                                          Text(
-                                            'Duration: ${step.duration}s',
-                                            style: TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ] else if (step.type == 'question') ...[
-                        Text(
-                          'Question:',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        ...?step.choices?.map((choice) => 
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  choice == step.correctAnswer 
-                                    ? Icons.check_circle 
-                                    : Icons.radio_button_unchecked,
-                                  color: choice == step.correctAnswer 
-                                    ? Colors.green 
-                                    : Colors.white54,
-                                  size: 16,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  choice,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                      SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton.icon(
-                            onPressed: () => _editStepDialog(
-                              _selectedSection!, 
-                              _sections.indexOf(_selectedSection!), 
-                              step, 
-                              index
-                            ),
-                            icon: Icon(Icons.edit, size: 16),
-                            label: Text('Edit'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.yellowAccent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    step.content.isEmpty ? 'New Step' : step.content,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
-            ],
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(),
+                  icon: Icon(Icons.delete, color: Colors.white54, size: 18),
+                  onPressed: () => _deleteStep(_sections.indexOf(_selectedSection!), index),
+                ),
+                SizedBox(width: 8),
+                Icon(
+                  isExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.white54,
+                  size: 20,
+                ),
+              ],
+            ),
+            onTap: () {
+              setState(() {
+                _expandedStepIndex = isExpanded ? null : index;
+              });
+            },
           ),
-        ),
+          
+          // Contenuto espanso per la modifica
+          if (isExpanded) ...[
+            Divider(color: Colors.white.withOpacity(0.1)),
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Tipo di step
+                  DropdownButtonFormField<String>(
+                    value: step.type,
+                    decoration: _inputDecoration('Step Type'),
+                    dropdownColor: const Color(0xFF282828),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'video',
+                        child: Text('Video', style: TextStyle(color: Colors.white)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'question',
+                        child: Text('Question', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedSection!.steps[index] = LevelStep(
+                          type: value!,
+                          content: step.content,
+                          topic: step.topic,
+                          choices: step.choices,
+                          correctAnswer: step.correctAnswer,
+                          explanation: step.explanation,
+                          videoUrl: step.videoUrl,
+                        );
+                      });
+                    },
+                  ),
+                  SizedBox(height: 16),
+
+                  // Campi specifici per tipo
+                  if (step.type == 'video') ...[
+                    // Campi per il video
+                    TextFormField(
+                      initialValue: step.content,
+                      decoration: _inputDecoration('Video Title'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: value,
+                            topic: step.topic,
+                            videoUrl: step.videoUrl,
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            height: 45,
+                            child: _uploadProgress.containsKey(index)
+                              ? Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.yellowAccent.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.yellowAccent),
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      LinearProgressIndicator(
+                                        value: _uploadProgress[index],
+                                        backgroundColor: Colors.transparent,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.yellowAccent.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Uploading ${(_uploadProgress[index]! * 100).toInt()}%',
+                                        style: TextStyle(
+                                          color: Colors.yellowAccent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.yellowAccent.withOpacity(0.1),
+                                    foregroundColor: Colors.yellowAccent,
+                                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: Colors.yellowAccent),
+                                    ),
+                                  ),
+                                  icon: Icon(Icons.upload_file),
+                                  label: Text('Upload Video'),
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform.pickFiles(
+                                      type: FileType.video,
+                                      allowMultiple: false,
+                                    );
+
+                                    if (result != null) {
+                                      final videoFile = File(result.files.single.path!);
+                                      try {
+                                        // Se c'è già un video, eliminalo prima
+                                        if (step.videoUrl != null) {
+                                          await _deleteVideoFromStorage(step.videoUrl!);
+                                        }
+
+                                        // Inizializza il progresso
+                                        setState(() {
+                                          _uploadProgress[index] = 0;
+                                        });
+
+                                        await _uploadVideo(
+                                          videoFile,
+                                          (String videoUrl) {
+                                            if (mounted) {
+                                              setState(() {
+                                                _uploadProgress.remove(index);
+                                                _selectedSection!.steps[index] = LevelStep(
+                                                  type: 'video',
+                                                  content: step.content,
+                                                  videoUrl: videoUrl,
+                                                  thumbnailUrl: null,
+                                                  isShort: false,
+                                                  topic: widget.course?.topic ?? '',
+                                                );
+                                              });
+                                            }
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('Video uploaded successfully!')),
+                                            );
+                                          },
+                                          (String error) {
+                                            setState(() {
+                                              _uploadProgress.remove(index);
+                                            });
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Error: $error'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          },
+                                          // Aggiungi callback per il progresso
+                                          (double progress) {
+                                            if (mounted) {
+                                              setState(() {
+                                                _uploadProgress[index] = progress;
+                                              });
+                                            }
+                                          },
+                                        );
+                                      } catch (e) {
+                                        setState(() {
+                                          _uploadProgress.remove(index);
+                                        });
+                                        print('Error during upload: $e');
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Error during upload: $e'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                ),
+                          ),
+                        ),
+                        if (step.videoUrl != null) ...[
+                          SizedBox(width: 16),
+                          IconButton(
+                            icon: Icon(Icons.play_circle_outline, color: Colors.yellowAccent),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => Dialog(
+                                  backgroundColor: Colors.transparent,
+                                  child: AspectRatio(
+                                    aspectRatio: 9/16,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        color: Colors.black,
+                                        child: VideoPlayer(
+                                          step.videoUrl!,
+                                          autoPlay: true,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ],
+                    ),
+                  ] else if (step.type == 'question') ...[
+                    // Campi per la domanda
+                    TextFormField(
+                      initialValue: step.content,
+                      decoration: _inputDecoration('Question'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: value,
+                            topic: step.topic,
+                            choices: step.choices,
+                            correctAnswer: step.correctAnswer,
+                            explanation: step.explanation,
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    TextFormField(
+                      initialValue: step.choices?.join(', '),
+                      decoration: _inputDecoration('Options (comma separated)'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: step.content,
+                            topic: step.topic,
+                            choices: value.split(',').map((e) => e.trim()).toList(),
+                            correctAnswer: step.correctAnswer,
+                            explanation: step.explanation,
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    TextFormField(
+                      initialValue: step.correctAnswer,
+                      decoration: _inputDecoration('Correct Answer'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: step.content,
+                            topic: step.topic,
+                            choices: step.choices,
+                            correctAnswer: value,
+                            explanation: step.explanation,
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    TextFormField(
+                      initialValue: step.explanation,
+                      decoration: _inputDecoration('Explanation'),
+                      style: TextStyle(color: Colors.white),
+                      maxLines: 3,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: step.content,
+                            topic: step.topic,
+                            choices: step.choices,
+                            correctAnswer: step.correctAnswer,
+                            explanation: value,
+                          );
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -572,7 +843,19 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
         ),
       ),
       child: InkWell(
-        onTap: () => _addStepDialog(_selectedSection!, _sections.indexOf(_selectedSection!)),
+        onTap: () {
+          setState(() {
+            // Aggiungi un nuovo step vuoto alla sezione corrente
+            _selectedSection!.steps.add(LevelStep(
+              type: 'question', // tipo predefinito
+              content: '',
+              topic: widget.course?.topic ?? '',
+              choices: [],
+            ));
+            // Espandi automaticamente il nuovo step
+            _expandedStepIndex = _selectedSection!.steps.length - 1;
+          });
+        },
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: EdgeInsets.all(12),
@@ -599,7 +882,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   @override
   void initState() {
     super.initState();
-    _course = widget.course;  // Inizializza con il corso passato come parametro
+    _course = widget.course;
     _loadTopics();
 
     if (widget.course != null) {
@@ -611,6 +894,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
       _sections = widget.course!.sections;
       _coverImageUrl = widget.course!.coverImageUrl;
       _selectedSection = _sections.isNotEmpty ? _sections[0] : null;
+      _isSubscriptionRequired = widget.course!.isSubscriptionRequired;
 
       _sources = List.from(widget.course!.sources);
       _acknowledgments = List.from(widget.course!.acknowledgments);
@@ -1124,6 +1408,9 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                             );
                           },
                           (String error) {
+                            setState(() {
+                              isUploading = false;
+                            });
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Errore: $error'),
@@ -1131,8 +1418,18 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                               ),
                             );
                           },
+                          (double progress) {
+                            if (mounted) {
+                              setState(() {
+                                _uploadProgress[sectionIndex] = progress;
+                              });
+                            }
+                          },
                         );
                       } catch (e) {
+                        setState(() {
+                          isUploading = false;
+                        });
                         print('Errore durante l\'upload: $e');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -1140,12 +1437,6 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                             backgroundColor: Colors.red,
                           ),
                         );
-                      } finally {
-                        if (mounted) {
-                          setDialogState(() {
-                            isUploading = false;
-                          });
-                        }
                       }
                     } else if (stepType == 'question' &&
                         questionContent != null &&
@@ -1275,7 +1566,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                     ] else if (stepType == 'question') ...[
                       TextFormField(
                         initialValue: content,
-                        decoration: _inputDecoration('Question Content'),
+                        decoration: _inputDecoration('Question'),
                         style: TextStyle(color: Colors.white),
                         onChanged: (value) => content = value,
                       ),
@@ -1308,7 +1599,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => _deleteStep(sectionIndex, stepIndex),
+                  onPressed: () => _deleteStep(_sections.indexOf(_selectedSection!), stepIndex),
                   child: Text(
                     'Delete',
                     style: TextStyle(
@@ -1356,45 +1647,35 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     );
   }
 
-  void _deleteStep(int sectionIndex, int stepIndex) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Text(
-          'Delete Step',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          'Are you sure you want to delete this step?',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _sections[sectionIndex].steps.removeAt(stepIndex);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Step deleted successfully')),
-              );
-            },
-            child: Text(
-              'Delete',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _deleteStep(int sectionIndex, int stepIndex) async {
+    // Se è un video, elimina prima il file dallo storage
+    final step = _selectedSection!.steps[stepIndex];
+    if (step.type == 'video' && step.videoUrl != null) {
+      await _deleteVideoFromStorage(step.videoUrl!);
+    }
+
+    setState(() {
+      _selectedSection!.steps.removeAt(stepIndex);
+      _expandedStepIndex = null;
+    });
+  }
+
+  Future<void> _deleteVideoFromStorage(String videoUrl) async {
+    try {
+      // Estrai il nome del file dall'URL
+      final fileName = videoUrl.split('%2F').last.split('?').first;
+      // Crea il riferimento al file usando il percorso completo
+      final storageRef = firebase_storage.FirebaseStorage.instance
+          .ref()
+          .child('course_videos')
+          .child(fileName);
+      
+      await storageRef.delete();
+      print('Video deleted successfully from storage');
+    } catch (e) {
+      print('Error deleting video from storage: $e');
+      // Non lanciare l'errore per permettere comunque l'aggiornamento dell'UI
+    }
   }
 
   Future<void> _saveCourse() async {
@@ -1410,7 +1691,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
         'visible': true,
         'authorId': FirebaseAuth.instance.currentUser?.uid,
         'coverImageUrl': _coverImageUrl,
-        'isSubscriptionRequired': _course?.isSubscriptionRequired ?? false,
+        'isSubscriptionRequired': _isSubscriptionRequired,
       };
 
       if (_isEditing && _course != null) {
@@ -1870,7 +2151,12 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     );
   }
 
-  Future<void> _uploadVideo(File videoFile, Function(String) onSuccess, Function(String) onError) async {
+  Future<void> _uploadVideo(
+    File videoFile,
+    Function(String) onSuccess,
+    Function(String) onError,
+    Function(double) onProgress,
+  ) async {
     try {
       final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final videoRef = firebase_storage.FirebaseStorage.instance
@@ -1878,34 +2164,30 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
           .child('course_videos')
           .child(fileName);
 
-      // Leggi il file come bytes
       final bytes = await videoFile.readAsBytes();
       
-      // Crea un upload task senza metadata
       final uploadTask = videoRef.putData(
         bytes,
         firebase_storage.SettableMetadata(contentType: 'video/mp4')
       );
 
-      // Monitora il progresso
       uploadTask.snapshotEvents.listen(
         (snapshot) {
           if (snapshot.totalBytes > 0) {
             final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-            print('Upload progress: ${(progress * 100).toStringAsFixed(2)}%');
+            onProgress(progress);
           }
         },
         onError: (error) {
-          print('Errore durante il monitoraggio dell\'upload: $error');
+          print('Error during upload progress monitoring: $error');
+          onError(error.toString());
         },
         cancelOnError: false,
       );
 
-      // Attendi il completamento
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       
-      print('Upload completed. URL: $downloadUrl');
       onSuccess(downloadUrl);
       
     } catch (e) {
@@ -2020,16 +2302,17 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   }
 }
 
-class VideoPlayerDialog extends StatefulWidget {
+class VideoPlayer extends StatefulWidget {
   final String videoUrl;
+  final bool autoPlay;
 
-  const VideoPlayerDialog({required this.videoUrl});
+  const VideoPlayer(this.videoUrl, {this.autoPlay = false});
 
   @override
-  _VideoPlayerDialogState createState() => _VideoPlayerDialogState();
+  _VideoPlayerState createState() => _VideoPlayerState();
 }
 
-class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
+class _VideoPlayerState extends State<VideoPlayer> {
   late VideoPlayerController _videoPlayerController;
   ChewieController? _chewieController;
 
@@ -2045,25 +2328,32 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
     
     _chewieController = ChewieController(
       videoPlayerController: _videoPlayerController,
-      aspectRatio: 9/16,
-      autoPlay: true,
+      autoPlay: widget.autoPlay,
       looping: false,
-      allowFullScreen: true,
-      allowMuting: true,
-      showControls: true,
-      placeholder: Center(
-        child: CircularProgressIndicator(
-          color: Colors.yellowAccent,
-        ),
-      ),
-      materialProgressColors: ChewieProgressColors(
-        playedColor: Colors.yellowAccent,
-        handleColor: Colors.yellowAccent,
-        backgroundColor: Colors.grey,
-        bufferedColor: Colors.white,
-      ),
+      aspectRatio: 9/16,
+      autoInitialize: true,
+      errorBuilder: (context, errorMessage) {
+        return Center(
+          child: Text(
+            errorMessage,
+            style: TextStyle(color: Colors.white),
+          ),
+        );
+      },
     );
+    
     setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _chewieController != null
+        ? Chewie(controller: _chewieController!)
+        : Center(
+            child: CircularProgressIndicator(
+              color: Colors.yellowAccent,
+            ),
+          );
   }
 
   @override
@@ -2071,41 +2361,5 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
     _videoPlayerController.dispose();
     _chewieController?.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AspectRatio(
-            aspectRatio: 9/16,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: _chewieController != null
-                    ? Chewie(controller: _chewieController!)
-                    : Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.yellowAccent,
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          SizedBox(height: 8),
-          IconButton(
-            icon: Icon(Icons.close, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
   }
 }

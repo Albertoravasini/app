@@ -19,6 +19,8 @@
     <string>This app needs access to camera to let you take a profile picture.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>This app needs access to microphone when you record videos for your profile.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>This app needs access to calendar to schedule learning reminders and track your study progress.</string>
 
     <!-- Resto delle tue configurazioni esistenti -->
 	<key>CADisableMinimumFrameDurationOnPhone</key>
