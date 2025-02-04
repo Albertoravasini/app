@@ -1,0 +1,153 @@
+# PROJECT OVERVIEW
+
+- This project is a engaging learning platform like skillshare with courses but in a engaging form like TikTok. you can watch courses, learn and interact with the teachers.
+
+# PERSONALITY
+
+- You are a professional developer 
+
+# TECH STACK
+
+- Flutter
+- Dart
+- Firebase
+- RevenueCat
+- NodeJS
+
+# BUILDING PROCESS
+
+- feel free to add new files and folders
+- Make sure to follow the code style
+- Make sure to follow the design style
+
+
+# CURRENT FILE STRUCTURE
+
+lib
+├── admin_panel
+│   ├── CourseEditScreen.dart
+│   ├── admin_panel_screen.dart
+│   ├── bulk_shorts_screen.dart
+│   ├── chart_screen.dart
+│   ├── course_management_screen.dart
+│   ├── edit_level_screen.dart
+│   ├── level_drag_drop_screen.dart
+│   ├── level_management_screen.dart.dart
+│   └── user_management_screen.dart.dart
+├── controllers
+│   ├── course_video_controller.dart
+│   ├── follow_controller.dart
+│   ├── profile_controller.dart
+│   ├── scroll_physics.dart
+│   ├── shorts_controller.dart
+│   ├── subscription_controller.dart
+│   └── video_player_manager.dart
+├── firebase_options.dart
+├── main.dart
+├── models
+│   ├── ai_chat_message.dart
+│   ├── article.dart
+│   ├── certification.dart
+│   ├── course.dart
+│   ├── event.dart
+│   ├── experience.dart
+│   ├── level.dart
+│   ├── message.dart
+│   ├── review.dart
+│   └── user.dart
+├── screens
+│   ├── Articles_screen.dart
+│   ├── NotificationsScreen.dart
+│   ├── Privacy_Policy_Screen.dart
+│   ├── VideoPlayerScreen.dart
+│   ├── access
+│   │   ├── login_screen.dart
+│   │   ├── onboarding_screen.dart
+│   │   ├── register_screen.dart
+│   │   ├── sign_in_options_screen.dart
+│   │   ├── splash_screen.dart
+│   │   └── topic_selection_screen.dart
+│   ├── bottom_navigation_bar_custom.dart
+│   ├── comments_screen.dart
+│   ├── course_detail_screen.dart
+│   ├── course_info_dialog.dart
+│   ├── course_screen.dart
+│   ├── course_stats_screen.dart
+│   ├── courses_list_screen.dart
+│   ├── end_of_quiz_screen.dart
+│   ├── home_screen.dart
+│   ├── level_screen.dart
+│   ├── note_editor_screen.dart
+│   ├── notes_screen.dart
+│   ├── profile_screen.dart
+│   ├── question_screen.dart
+│   ├── quiz_screen.dart
+│   ├── section_selection_sheet.dart
+│   ├── settings_screen.dart
+│   ├── shorts_screen.dart
+│   ├── streak_screen.dart
+│   ├── student_details_screen.dart
+│   ├── subscription_screen.dart
+│   ├── subtopic_selection_sheet.dart
+│   ├── support_screen.dart
+│   ├── teacher_courses_screen.dart
+│   ├── teacher_dashboard_screen.dart
+│   ├── teacher_students_screen.dart
+│   └── topic_selection_sheet.dart
+├── services
+│   ├── ai_chat_service.dart
+│   ├── ai_service.dart
+│   ├── articles_service.dart
+│   ├── auth_service.dart
+│   ├── comment_service.dart
+│   ├── course_service.dart
+│   ├── firebase_service.dart
+│   ├── image_service.dart
+│   ├── level_service.dart
+│   ├── notification_service.dart
+│   ├── purchase_service.dart
+│   ├── shorts_service.dart
+│   └── web_auth_service.dart
+├── styles
+│   ├── colors.dart
+│   └── text_styles.dart
+├── utils
+│   └── platform_helper.dart
+├── web
+│   ├── layout
+│   │   └── web_main_layout.dart
+│   ├── screens
+│   │   ├── web_creator_screen.dart
+│   │   ├── web_explore_screen.dart
+│   │   ├── web_home_screen.dart
+│   │   ├── web_landing_screen.dart
+│   │   ├── web_login_screen.dart
+│   │   ├── web_onboarding_screen.dart
+│   │   └── web_signup_screen.dart
+│   └── widgets
+│       ├── web_header.dart
+│       ├── web_sidebar.dart
+│       ├── web_video_info.dart
+│       └── web_video_player.dart
+└── widgets
+    ├── about_tab.dart
+    ├── ai_chat_widget.dart
+    ├── calendar_tab.dart
+    ├── certification_manager.dart
+    ├── course_preview_sheet.dart
+    ├── course_question_card.dart
+    ├── course_video
+    │   └── course_info_overlay.dart
+    ├── custom_text_field.dart
+    ├── event_manager.dart
+    ├── experience_manager.dart
+    ├── page_view_container.dart
+    ├── private_chat_tab.dart
+    ├── profile_edit_form.dart
+    ├── profile_feed_tab.dart
+    ├── progress_bar.dart
+    ├── review_manager.dart
+    ├── social_contacts_manager.dart
+    ├── tutorial_overlay.dart
+    └── video_player_widget.dart
+

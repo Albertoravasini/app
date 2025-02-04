@@ -1407,7 +1407,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             _toggleFollow();
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: _isFollowing ? Colors.yellowAccent : const Color(0xFF282828),
+            backgroundColor: _isFollowing ? Colors.yellowAccent : const Color(0xFF181819),
             foregroundColor: _isFollowing ? Colors.black : Colors.yellowAccent,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             minimumSize: const Size(120, 45), // Dimensione minima

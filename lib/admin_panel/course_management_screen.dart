@@ -399,15 +399,23 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                       ),
                       decoration: BoxDecoration(
                         color: course.visible
-                            ? Colors.green.withOpacity(0.9)
-                            : Colors.grey.withOpacity(0.9),
+                            ? Colors.yellowAccent.withOpacity(0.2)
+                            : Colors.white.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: course.visible
+                              ? Colors.yellowAccent
+                              : Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
                       ),
                       child: Text(
                         course.visible ? 'Published' : 'Draft',
-                        style: const TextStyle(
+                        style: TextStyle(
+                          color: course.visible ? Colors.yellowAccent : Colors.white70,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
+                          fontFamily: 'Montserrat',
                         ),
                       ),
                     ),

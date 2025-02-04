@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/course.dart';
 import '../models/user.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../screens/student_details_screen.dart';
 
 class CourseStatsScreen extends StatefulWidget {
   final Course course;
@@ -78,7 +79,9 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
             }
           }
 
+          final student = UserModel.fromMap(userData);
           students.add({
+            'user': student,
             'name': userData['name'] ?? 'Unknown',
             'startDate': courseData['startDate'] as Timestamp,
             'completedSteps': completedStepsCount,
@@ -265,6 +268,16 @@ class _CourseStatsScreenState extends State<CourseStatsScreen> {
             ),
           ),
           child: ListTile(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StudentDetailsScreen(
+                    student: student['user'] as UserModel,
+                  ),
+                ),
+              );
+            },
             title: Text(
               student['name'],
               style: const TextStyle(

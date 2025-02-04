@@ -390,16 +390,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
               child: Stack(
                 children: [
                   Container(
+                    width: double.infinity,
                     decoration: BoxDecoration(
                       color: const Color(0xFF1F1F1F),
                     ),
                   ),
-                  FractionallySizedBox(
-                    widthFactor: _progress,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[600],
-                      ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: MediaQuery.of(context).size.width * _progress,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[600],
                     ),
                   ),
                 ],

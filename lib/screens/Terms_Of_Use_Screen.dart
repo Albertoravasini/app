@@ -1,9 +1,7 @@
-// ignore: file_names
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
-class PrivacyPolicyScreen extends StatelessWidget {
-  const PrivacyPolicyScreen({super.key});
+class TermsOfUseScreen extends StatelessWidget {
+  const TermsOfUseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +22,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Privacy Policy',
+          'Terms of Use',
           style: TextStyle(
             color: Colors.white,
             fontSize: 18,
@@ -61,27 +59,27 @@ class PrivacyPolicyScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   _buildSection(
-                    'Just Learn ("us", "we", or "our") operates the Just Learn mobile application (the "Service"). This page informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service.',
+                    'Please read these Terms of Use ("Terms", "Terms of Use") carefully before using the Just Learn mobile application (the "Service") operated by Just Learn ("us", "we", or "our").',
                   ),
                   const SizedBox(height: 32),
-                  _buildTitle('Information Collection and Use'),
+                  _buildTitle('Subscriptions'),
                   _buildSection(
-                    'We collect several different types of information for various purposes to provide and improve our Service to you:\n\n• Personal Data: While using our Service, we may ask you to provide us with certain personally identifiable information that can be used to contact or identify you.\n\n• Usage Data: We may also collect information that your browser or device sends whenever you visit our Service.',
+                    'Some parts of the Service are billed on a subscription basis ("Subscription(s)"). You will be billed in advance on a recurring and periodic basis ("Billing Cycle"). Billing cycles are set on a monthly or six-monthly basis, depending on the type of subscription plan you select.\n\nAt the end of each Billing Cycle, your Subscription will automatically renew under the exact same conditions unless you cancel it or we cancel it. You may cancel your Subscription renewal through your iTunes/App Store account settings.',
                   ),
                   const SizedBox(height: 32),
-                  _buildTitle('Data Security'),
+                  _buildTitle('Free Trial'),
                   _buildSection(
-                    'The security of your data is important to us, but remember that no method of transmission over the Internet, or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your Personal Data, we cannot guarantee its absolute security.',
+                    'We may, at our sole discretion, offer a Subscription with a free trial for a limited period of time ("Free Trial"). You may be required to enter your billing information in order to sign up for the Free Trial.\n\nIf you do enter your billing information when signing up for the Free Trial, you will not be charged by us until the Free Trial has expired. On the last day of the Free Trial period, unless you cancelled your Subscription, you will be automatically charged the applicable Subscription fees for the type of Subscription you have selected.',
                   ),
                   const SizedBox(height: 32),
-                  _buildTitle('Your Rights'),
+                  _buildTitle('Content'),
                   _buildSection(
-                    'You have the right to:\n\n• Access your personal data\n• Correct inaccurate personal data\n• Request deletion of your personal data\n• Withdraw consent at any time\n• Object to processing of your personal data',
+                    'Our Service allows you to post, link, store, share and otherwise make available certain information, text, graphics, videos, or other material ("Content"). You are responsible for the Content that you post to the Service, including its legality, reliability, and appropriateness.',
                   ),
                   const SizedBox(height: 32),
                   _buildTitle('Contact Us'),
                   _buildSection(
-                    'If you have any questions about this Privacy Policy or our practices, please contact us:',
+                    'If you have any questions about these Terms, please contact us:',
                   ),
                   const SizedBox(height: 8),
                   GestureDetector(
@@ -132,4 +130,4 @@ class PrivacyPolicyScreen extends StatelessWidget {
       ),
     );
   }
-}
+} 

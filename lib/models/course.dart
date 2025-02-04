@@ -185,12 +185,14 @@ class Section {
   final List<LevelStep> steps;
   String? imageUrl;
   int sectionNumber;
+  List<SectionLink> links;
 
   Section({
     required this.title,
     required this.steps,
     this.imageUrl,
     required this.sectionNumber,
+    this.links = const [],
   });
 
   factory Section.fromMap(Map<String, dynamic> data) {
@@ -198,7 +200,8 @@ class Section {
       title: data['title'] ?? '',
       steps: List<LevelStep>.from(data['steps']?.map((step) => LevelStep.fromMap(step)) ?? []),
       imageUrl: data['imageUrl'],
-      sectionNumber: data['sectionNumber'] ?? 1, // Usa il numero fornito o 1 come default
+      sectionNumber: data['sectionNumber'] ?? 1,
+      links: List<SectionLink>.from(data['links']?.map((link) => SectionLink.fromMap(link)) ?? []),
     );
   }
 
@@ -208,6 +211,35 @@ class Section {
       'steps': steps.map((step) => step.toMap()).toList(),
       'imageUrl': imageUrl,
       'sectionNumber': sectionNumber,
+      'links': links.map((link) => link.toMap()).toList(),
+    };
+  }
+}
+
+class SectionLink {
+  String url;
+  String icon;
+  String title;
+
+  SectionLink({
+    required this.url,
+    required this.icon,
+    required this.title,
+  });
+
+  factory SectionLink.fromMap(Map<String, dynamic> data) {
+    return SectionLink(
+      url: data['url'] ?? '',
+      icon: data['icon'] ?? 'link',
+      title: data['title'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'url': url,
+      'icon': icon,
+      'title': title,
     };
   }
 }

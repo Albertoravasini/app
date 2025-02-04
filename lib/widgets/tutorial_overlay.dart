@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class TutorialOverlay extends StatefulWidget {
   final VoidCallback onComplete;
@@ -64,10 +65,12 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
       case 1:
         return _buildCourseNavigationStep();
       case 2:
-        return _buildArticlesStep();
+        return _buildResourceLinksStep();
       case 3:
-        return _buildCommentsStep();
+        return _buildArticlesStep();
       case 4:
+        return _buildCommentsStep();
+      case 5:
         return _buildNotesStep();
       default:
         return Container();
@@ -122,15 +125,15 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
       children: [
         Container(color: Colors.black.withOpacity(0.8)),
         Positioned(
-          bottom: 10,
-          left: 5,
+          bottom: 17,
+          left: 15,
           child: Container(
             width: 160,
-            height: 40,
+            height: 30,
             decoration: BoxDecoration(
               color: Colors.transparent,
               border: Border.all(color: Colors.yellowAccent, width: 2),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(50),
             ),
           ),
         ),
@@ -170,13 +173,13 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     );
   }
 
-  Widget _buildArticlesStep() {
+  Widget _buildResourceLinksStep() {
     return Stack(
       children: [
         Container(color: Colors.black.withOpacity(0.8)),
         Positioned(
           right: 11,
-          bottom: 120,
+          bottom: 211,
           child: Container(
             width: 40,
             height: 40,
@@ -184,6 +187,11 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
               color: Colors.transparent,
               border: Border.all(color: Colors.yellowAccent, width: 2),
               borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              Icons.link_rounded,
+              color: Colors.white,
+              size: 30,
             ),
           ),
         ),
@@ -198,7 +206,76 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.article, color: Colors.yellowAccent, size: 36),
+                Icon(
+                  Icons.link_rounded,
+                  color: Colors.yellowAccent,
+                  size: 36,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Chapter Resources',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Access additional learning resources for this chapter.',
+                  style: TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                _buildNavigationButtons(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildArticlesStep() {
+    return Stack(
+      children: [
+        Container(color: Colors.black.withOpacity(0.8)),
+        Positioned(
+          right: 11,
+          bottom: 153,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              border: Border.all(color: Colors.yellowAccent, width: 2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SvgPicture.asset(
+              'assets/fluent_preview-link-24-filled.svg',
+              color: Colors.white,
+              width: 30,
+              height: 30,
+            ),
+          ),
+        ),
+        Center(
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SvgPicture.asset(
+                  'assets/fluent_preview-link-24-filled.svg',
+                  color: Colors.yellowAccent,
+                  width: 36,
+                  height: 36,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Related Articles',
@@ -230,7 +307,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         Container(color: Colors.black.withOpacity(0.8)),
         Positioned(
           right: 11,
-          bottom: 70,
+          bottom: 105,
           child: Container(
             width: 40,
             height: 40,
@@ -238,6 +315,12 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
               color: Colors.transparent,
               border: Border.all(color: Colors.yellowAccent, width: 2),
               borderRadius: BorderRadius.circular(8),
+            ),
+            child: SvgPicture.asset(
+              'assets/ri_chat-ai-line.svg',
+              color: Colors.white,
+              width: 30,
+              height: 30,
             ),
           ),
         ),
@@ -252,7 +335,12 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.chat_bubble, color: Colors.yellowAccent, size: 36),
+                SvgPicture.asset(
+                  'assets/ri_chat-ai-line.svg',
+                  color: Colors.yellowAccent,
+                  width: 36,
+                  height: 36,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'AI Chat',
@@ -284,7 +372,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
         Container(color: Colors.black.withOpacity(0.8)),
         Positioned(
           right: 11,
-          bottom: 20,
+          bottom: 53,
           child: Container(
             width: 40,
             height: 40,
@@ -292,6 +380,12 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
               color: Colors.transparent,
               border: Border.all(color: Colors.yellowAccent, width: 2),
               borderRadius: BorderRadius.circular(8),
+            ),
+            child: Image.asset(
+              'assets/solar_pen-bold.png',
+              color: Colors.white,
+              width: 27,
+              height: 27,
             ),
           ),
         ),
@@ -306,7 +400,12 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.edit_note, color: Colors.yellowAccent, size: 36),
+                Image.asset(
+                  'assets/solar_pen-bold.png',
+                  color: Colors.yellowAccent,
+                  width: 36,
+                  height: 36,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Notes',
@@ -336,7 +435,7 @@ class _TutorialOverlayState extends State<TutorialOverlay> with SingleTickerProv
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        ...List.generate(5, (index) => Container(
+        ...List.generate(6, (index) => Container(
           width: _currentStep == index ? 24 : 8,
           height: 8,
           margin: const EdgeInsets.symmetric(horizontal: 4),

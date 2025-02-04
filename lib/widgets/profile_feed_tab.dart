@@ -253,14 +253,12 @@ class ProfileFeedTab extends StatelessWidget {
                   borderColor = Colors.white.withOpacity(0.3);
                   iconColor = Colors.white;
                   textColor = Colors.white;
-                  icon = Icons.play_circle_filled;
                   text = 'Continue';
                 } else {
                   // Available to enroll
                   borderColor = Colors.yellowAccent.withOpacity(0.3);
                   iconColor = Colors.yellowAccent;
                   textColor = Colors.yellowAccent;
-                  icon = Icons.school;
                   text = 'Enroll';
                 }
 
@@ -277,11 +275,7 @@ class ProfileFeedTab extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        icon,
-                        size: 16,
-                        color: iconColor,
-                      ),
+                      
                       const SizedBox(width: 4),
                       Text(
                         text,

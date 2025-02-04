@@ -12,6 +12,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CourseEditScreen extends StatefulWidget {
   final Course? course;
@@ -35,6 +36,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   bool _isEditing = false;
   String? _coverImageUrl;
   bool _isSubscriptionRequired = false;
+  bool _isVisible = true;  // Default a true per rendere i corsi visibili di default
    Course? _course;  // Aggiungi quest
 
   // Nuovi campi per fonti, ringraziamenti e approfondimenti
@@ -47,7 +49,21 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   final List<String> _stepTitles = ['Basic', 'Content', 'Resources', 'Summary'];
 
   int? _expandedStepIndex;
-  Map<int, double> _uploadProgress = {};  // Per tracciare il progresso di upload per ogni step
+  Map<String, double> _uploadProgress = {};  // Per tracciare il progresso di upload per ogni step
+  bool _isSaving = false;
+
+  final List<Map<String, IconData>> _availableIcons = [
+    {'link': FontAwesomeIcons.link},
+    {'book': FontAwesomeIcons.book},
+    {'video': FontAwesomeIcons.video},
+    {'file': FontAwesomeIcons.file},
+    {'github': FontAwesomeIcons.github},
+    {'youtube': FontAwesomeIcons.youtube},
+    {'article': FontAwesomeIcons.newspaper},
+    {'code': FontAwesomeIcons.code},
+    {'download': FontAwesomeIcons.download},
+    {'web': FontAwesomeIcons.globe},
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -164,152 +180,341 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   }
 
   Widget _buildBasicInfoStep() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Card(
-          color: const Color(0xFF282828),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: Colors.yellowAccent.withOpacity(0.3),
-              width: 1,
-              style: BorderStyle.solid,
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Card(
+            color: const Color(0xFF282828),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: Colors.yellowAccent.withOpacity(0.3),
+                width: 1,
+              ),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header con icona
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.yellowAccent.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header con icona
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.yellowAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.school_outlined,
+                          color: Colors.yellowAccent,
+                          size: 24,
+                        ),
                       ),
-                      child: Icon(
-                        Icons.school_outlined,
-                        color: Colors.yellowAccent,
-                        size: 24,
+                      const SizedBox(width: 12),
+                      Text(
+                        'Course Details',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontFamily: 'Montserrat',
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Course Details',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontFamily: 'Montserrat',
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Form fields
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
-                      width: 1,
-                    ),
+                    ],
                   ),
-                  child: DropdownButtonFormField<String>(
-                    value: _selectedTopic,
-                    decoration: _inputDecoration('Topic').copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(Icons.add, color: Colors.yellowAccent),
-                        onPressed: () => _showAddTopicDialog(context),
+                  const SizedBox(height: 24),
+
+                  // Cover Image Upload
+                  Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E1E1E),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white24,
+                        width: 1,
                       ),
                     ),
-                    dropdownColor: const Color(0xFF282828),
-                    items: [
-                      ..._topics.map((topic) => DropdownMenuItem(
-                        value: topic,
-                        child: Text(
-                          topic,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Montserrat',
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_coverImageUrl != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.network(
+                              _coverImageUrl!,
+                              width: double.infinity,
+                              height: 200,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        if (_uploadProgress.containsKey('cover'))
+                          Container(
+                            width: double.infinity,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: _uploadProgress['cover'],
+                                  color: Colors.yellowAccent,
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Uploading ${(_uploadProgress['cover']! * 100).toInt()}%',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_coverImageUrl == null && !_uploadProgress.containsKey('cover'))
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_outlined,
+                                color: Colors.white54,
+                                size: 48,
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Upload Cover Image',
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: InkWell(
+                            onTap: () async {
+                              final result = await FilePicker.platform.pickFiles(
+                                type: FileType.image,
+                                allowMultiple: false,
+                              );
+
+                              if (result != null) {
+                                final imageFile = File(result.files.single.path!);
+                                try {
+                                  // Se c'è già un'immagine, eliminala prima
+                                  if (_coverImageUrl != null) {
+                                    final oldImageRef = FirebaseStorage.instance.refFromURL(_coverImageUrl!);
+                                    await oldImageRef.delete();
+                                  }
+
+                                  setState(() {
+                                    _uploadProgress['cover'] = 0;
+                                  });
+
+                                  final fileName = 'course_cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+                                  final storageRef = FirebaseStorage.instance
+                                      .ref()
+                                      .child('course_covers')
+                                      .child(fileName);
+
+                                  final uploadTask = storageRef.putFile(imageFile);
+
+                                  uploadTask.snapshotEvents.listen(
+                                    (snapshot) {
+                                      setState(() {
+                                        _uploadProgress['cover'] = snapshot.bytesTransferred / snapshot.totalBytes;
+                                      });
+                                    },
+                                    onError: (error) {
+                                      print('Error during upload: $error');
+                                      setState(() {
+                                        _uploadProgress.remove('cover');
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Error uploading image: $error'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    },
+                                  );
+
+                                  await uploadTask;
+                                  final downloadUrl = await storageRef.getDownloadURL();
+
+                                  setState(() {
+                                    _coverImageUrl = downloadUrl;
+                                    _uploadProgress.remove('cover');
+                                  });
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Cover image uploaded successfully!'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  print('Error during image upload: $e');
+                                  setState(() {
+                                    _uploadProgress.remove('cover');
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error uploading image: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.yellowAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.yellowAccent,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.upload_outlined,
+                                    color: Colors.yellowAccent,
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    _coverImageUrl == null ? 'Upload' : 'Change',
+                                    style: TextStyle(
+                                      color: Colors.yellowAccent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      )).toList(),
-                    ],
-                    onChanged: (value) => setState(() => _selectedTopic = value),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                
-                TextFormField(
-                  initialValue: _courseTitle,
-                  decoration: _inputDecoration('Course Title'),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Montserrat',
+                  const SizedBox(height: 24),
+                  
+                  // Form fields
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                        width: 1,
+                      ),
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedTopic,
+                      decoration: _inputDecoration('Topic').copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(Icons.add, color: Colors.yellowAccent),
+                          onPressed: () => _showAddTopicDialog(context),
+                        ),
+                      ),
+                      dropdownColor: const Color(0xFF282828),
+                      items: [
+                        ..._topics.map((topic) => DropdownMenuItem(
+                          value: topic,
+                          child: Text(
+                            topic,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontFamily: 'Montserrat',
+                            ),
+                          ),
+                        )).toList(),
+                      ],
+                      onChanged: (value) => setState(() => _selectedTopic = value),
+                    ),
                   ),
-                  onChanged: (value) => _courseTitle = value,
-                ),
-                const SizedBox(height: 16),
-                
-                TextFormField(
-                  initialValue: _courseDescription,
-                  decoration: _inputDecoration('Description'),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Montserrat',
+                  const SizedBox(height: 16),
+                  
+                  TextFormField(
+                    initialValue: _courseTitle,
+                    decoration: _inputDecoration('Course Title'),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Montserrat',
+                    ),
+                    onChanged: (value) => _courseTitle = value,
                   ),
-                  maxLines: 3,
-                  onChanged: (value) => _courseDescription = value,
-                ),
-                const SizedBox(height: 16),
-                
-                TextFormField(
-                  initialValue: _courseCost?.toString(),
-                  decoration: _inputDecoration('Cost (coins)'),
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'Montserrat',
+                  const SizedBox(height: 16),
+                  
+                  TextFormField(
+                    initialValue: _courseDescription,
+                    decoration: _inputDecoration('Description'),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Montserrat',
+                    ),
+                    maxLines: 3,
+                    onChanged: (value) => _courseDescription = value,
                   ),
-                  keyboardType: TextInputType.number,
-                  onChanged: (value) => _courseCost = int.tryParse(value),
-                ),
-                const SizedBox(height: 16),
-                
-                // Aggiungi lo switch per la subscription
-                SwitchListTile(
-                  title: const Text(
-                    'Subscription Required',
-                    style: TextStyle(color: Colors.white),
+                  const SizedBox(height: 16),
+                  
+                  TextFormField(
+                    initialValue: _courseCost?.toString(),
+                    decoration: _inputDecoration('Cost (coins)'),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Montserrat',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) => _courseCost = int.tryParse(value),
                   ),
-                  subtitle: const Text(
-                    'Only subscribers can access this course',
-                    style: TextStyle(color: Colors.white70),
+                  const SizedBox(height: 16),
+                  
+                  // Aggiungi lo switch per la subscription
+                  SwitchListTile(
+                    title: const Text(
+                      'Subscription Required',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    subtitle: const Text(
+                      'Only subscribers can access this course',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    value: _isSubscriptionRequired,
+                    onChanged: (bool value) {
+                      setState(() {
+                        _isSubscriptionRequired = value;
+                        if (_course != null) {
+                          _course!.isSubscriptionRequired = value;
+                        }
+                      });
+                    },
+                    activeColor: Colors.purpleAccent,
+                    inactiveTrackColor: Colors.white24,
                   ),
-                  value: _isSubscriptionRequired,
-                  onChanged: (bool value) {
-                    setState(() {
-                      _isSubscriptionRequired = value;
-                      if (_course != null) {
-                        _course!.isSubscriptionRequired = value;
-                      }
-                    });
-                  },
-                  activeColor: Colors.purpleAccent,
-                  inactiveTrackColor: Colors.white24,
-                ),
-                
-                const SizedBox(height: 16),
-              ],
+                  
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -455,9 +660,9 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                       return _buildAddStepButton();
                     }
                     return _buildCompactStepCard(
-                      _selectedSection!.steps[index], 
+                      _selectedSection!.steps[index],
                       index,
-                      key: ValueKey(_selectedSection!.steps[index]),
+                      key: ValueKey('step_card_$index'),
                     );
                   },
                 ),
@@ -468,10 +673,13 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
 
   Widget _buildCompactStepCard(LevelStep step, int index, {Key? key}) {
     bool isExpanded = _expandedStepIndex == index;
-    bool isNewStep = step.content.isEmpty; // Verifica se è un nuovo step
+    bool isNewStep = step.content.isEmpty;
+    
+    // Crea una chiave unica per ogni step usando l'indice
+    final uniqueKey = ValueKey('step_$index');
     
     return Card(
-      key: key,
+      key: uniqueKey,
       margin: EdgeInsets.only(bottom: 8),
       color: Color(0xFF282828),
       shape: RoundedRectangleBorder(
@@ -600,7 +808,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                         Expanded(
                           child: Container(
                             height: 45,
-                            child: _uploadProgress.containsKey(index)
+                            child: _uploadProgress.containsKey(index.toString())
                               ? Container(
                                   decoration: BoxDecoration(
                                     color: Colors.yellowAccent.withOpacity(0.1),
@@ -611,14 +819,14 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                                     alignment: Alignment.center,
                                     children: [
                                       LinearProgressIndicator(
-                                        value: _uploadProgress[index],
+                                        value: _uploadProgress[index.toString()],
                                         backgroundColor: Colors.transparent,
                                         valueColor: AlwaysStoppedAnimation<Color>(
                                           Colors.yellowAccent.withOpacity(0.3),
                                         ),
                                       ),
                                       Text(
-                                        'Uploading ${(_uploadProgress[index]! * 100).toInt()}%',
+                                        'Uploading ${(_uploadProgress[index.toString()]! * 100).toInt()}%',
                                         style: TextStyle(
                                           color: Colors.yellowAccent,
                                           fontWeight: FontWeight.bold,
@@ -655,7 +863,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
 
                                         // Inizializza il progresso
                                         setState(() {
-                                          _uploadProgress[index] = 0;
+                                          _uploadProgress[index.toString()] = 0;
                                         });
 
                                         await _uploadVideo(
@@ -663,7 +871,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                                           (String videoUrl) {
                                             if (mounted) {
                                               setState(() {
-                                                _uploadProgress.remove(index);
+                                                _uploadProgress.remove(index.toString());
                                                 _selectedSection!.steps[index] = LevelStep(
                                                   type: 'video',
                                                   content: step.content,
@@ -680,7 +888,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                                           },
                                           (String error) {
                                             setState(() {
-                                              _uploadProgress.remove(index);
+                                              _uploadProgress.remove(index.toString());
                                             });
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
@@ -693,14 +901,14 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                                           (double progress) {
                                             if (mounted) {
                                               setState(() {
-                                                _uploadProgress[index] = progress;
+                                                _uploadProgress[index.toString()] = progress;
                                               });
                                             }
                                           },
                                         );
                                       } catch (e) {
                                         setState(() {
-                                          _uploadProgress.remove(index);
+                                          _uploadProgress.remove(index.toString());
                                         });
                                         print('Error during upload: $e');
                                         ScaffoldMessenger.of(context).showSnackBar(
@@ -745,7 +953,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                       ],
                     ),
                   ] else if (step.type == 'question') ...[
-                    // Campi per la domanda
+                    // Campo per la domanda
                     TextFormField(
                       initialValue: step.content,
                       decoration: _inputDecoration('Question'),
@@ -756,7 +964,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                             type: step.type,
                             content: value,
                             topic: step.topic,
-                            choices: step.choices,
+                            choices: step.choices ?? [],
                             correctAnswer: step.correctAnswer,
                             explanation: step.explanation,
                           );
@@ -764,42 +972,148 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                       },
                     ),
                     SizedBox(height: 16),
-                    TextFormField(
-                      initialValue: step.choices?.join(', '),
-                      decoration: _inputDecoration('Options (comma separated)'),
-                      style: TextStyle(color: Colors.white),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedSection!.steps[index] = LevelStep(
-                            type: step.type,
-                            content: step.content,
-                            topic: step.topic,
-                            choices: value.split(',').map((e) => e.trim()).toList(),
-                            correctAnswer: step.correctAnswer,
-                            explanation: step.explanation,
-                          );
-                        });
-                      },
+                    
+                    // Lista delle risposte
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Answers',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        ...List.generate(
+                          ((step.choices?.length ?? 0) + 1),
+                          (choiceIndex) {
+                            // Assicurati che choices non sia null
+                            final choices = step.choices ?? [];
+                            final isLastItem = choiceIndex == choices.length;
+                            // Controlla che l'indice sia valido prima di accedere a choices
+                            final isCorrect = !isLastItem && step.correctAnswer == choices[choiceIndex];
+                            
+                            if (isLastItem) {
+                              return Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.yellowAccent.withOpacity(0.1),
+                                    foregroundColor: Colors.yellowAccent,
+                                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: Colors.yellowAccent),
+                                    ),
+                                  ),
+                                  icon: Icon(Icons.add),
+                                  label: Text('Add Answer'),
+                                  onPressed: () {
+                                    setState(() {
+                                      final newChoices = List<String>.from(choices);
+                                      newChoices.add('');
+                                      _selectedSection!.steps[index] = LevelStep(
+                                        type: step.type,
+                                        content: step.content,
+                                        topic: step.topic,
+                                        choices: newChoices,
+                                        correctAnswer: step.correctAnswer,
+                                        explanation: step.explanation,
+                                      );
+                                    });
+                                  },
+                                ),
+                              );
+                            }
+
+                            return Container(
+                              margin: EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black12,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isCorrect 
+                                      ? Colors.greenAccent.withOpacity(0.5)
+                                      : Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      initialValue: choices[choiceIndex],
+                                      decoration: InputDecoration(
+                                        hintText: 'Enter answer',
+                                        hintStyle: TextStyle(color: Colors.white38),
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                                      ),
+                                      style: TextStyle(color: Colors.white),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          final newChoices = List<String>.from(choices);
+                                          newChoices[choiceIndex] = value;
+                                          _selectedSection!.steps[index] = LevelStep(
+                                            type: step.type,
+                                            content: step.content,
+                                            topic: step.topic,
+                                            choices: newChoices,
+                                            correctAnswer: isCorrect ? value : step.correctAnswer,
+                                            explanation: step.explanation,
+                                          );
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      isCorrect ? Icons.check_circle : Icons.check_circle_outline,
+                                      color: isCorrect ? Colors.greenAccent : Colors.white38,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _selectedSection!.steps[index] = LevelStep(
+                                          type: step.type,
+                                          content: step.content,
+                                          topic: step.topic,
+                                          choices: choices,
+                                          correctAnswer: isCorrect ? null : choices[choiceIndex],
+                                          explanation: step.explanation,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.delete_outline, color: Colors.white38),
+                                    onPressed: () {
+                                      setState(() {
+                                        final newChoices = List<String>.from(choices);
+                                        newChoices.removeAt(choiceIndex);
+                                        _selectedSection!.steps[index] = LevelStep(
+                                          type: step.type,
+                                          content: step.content,
+                                          topic: step.topic,
+                                          choices: newChoices,
+                                          correctAnswer: step.correctAnswer == choices[choiceIndex] 
+                                              ? null 
+                                              : step.correctAnswer,
+                                          explanation: step.explanation,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     SizedBox(height: 16),
-                    TextFormField(
-                      initialValue: step.correctAnswer,
-                      decoration: _inputDecoration('Correct Answer'),
-                      style: TextStyle(color: Colors.white),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedSection!.steps[index] = LevelStep(
-                            type: step.type,
-                            content: step.content,
-                            topic: step.topic,
-                            choices: step.choices,
-                            correctAnswer: value,
-                            explanation: step.explanation,
-                          );
-                        });
-                      },
-                    ),
-                    SizedBox(height: 16),
+                    
+                    // Campo per la spiegazione
                     TextFormField(
                       initialValue: step.explanation,
                       decoration: _inputDecoration('Explanation'),
@@ -830,7 +1144,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
 
   Widget _buildAddStepButton() {
     return Card(
-      key: ValueKey('add_step'),
+      key: ValueKey('add_step_button'),
       margin: EdgeInsets.only(bottom: 8),
       color: Colors.transparent,
       elevation: 0,
@@ -839,7 +1153,6 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
         side: BorderSide(
           color: Colors.yellowAccent.withOpacity(0.3),
           width: 1,
-          style: BorderStyle.solid,
         ),
       ),
       child: InkWell(
@@ -979,270 +1292,13 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
   void _addSection() {
     String? sectionTitle;
     String? imageUrl;
+    List<SectionLink> links = [];
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF282828),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.yellowAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.library_books_outlined,
-                  color: Colors.yellowAccent,
-                  size: 24,
-                ),
-              ),
-              SizedBox(width: 12),
-              Text(
-                'New Chapter',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                decoration: _inputDecoration('Titolo Capitolo'),
-                style: TextStyle(color: Colors.white),
-                onChanged: (value) => sectionTitle = value,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                decoration: _inputDecoration('URL Immagine (opzionale)'),
-                style: TextStyle(color: Colors.white),
-                onChanged: (value) => imageUrl = value,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontFamily: 'Montserrat',
-                ),
-              ),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.yellowAccent,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onPressed: () {
-                if (sectionTitle != null && sectionTitle!.isNotEmpty) {
-                  setState(() {
-                    _sections.add(Section(
-                      title: sectionTitle!,
-                      steps: [],
-                      imageUrl: imageUrl,
-                      sectionNumber: _sections.length + 1,
-                    ));
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: Text(
-                'Create',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Montserrat',
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _editSection(Section section, int index) {
-    String? sectionTitle = section.title;
-    String? imageUrl = section.imageUrl;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF282828),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.yellowAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.edit_outlined,
-                  color: Colors.yellowAccent,
-                  size: 24,
-                ),
-              ),
-              SizedBox(width: 12),
-              Text(
-                'Edit Chapter',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontFamily: 'Montserrat',
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                initialValue: section.title,
-                decoration: _inputDecoration('Chapter Title'),
-                style: TextStyle(color: Colors.white),
-                onChanged: (value) => sectionTitle = value,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                initialValue: section.imageUrl,
-                decoration: _inputDecoration('Image URL (optional)'),
-                style: TextStyle(color: Colors.white),
-                onChanged: (value) => imageUrl = value,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => _deleteSection(index),
-              child: Text(
-                'Delete',
-                style: TextStyle(
-                  color: Colors.redAccent,
-                  fontFamily: 'Montserrat',
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontFamily: 'Montserrat',
-                ),
-              ),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.yellowAccent,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              onPressed: () {
-                if (sectionTitle != null && sectionTitle!.isNotEmpty) {
-                  setState(() {
-                    _sections[index].title = sectionTitle!;
-                    _sections[index].imageUrl = imageUrl;
-                  });
-                  Navigator.pop(context);
-                }
-              },
-              child: Text(
-                'Save',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'Montserrat',
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _deleteSection(int index) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: Text(
-          'Delete Chapter',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          'Are you sure you want to delete this chapter?',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _sections.removeAt(index);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Chapter deleted successfully')),
-              );
-            },
-            child: Text(
-              'Delete',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _addStepDialog(Section section, int sectionIndex) {
-    String? stepType;
-    String? videoTitle;
-    String? videoUrl;
-    File? videoFile;
-    String? questionContent;
-    List<String> choices = [];
-    String? correctAnswer;
-    String? explanation;
-    bool isUploading = false;
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (context, setState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF282828),
               shape: RoundedRectangleBorder(
@@ -1257,16 +1313,14 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      stepType == 'video' ? Icons.play_circle_outline : 
-                      stepType == 'question' ? Icons.quiz_outlined : 
-                      Icons.add_circle_outline,
+                      Icons.library_books_outlined,
                       color: Colors.yellowAccent,
                       size: 24,
                     ),
                   ),
                   SizedBox(width: 12),
                   Text(
-                    'New Step',
+                    'New Chapter',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -1281,188 +1335,118 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    DropdownButtonFormField<String>(
-                      decoration: _inputDecoration('Step Type'),
-                      dropdownColor: const Color(0xFF282828),
-                      value: stepType,
-                      items: [
-                        DropdownMenuItem(
-                          value: 'video',
-                          child: Text('Video', style: TextStyle(color: Colors.white)),
-                        ),
-                        DropdownMenuItem(
-                          value: 'question',
-                          child: Text('Question', style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setDialogState(() => stepType = value);
-                      },
+                    TextFormField(
+                      decoration: _inputDecoration('Chapter Title'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) => sectionTitle = value,
                     ),
                     SizedBox(height: 16),
-                    if (stepType == 'video') ...[
-                      TextFormField(
-                        decoration: _inputDecoration('Video Title'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => videoTitle = value,
-                      ),
-                      SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.yellowAccent.withOpacity(0.1),
-                          foregroundColor: Colors.yellowAccent,
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: Colors.yellowAccent),
+                    TextFormField(
+                      decoration: _inputDecoration('Image URL (optional)'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) => imageUrl = value,
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Resource Links',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        icon: Icon(Icons.upload_file),
-                        label: Text('Select Video'),
-                        onPressed: isUploading ? null : () async {
-                          final result = await FilePicker.platform.pickFiles(
-                            type: FileType.video,
-                            allowMultiple: false,
-                          );
-
-                          if (result != null) {
-                            setDialogState(() {
-                              videoFile = File(result.files.single.path!);
+                        IconButton(
+                          icon: Icon(Icons.add_circle_outline, color: Colors.yellowAccent),
+                          onPressed: () {
+                            _addLinkDialog(context, (link) {
+                              setState(() {
+                                links.add(link);
+                              });
                             });
-                          }
-                        },
-                      ),
-                    ] else if (stepType == 'question') ...[
-                      TextFormField(
-                        decoration: _inputDecoration('Question'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => questionContent = value,
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        decoration: _inputDecoration('Options (comma separated)'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) {
-                          choices = value.split(',').map((e) => e.trim()).toList();
-                        },
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        decoration: _inputDecoration('Correct Answer'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => correctAnswer = value,
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        decoration: _inputDecoration('Explanation'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => explanation = value,
-                      ),
-                    ],
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    ...links.asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      SectionLink link = entry.value;
+                      return Card(
+                        color: Colors.black12,
+                        child: ListTile(
+                          leading: FaIcon(
+                            _availableIcons.firstWhere(
+                              (i) => i.containsKey(link.icon),
+                              orElse: () => {'link': FontAwesomeIcons.link},
+                            ).values.first,
+                            color: Colors.yellowAccent,
+                          ),
+                          title: Text(
+                            link.title,
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          subtitle: Text(
+                            link.url,
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () {
+                              setState(() {
+                                links.removeAt(idx);
+                              });
+                            },
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
+                  onPressed: () => Navigator.pop(context),
                   child: Text(
                     'Cancel',
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontFamily: 'Montserrat',
+                    ),
                   ),
                 ),
                 TextButton(
-                  onPressed: isUploading ? null : () async {
-                    if (stepType == 'video' && videoFile != null && videoTitle != null && videoTitle!.isNotEmpty) {
-                      try {
-                        setDialogState(() {
-                          isUploading = true;
-                        });
-
-                        // Verifica che il file esista e sia accessibile
-                        if (!await videoFile!.exists()) {
-                          throw Exception('Il file video non esiste o non è accessibile');
-                        }
-
-                        // Verifica la dimensione del file
-                        final fileSize = await videoFile!.length();
-                        print('Dimensione file: ${fileSize / (1024 * 1024)} MB');
-
-                        await _uploadVideo(
-                          videoFile!,
-                          (String videoUrl) {
-                            if (mounted) {
-                              setState(() {
-                                section.steps.add(LevelStep(
-                                  type: 'video',
-                                  content: videoTitle!,
-                                  videoUrl: videoUrl,
-                                  thumbnailUrl: null,
-                                  isShort: false,
-                                  topic: widget.course?.topic ?? '',
-                                ));
-                              });
-                            }
-                            Navigator.pop(dialogContext);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Video caricato con successo!')),
-                            );
-                          },
-                          (String error) {
-                            setState(() {
-                              isUploading = false;
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Errore: $error'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          },
-                          (double progress) {
-                            if (mounted) {
-                              setState(() {
-                                _uploadProgress[sectionIndex] = progress;
-                              });
-                            }
-                          },
-                        );
-                      } catch (e) {
-                        setState(() {
-                          isUploading = false;
-                        });
-                        print('Errore durante l\'upload: $e');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Errore durante l\'upload: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } else if (stepType == 'question' &&
-                        questionContent != null &&
-                        questionContent!.isNotEmpty &&
-                        correctAnswer != null &&
-                        correctAnswer!.isNotEmpty &&
-                        choices.isNotEmpty) {
-                      setState(() {
-                        section.steps.add(LevelStep(
-                          type: 'question',
-                          content: questionContent!,
-                          choices: choices,
-                          correctAnswer: correctAnswer!,
-                          explanation: explanation,
-                          topic: widget.course?.topic ?? '',
-                          videoUrl: null,
-                          thumbnailUrl: null,
-                          isShort: false,
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.yellowAccent,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (sectionTitle != null && sectionTitle!.isNotEmpty) {
+                      this.setState(() {
+                        _sections.add(Section(
+                          title: sectionTitle!,
+                          steps: [],
+                          imageUrl: imageUrl,
+                          sectionNumber: _sections.length + 1,
+                          links: links,
                         ));
                       });
-                      Navigator.pop(dialogContext);
+                      Navigator.pop(context);
                     }
                   },
                   child: Text(
-                    'Add',
-                    style: TextStyle(color: Colors.black),
+                    'Create',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Montserrat',
+                    ),
                   ),
                 ),
               ],
@@ -1473,15 +1457,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     );
   }
 
-  void _editStepDialog(Section section, int sectionIndex, LevelStep step, int stepIndex) {
-    String? stepType = step.type;
-    String? content = step.content;
-    String? videoUrl = step.videoUrl;
-    String? videoTitle = step.type == 'video' ? step.content : null;
-    String? correctAnswer = step.correctAnswer;
-    List<String>? choices = step.choices;
-    String? explanation = step.explanation;
-    String? thumbnailUrl = step.thumbnailUrl;
+  void _editSection(Section section, int index) {
+    String? sectionTitle = section.title;
+    String? imageUrl = section.imageUrl;
+    List<SectionLink> links = List.from(section.links);
 
     showDialog(
       context: context,
@@ -1509,7 +1488,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                   ),
                   SizedBox(width: 12),
                   Text(
-                    'Edit Step',
+                    'Edit Chapter',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -1522,84 +1501,85 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    DropdownButtonFormField<String>(
-                      value: stepType,
-                      decoration: _inputDecoration('Step Type'),
-                      dropdownColor: const Color(0xFF282828),
-                      items: ['video', 'question'].map((type) {
-                        return DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(
-                            type,
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          stepType = value;
-                        });
-                      },
+                    TextFormField(
+                      initialValue: section.title,
+                      decoration: _inputDecoration('Chapter Title'),
                       style: TextStyle(color: Colors.white),
+                      onChanged: (value) => sectionTitle = value,
                     ),
                     SizedBox(height: 16),
-                    if (stepType == 'video') ...[
-                      TextFormField(
-                        initialValue: videoUrl,
-                        decoration: _inputDecoration('YouTube Video ID'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) {
-                          videoUrl = value;
-                          setState(() {
-                            thumbnailUrl = 'https://img.youtube.com/vi/$value/0.jpg';
-                          });
-                        },
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: videoTitle,
-                        decoration: _inputDecoration('Video Title'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => videoTitle = value,
-                      ),
-                    ] else if (stepType == 'question') ...[
-                      TextFormField(
-                        initialValue: content,
-                        decoration: _inputDecoration('Question'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => content = value,
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: choices?.join(', '),
-                        decoration: _inputDecoration('Options (comma separated)'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) {
-                          choices = value.split(',').map((e) => e.trim()).toList();
-                        },
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: correctAnswer,
-                        decoration: _inputDecoration('Correct Answer'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => correctAnswer = value,
-                      ),
-                      SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: explanation,
-                        decoration: _inputDecoration('Explanation'),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (value) => explanation = value,
-                      ),
-                    ],
+                    TextFormField(
+                      initialValue: section.imageUrl,
+                      decoration: _inputDecoration('Image URL (optional)'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) => imageUrl = value,
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Resource Links',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontFamily: 'Montserrat',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.add_circle_outline, color: Colors.yellowAccent),
+                          onPressed: () {
+                            _addLinkDialog(context, (link) {
+                              setState(() {
+                                links.add(link);
+                              });
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    ...links.asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      SectionLink link = entry.value;
+                      return Card(
+                        color: Colors.black12,
+                        child: ListTile(
+                          leading: FaIcon(
+                            _availableIcons.firstWhere(
+                              (i) => i.containsKey(link.icon),
+                              orElse: () => {'link': FontAwesomeIcons.link},
+                            ).values.first,
+                            color: Colors.yellowAccent,
+                          ),
+                          title: Text(
+                            link.title,
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          subtitle: Text(
+                            link.url,
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete_outline, color: Colors.redAccent),
+                            onPressed: () {
+                              setState(() {
+                                links.removeAt(idx);
+                              });
+                            },
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => _deleteStep(_sections.indexOf(_selectedSection!), stepIndex),
+                  onPressed: () => _deleteSection(index),
                   child: Text(
                     'Delete',
                     style: TextStyle(
@@ -1627,11 +1607,148 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                     ),
                   ),
                   onPressed: () {
-                    // ... logica esistente per il salvataggio ...
-                    Navigator.pop(context);
+                    if (sectionTitle != null && sectionTitle!.isNotEmpty) {
+                      this.setState(() {
+                        _sections[index].title = sectionTitle!;
+                        _sections[index].imageUrl = imageUrl;
+                        _sections[index].links = links;
+                      });
+                      Navigator.pop(context);
+                    }
                   },
                   child: Text(
                     'Save',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Montserrat',
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
+  }
+
+  void _addLinkDialog(BuildContext context, Function(SectionLink) onAdd) {
+    String? title;
+    String? url;
+    String selectedIcon = 'link';
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF282828),
+              title: Text(
+                'Add Resource Link',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        decoration: _inputDecoration('Title'),
+                        style: TextStyle(color: Colors.white),
+                        onChanged: (value) => title = value,
+                      ),
+                      SizedBox(height: 16),
+                      TextFormField(
+                        decoration: _inputDecoration('URL'),
+                        style: TextStyle(color: Colors.white),
+                        onChanged: (value) => url = value,
+                      ),
+                      SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        height: 200,
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 5,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemCount: _availableIcons.length,
+                          itemBuilder: (context, index) {
+                            final iconMap = _availableIcons[index];
+                            final iconKey = iconMap.keys.first;
+                            final iconData = iconMap.values.first;
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  selectedIcon = iconKey;
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: selectedIcon == iconKey
+                                      ? Colors.yellowAccent.withOpacity(0.2)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: selectedIcon == iconKey
+                                        ? Colors.yellowAccent
+                                        : Colors.white24,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: FaIcon(
+                                    iconData,
+                                    color: selectedIcon == iconKey
+                                        ? Colors.yellowAccent
+                                        : Colors.white70,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.yellowAccent,
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: () {
+                    if (title != null && url != null &&
+                        title!.isNotEmpty && url!.isNotEmpty) {
+                      onAdd(SectionLink(
+                        title: title!,
+                        url: url!,
+                        icon: selectedIcon,
+                      ));
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Text(
+                    'Add',
                     style: TextStyle(
                       color: Colors.black,
                       fontWeight: FontWeight.w600,
@@ -1678,75 +1795,85 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     }
   }
 
-  Future<void> _saveCourse() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _saveCourse() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isSaving = true;
+      });
 
-    try {
-      final courseData = {
-        'title': _courseTitle,
-        'description': _courseDescription,
-        'cost': _courseCost,
-        'topic': _selectedTopic,
-        'sections': _sections.map((s) => s.toMap()).toList(),
-        'visible': true,
-        'authorId': FirebaseAuth.instance.currentUser?.uid,
-        'coverImageUrl': _coverImageUrl,
-        'isSubscriptionRequired': _isSubscriptionRequired,
-      };
+      try {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          throw Exception('User not authenticated');
+        }
 
-      if (_isEditing && _course != null) {
-        await FirebaseFirestore.instance
-            .collection('courses')
-            .doc(_course!.id)
-            .update(courseData);
-      } else {
-        await FirebaseFirestore.instance
-            .collection('courses')
-            .add(courseData);
-      }
-
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      print('Error saving course: $e');
-    }
-  }
-
-  // Aggiungi questa funzione per migrare i corsi esistenti
-  Future<void> migrateExistingCourses() async {
-    try {
-      final coursesRef = FirebaseFirestore.instance.collection('courses');
-      final QuerySnapshot coursesSnapshot = await coursesRef.get();
-
-      // Ottieni i dati dell'admin
-      final adminDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc('YOUR_ADMIN_USER_ID') // Sostituisci con l'ID del tuo utente admin
-          .get();
-
-      if (!adminDoc.exists) {
-        throw Exception('Admin user document not found');
-      }
-
-      final adminData = adminDoc.data()!;
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (var doc in coursesSnapshot.docs) {
-        final courseData = doc.data() as Map<String, dynamic>;
+        // Ottieni i dati dell'utente corrente
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
         
-        // Verifica se il corso ha già i campi dell'autore
-        if (!courseData.containsKey('authorId')) {
-          batch.update(doc.reference, {
-            'authorId': adminDoc.id,
-            'authorName': adminData['name'] ?? 'JustLearn Admin',
-            'authorProfileUrl': adminData['profileImageUrl'] ?? '',
-          });
+        final userData = userDoc.data();
+        if (userData == null) {
+          throw Exception('User data not found');
+        }
+
+        final courseData = {
+          'title': _courseTitle,
+          'description': _courseDescription,
+          'topic': _selectedTopic,
+          'cost': _courseCost,
+          'visible': _isVisible,
+          'sections': _sections.map((section) => section.toMap()).toList(),
+          'authorId': currentUser.uid,
+          'authorName': userData['name'] ?? 'Unknown Author',
+          'authorProfileUrl': userData['profileImageUrl'],
+          'isSubscriptionRequired': _isSubscriptionRequired,
+          'coverImageUrl': _coverImageUrl,
+          'sources': _sources,
+          'acknowledgments': _acknowledgments,
+          'recommendedBooks': _recommendedBooks,
+          'recommendedPodcasts': _recommendedPodcasts,
+          'recommendedWebsites': _recommendedWebsites,
+        };
+
+        if (widget.course != null) {
+          // Aggiornamento corso esistente
+          await FirebaseFirestore.instance
+              .collection('courses')
+              .doc(widget.course!.id)
+              .update(courseData);
+        } else {
+          // Creazione nuovo corso
+          await FirebaseFirestore.instance
+              .collection('courses')
+              .add(courseData);
+        }
+
+        setState(() {
+          _isSaving = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Course saved successfully!')),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        setState(() {
+          _isSaving = false;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving course: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
-
-      await batch.commit();
-      print('Migration completed successfully');
-    } catch (e) {
-      print('Error during migration: $e');
     }
   }
 
@@ -1990,10 +2117,6 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
             TextButton(
               style: TextButton.styleFrom(
                 backgroundColor: Colors.yellowAccent,
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
               ),
               onPressed: () {
                 if (newItem != null && newItem!.isNotEmpty) {
@@ -2299,6 +2422,47 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
       total += section.steps.length;
     }
     return total.toString();
+  }
+
+  void _deleteSection(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: Text(
+          'Delete Chapter',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Are you sure you want to delete this chapter?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _sections.removeAt(index);
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Chapter deleted successfully')),
+              );
+            },
+            child: Text(
+              'Delete',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

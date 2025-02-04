@@ -11,6 +11,8 @@ import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:Just_Learn/screens/profile_screen.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:Just_Learn/utils/platform_helper.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CourseInfoOverlay extends StatefulWidget {
   final Course? course;
@@ -49,6 +51,19 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
   late Animation<double> _scaleAnimation;
   bool _showUnlockOptions = false;
   bool _isAnimating = false;
+
+  final List<Map<String, IconData>> _availableIcons = [
+    {'link': FontAwesomeIcons.link},
+    {'book': FontAwesomeIcons.book},
+    {'video': FontAwesomeIcons.video},
+    {'file': FontAwesomeIcons.file},
+    {'github': FontAwesomeIcons.github},
+    {'youtube': FontAwesomeIcons.youtube},
+    {'article': FontAwesomeIcons.newspaper},
+    {'code': FontAwesomeIcons.code},
+    {'download': FontAwesomeIcons.download},
+    {'web': FontAwesomeIcons.globe},
+  ];
 
   @override
   void initState() {
@@ -377,6 +392,143 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
     );
   }
 
+  void _showResourceLinks() {
+    print('DEBUG - Course: ${widget.course?.title}');
+    print('DEBUG - Is in course: ${widget.isInCourse}');
+    print('DEBUG - currentSection: ${widget.currentSection?.title}');
+    print('DEBUG - currentSection links: ${widget.currentSection?.links}');
+    print('DEBUG - currentSection links length: ${widget.currentSection?.links.length}');
+    
+    if (widget.currentSection == null || widget.currentSection!.links.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No resources available for this chapter'),
+          backgroundColor: Colors.grey[800],
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF282828),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.link,
+                        color: Colors.yellowAccent,
+                        size: 20,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Chapter Resources',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(color: Colors.white12),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  itemCount: widget.currentSection!.links.length,
+                  itemBuilder: (context, index) {
+                    final link = widget.currentSection!.links[index];
+                    return InkWell(
+                      onTap: () async {
+                        final url = Uri.parse(link.url);
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        }
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        margin: EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            FaIcon(
+                              _availableIcons.firstWhere(
+                                (i) => i.containsKey(link.icon),
+                                orElse: () => {'link': FontAwesomeIcons.link},
+                              ).values.first,
+                              color: Colors.yellowAccent,
+                              size: 20,
+                            ),
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                link.title,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontFamily: 'Montserrat',
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: Colors.white24,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (PlatformHelper.isWeb) {
@@ -446,6 +598,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                     child: Container(
                       constraints: const BoxConstraints(maxWidth: 240),
                       height: 23,
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
                       decoration: ShapeDecoration(
                         color: const Color(0x93333333),
                         shape: RoundedRectangleBorder(
@@ -456,30 +609,42 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 7),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(
                             Icons.school,
                             color: Colors.white,
-                            size: 15,
+                            size: 14,
                           ),
                           const SizedBox(width: 4),
                           Flexible(
-                            child: Text(
-                              widget.isInCourse 
-                                  ? "Section ${widget.currentSection?.sectionNumber ?? 1}: ${widget.currentSection?.title ?? 'Section 1'}"
-                                  : widget.topic,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.72,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    widget.isInCourse 
+                                        ? "Section ${widget.currentSection?.sectionNumber ?? 1}: ${widget.currentSection?.title ?? 'Section 1'}"
+                                        : widget.topic,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontFamily: 'Montserrat',
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.72,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.keyboard_arrow_down_rounded,
+                                  color: Colors.white.withOpacity(0.7),
+                                  size: 16,
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -667,12 +832,39 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
           child: Column(
             children: [
               GestureDetector(
+                onTap: _showResourceLinks,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      child: Icon(
+                        Icons.link_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
+                    ),
+                    Text(
+                      '${widget.currentSection?.links.length ?? 0}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontFamily: 'Montserrat',
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            
+              GestureDetector(
                 onTap: () => widget.onShowArticles(true),
                 child: Column(
                   children: [
                     SvgPicture.asset(
                       'assets/fluent_preview-link-24-filled.svg',
-                      color: Colors.white70,
+                      color: Colors.white,
                       width: 30,
                       height: 30,
                     ),
@@ -686,7 +878,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                   children: [
                     SvgPicture.asset(
                       'assets/ri_chat-ai-line.svg',
-                      color: Colors.white70,
+                      color: Colors.white,
                       width: 30,
                       height: 30,
                     ),
@@ -700,14 +892,15 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                   children: [
                     Image.asset(
                       'assets/solar_pen-bold.png',
-                      color: Colors.white70,
-                      width: 30,
-                      height: 30,
+                      color: Colors.white,
+                      width: 27,
+                      height: 27,
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 57),
                   ],
                 ),
               ),
+              
             ],
           ),
         ),

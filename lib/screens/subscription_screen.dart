@@ -1,9 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/purchase_service.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'dart:ui';
+import 'package:Just_Learn/screens/Privacy_Policy_Screen.dart';
+import 'package:Just_Learn/screens/Terms_Of_Use_Screen.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   const SubscriptionScreen({Key? key}) : super(key: key);
@@ -13,7 +18,7 @@ class SubscriptionScreen extends StatefulWidget {
 }
 
 class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProviderStateMixin {
-  String selectedPlan = 'annual';
+  String selectedPlan = 'semiannual';
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late AnimationController _mainController;
   late AnimationController _pulseController;
@@ -21,6 +26,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
   double _opacity = 1.0;
   List<Offering>? _offerings;
   bool _isLoading = true;
+  bool _isPressed = false;
+  bool _showFloatingCTA = false;
+  double _ctaOpacity = 0.0;
 
   @override
   void initState() {
@@ -29,12 +37,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     _scrollController = ScrollController()
       ..addListener(() {
         final offset = _scrollController.offset;
-        final opacity = (1 - (offset / 100).clamp(0, 1)).toDouble();
-        setState(() => _opacity = opacity);
+        final maxScroll = _scrollController.position.maxScrollExtent;
+        final viewportHeight = _scrollController.position.viewportDimension;
+        final scrollPercentage = (offset / maxScroll).clamp(0.0, 1.0);
+        
+        setState(() {
+          if (offset >= maxScroll) {
+            _ctaOpacity = 1.0;
+          } else if (offset > 300) {
+            _ctaOpacity = ((offset - 300) / 100).clamp(0.0, 1.0);
+          } else {
+            _ctaOpacity = 0.0;
+          }
+          _showFloatingCTA = offset > 300;
+        });
       });
     _loadOfferings();
     Posthog().screen(
-      screenName: 'Subscription Screen',
+      screenName: 'Premium Subscription',
       properties: {
         'timestamp': DateTime.now().toIso8601String(),
       },
@@ -95,148 +115,253 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-    
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      body: CustomScrollView(
-        controller: _scrollController,
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Header Premium con design più moderno
-          SliverAppBar(
-            expandedHeight: 280, // Aumentato per più impatto visivo
-            pinned: true,
-            stretch: true,
-            backgroundColor: const Color(0xFF121212),
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+      body: Stack(
+        children: [
+          // Base background color
+          Container(
+            color: const Color(0xFF121212),
+          ),
+          // Subtle top gradient overlay
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF1E1C00).withOpacity(0.8),
+                    const Color(0xFF1A1A00).withOpacity(0.3),
+                    const Color(0xFF121212).withOpacity(0.1),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.3, 0.5, 0.7],
+                ),
+              ),
             ),
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground],
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Background pattern animato
-                  _buildAnimatedBackground(),
-                  
-                  // Overlay contenuto
-                  Opacity(
-                    opacity: _opacity,
-                    child: SafeArea(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Badge Premium più attraente
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  Colors.yellowAccent.withOpacity(0.2),
-                                  Colors.orangeAccent.withOpacity(0.2),
+          ),
+          // Subtle glow effect
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.4,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.yellowAccent.withOpacity(0.015),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          CustomScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // Premium Header
+              SliverAppBar(
+                expandedHeight: 280,
+                pinned: true,
+                backgroundColor: Colors.transparent,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Stack(
+                    children: [
+                      // Content
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 80, 24, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Premium badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.yellowAccent.withOpacity(0.2),
+                                    Colors.orangeAccent.withOpacity(0.2),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: Colors.yellowAccent.withOpacity(0.3),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    FontAwesomeIcons.crown,
+                                    color: Colors.yellowAccent,
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'PREMIUM',
+                                    style: TextStyle(
+                                      color: Colors.yellowAccent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.yellowAccent.withOpacity(0.3),
+                            ),
+                            const SizedBox(height: 24),
+                            // Main title with gradient
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [Colors.white, Colors.white70],
+                              ).createShader(bounds),
+                              child: const Text(
+                                'Unlock All Premium\nCourses Today',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                  height: 1.2,
+                                ),
                               ),
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.star,
-                                  color: Colors.yellowAccent,
-                                  size: 18,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'PREMIUM',
-                                  style: TextStyle(
-                                    color: Colors.yellowAccent,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.2,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(height: 12),
+                            Text(
+                              'Learn from expert teachers',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 16,
+                                height: 1.2,
+                              ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Plans section first
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      // Plans section
+                      _buildPlanSection(),
+                      const SizedBox(height: 32),
+                      // Premium features section
+                      _buildPremiumFeatures(),
+                      const SizedBox(height: 32),
+                      // Social proof section
+                      _buildSocialProof(),
+                      const SizedBox(height: 32),
+                      // Policy text and secure payment info
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            FontAwesomeIcons.shield,
+                            size: 14,
+                            color: Colors.white.withOpacity(0.5),
                           ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'Unlock Your Full\nLearning Potential',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              height: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
+                          const SizedBox(width: 8),
                           Text(
-                            'Join millions of premium learners',
+                            'Cancel anytime · Secure payment',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 16,
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 14,
                             ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 14,
+                          ),
+                          children: [
+                            const TextSpan(text: 'By subscribing, you agree to our '),
+                            TextSpan(
+                              text: 'Terms of Use',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const TermsOfUseScreen(),
+                                    ),
+                                  );
+                                },
+                            ),
+                            const TextSpan(text: ' and '),
+                            TextSpan(
+                              text: 'Privacy Policy',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const PrivacyPolicyScreen(),
+                                    ),
+                                  );
+                                },
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: MediaQuery.of(context).padding.bottom ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // Contenuto principale con design migliorato
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF121212),
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(32),
                 ),
               ),
-              child: Column(
-                children: [
-                  // Indicatore visivo dello scroll
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 24),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
+            ],
+          ),
+          // Close button
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 16,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(30),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildPlanSection(),
-                        const SizedBox(height: 32),
-                        _buildEnhancedFeatures(),
-                        const SizedBox(height: 32),
-                        _buildEnhancedCTA(),
-                      ],
-                    ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -245,64 +370,192 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     );
   }
 
+  Widget _buildPremiumFeatures() {
+    final features = [
+      {
+        'icon': FontAwesomeIcons.infinity,
+        'title': 'Unlimited Access',
+        'description': 'Access 100% of all courses',
+      },
+      {
+        'icon': FontAwesomeIcons.rocket,
+        'title': 'New Courses Weekly',
+        'description': 'Fresh content from top teachers',
+      },
+      {
+        'icon': Icons.school,
+        'title': 'Learn from the Best',
+        'description': 'Direct access to expert teachers',
+      },
+      {
+        'icon': FontAwesomeIcons.chartLine,
+        'title': 'Learn Every Day',
+        'description': 'Learn new skills every day',
+      },
+    ];
+
+    return Column(
+      children: features.map((feature) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          width: double.infinity,
+          child: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 300),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Icon container
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.1),
+                          Colors.white.withOpacity(0.05),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                    ),
+                    child: Icon(
+                      feature['icon'] as IconData,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          feature['title'] as String,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          feature['description'] as String,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildPlanSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GestureDetector(
-          onTap: () => setState(() => selectedPlan = 'annual'),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  selectedPlan == 'annual'
-                      ? Colors.yellowAccent.withOpacity(0.15)
-                      : Colors.yellowAccent.withOpacity(0.05),
-                  selectedPlan == 'annual'
-                      ? Colors.yellowAccent.withOpacity(0.05)
-                      : Colors.yellowAccent.withOpacity(0.02),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selectedPlan == 'annual'
-                    ? Colors.yellowAccent.withOpacity(0.3)
-                    : Colors.yellowAccent.withOpacity(0.1),
-                width: selectedPlan == 'annual' ? 2 : 1,
-              ),
-            ),
-            child: Column(
+        // 6-month plan
+        _buildPlanCard(
+          title: '6-Month Plan',
+          price: '\$29.99',
+          period: '6 months',
+          savings: 'SAVE 50%',
+          isSelected: selectedPlan == 'semiannual',
+          onTap: () => setState(() => selectedPlan = 'semiannual'),
+        ),
+        const SizedBox(height: 12),
+        // Monthly plan
+        _buildPlanCard(
+          title: 'Monthly Plan',
+          price: '\$9.99',
+          period: 'month',
+          isSelected: selectedPlan == 'monthly',
+          onTap: () => setState(() => selectedPlan = 'monthly'),
+          isPrimary: false,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlanCard({
+    required String title,
+    required String price,
+    required String period,
+    String? savings,
+    required bool isSelected,
+    required VoidCallback onTap,
+    bool isPrimary = true,
+  }) {
+    return GestureDetector(
+      onTap: () async {
+        setState(() => selectedPlan = isPrimary ? 'semiannual' : 'monthly');
+        await _handleSubscribe();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: isPrimary ? LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              isSelected 
+                  ? Colors.yellowAccent.withOpacity(0.15)
+                  : Colors.yellowAccent.withOpacity(0.05),
+              isSelected
+                  ? Colors.yellowAccent.withOpacity(0.05)
+                  : Colors.orangeAccent.withOpacity(0.05),
+            ],
+          ) : null,
+          color: isPrimary ? null : (isSelected ? const Color(0xFF383838) : const Color(0xFF282828)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? (isPrimary ? Colors.yellowAccent.withOpacity(0.3) : Colors.white.withOpacity(0.2))
+                : Colors.transparent,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Annual Plan',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              color: isPrimary ? Colors.yellowAccent : Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          if (isSelected) ...[
                             const SizedBox(width: 8),
-                            if (selectedPlan == 'annual')
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.yellowAccent,
-                                size: 20,
-                              ),
+                            Icon(
+                              Icons.check_circle,
+                              color: isPrimary ? Colors.yellowAccent : Colors.white,
+                              size: 18,
+                            ),
                           ],
-                        ),
-                        const SizedBox(height: 4),
+                        ],
+                      ),
+                      if (savings != null) ...[
+                        const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -312,9 +565,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                             color: Colors.yellowAccent,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'SAVE 50%',
-                            style: TextStyle(
+                          child: Text(
+                            savings,
+                            style: const TextStyle(
                               color: Colors.black,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
@@ -322,91 +575,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                           ),
                         ),
                       ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text(
-                          '\$29.99',
-                          style: TextStyle(
-                            color: Colors.yellowAccent,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'per year',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: () => setState(() => selectedPlan = 'monthly'),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: selectedPlan == 'monthly'
-                  ? const Color(0xFF383838)
-                  : const Color(0xFF282828),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selectedPlan == 'monthly'
-                    ? Colors.white.withOpacity(0.2)
-                    : Colors.transparent,
-                width: selectedPlan == 'monthly' ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'Monthly Plan',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (selectedPlan == 'monthly')
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text(
-                      '\$9.99',
+                    Text(
+                      price,
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
+                        color: isPrimary ? Colors.yellowAccent : Colors.white,
+                        fontSize: isPrimary ? 32 : 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      'per month',
+                      'per $period',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.7),
                         fontSize: 14,
@@ -416,102 +600,64 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                 ),
               ],
             ),
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildEnhancedFeatures() {
-    final features = [
-      {
-        'icon': Icons.star_rounded,
-        'title': 'Premium Content',
-        'description': 'Access all courses and exclusive materials',
-      },
-      {
-        'icon': Icons.offline_bolt_rounded,
-        'title': 'Offline Mode',
-        'description': 'Learn anywhere, anytime',
-      },
-      {
-        'icon': Icons.psychology_rounded,
-        'title': 'AI Tutor',
-        'description': 'Get personalized learning assistance',
-      },
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: features.map((feature) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 20),
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.yellowAccent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                feature['icon'] as IconData,
-                color: Colors.yellowAccent,
-              ),
-            ),
-            title: Text(
-              feature['title'] as String,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              feature['description'] as String,
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-              ),
-            ),
+  Widget _buildSocialProof() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (index) => const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2),
+              child: Icon(Icons.star, color: Colors.yellowAccent, size: 20),
+            )),
           ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildEnhancedCTA() {
-    return Column(
-      children: [
-        ElevatedButton(
-          onPressed: () async {
-            await _handleSubscribe();
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.yellowAccent,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            minimumSize: const Size(double.infinity, 56),
-          ),
-          child: const Text(
-            'Start Premium Now',
+          const SizedBox(height: 12),
+          const Text(
+            '4.9 out of 5',
             style: TextStyle(
+              color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Cancel anytime. Terms apply.',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 14,
+          const SizedBox(height: 4),
+          Text(
+            'Joined by 1000+ learners',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14,
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnimatedBackground() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.yellowAccent.withOpacity(0.1),
+            Colors.orangeAccent.withOpacity(0.05),
+            const Color(0xFF121212),
+          ],
+          stops: const [0.0, 0.3, 0.6],
         ),
-        const SizedBox(height: 32),
-      ],
+      ),
     );
   }
 
@@ -564,7 +710,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Abbonamento attivato con successo!'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.white,
           ),
         );
         
@@ -596,21 +742,5 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Widget _buildAnimatedBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.yellowAccent.withOpacity(0.1),
-            Colors.orangeAccent.withOpacity(0.05),
-            Colors.black.withOpacity(0.1),
-          ],
-        ),
-      ),
-    );
   }
 }

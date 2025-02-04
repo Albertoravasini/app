@@ -110,7 +110,10 @@ class MyApp extends StatelessWidget {
               color: Colors.white,
             ),
             appBarTheme: const AppBarTheme(
-              color: Colors.black,
+              backgroundColor: Color(0xFF121212),
+              surfaceTintColor: Colors.transparent,
+              scrolledUnderElevation: 0,
+              elevation: 0,
               titleTextStyle: TextStyle(
                 fontSize: 20.0,
                 fontFamily: 'Montserrat',

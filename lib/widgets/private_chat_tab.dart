@@ -160,32 +160,52 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
     // Se non il proprietario e nessuna subscription, mostra il messaggio
     if (widget.currentUser.uid != widget.profileUser.uid && !_hasSubscription!) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.lock_outline,
-              size: 64,
-              color: Colors.white.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Private chat not available',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(
+                    color: Colors.yellowAccent.withOpacity(0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Icon(
+                  Icons.lock_outline_rounded,
+                  size: 32,
+                  color: Colors.yellowAccent,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Subscribe to chat with this creator',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.5),
-                fontSize: 14,
+              const SizedBox(height: 24),
+              const Text(
+                'Private Chat Locked',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontFamily: 'Montserrat',
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Text(
+                'Subscribe to unlock private chat with ${widget.profileUser.name} and get exclusive access to direct communication.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 16,
+                  fontFamily: 'Montserrat',
+                  fontWeight: FontWeight.w500,
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }

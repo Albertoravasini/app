@@ -16,6 +16,7 @@ import 'package:Just_Learn/services/image_service.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'profile_screen.dart';
+import 'teacher_dashboard_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final UserModel currentUser;
@@ -68,7 +69,7 @@ class SettingsScreen extends StatelessWidget {
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ProfileScreen(currentUser: currentUser),
+                        builder: (context) => TeacherDashboardScreen(teacherId: currentUser.uid),
                       ),
                     ),
                   )
@@ -166,7 +167,14 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _buildProfileSection(BuildContext context) {
     return GestureDetector(
-      
+      onTap: currentUser.role == 'teacher' 
+        ? () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProfileScreen(currentUser: currentUser),
+            ),
+          )
+        : null,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -208,11 +216,12 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.white54,
-              size: 16,
-            ),
+            if (currentUser.role == 'teacher')
+              const Icon(
+                Icons.arrow_forward_ios,
+                color: Colors.white54,
+                size: 16,
+              ),
           ],
         ),
       ),
@@ -226,22 +235,15 @@ class SettingsScreen extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF2C2C2E),
-            const Color(0xFF1C1C1E),
+            const Color(0xFFFFFF28).withOpacity(0.08),
+            const Color(0xFFFFD700).withOpacity(0.08),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.yellowAccent.withOpacity(0.2),
+          color: const Color(0xFFFFFF28).withOpacity(0.3),
           width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -263,7 +265,7 @@ class SettingsScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.yellowAccent.withOpacity(0.2),
+                        color: const Color(0xFFFFFF28).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Row(
@@ -272,13 +274,13 @@ class SettingsScreen extends StatelessWidget {
                           Icon(
                             Icons.workspace_premium,
                             size: 16,
-                            color: Colors.yellowAccent,
+                            color: Color(0xFFFFFF28),
                           ),
                           SizedBox(width: 4),
                           Text(
                             'PRO',
                             style: TextStyle(
-                              color: Colors.yellowAccent,
+                              color: Color(0xFFFFFF28),
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
                             ),
@@ -290,13 +292,13 @@ class SettingsScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.yellowAccent.withOpacity(0.2),
+                        color: const Color(0xFFFFFF28).withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
                         'SAVE 50%',
                         style: TextStyle(
-                          color: Colors.yellowAccent,
+                          color: Color(0xFFFFFF28),
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -315,7 +317,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Get unlimited access to all features',
+                  'Get unlimited access to all courses',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 14,
@@ -325,7 +327,7 @@ class SettingsScreen extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '\$2.49',
+                      '\$4.99',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 24,
@@ -343,7 +345,7 @@ class SettingsScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.yellowAccent,
+                        color: const Color(0xFFFFFF28),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Row(

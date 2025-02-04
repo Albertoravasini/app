@@ -12,7 +12,7 @@ class PurchaseService {
   
   // ID dei prodotti RevenueCat (aggiornati in base ai log)
   static const String _monthlyId = '\$rc_monthly';
-  static const String _threeMonthId = '\$rc_three_month';
+  static const String _threeMonthId = '\$rc_six_month';
   
   // ID dell'entitlement
   static const String _entitlementId = 'premium';
