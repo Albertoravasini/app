@@ -16,6 +16,7 @@ import 'package:Just_Learn/widgets/page_view_container.dart';
 import '../services/course_service.dart';
 import 'package:Just_Learn/screens/section_selection_sheet.dart';
 import 'package:Just_Learn/controllers/video_player_manager.dart';
+import '../widgets/points_screen.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -887,6 +888,23 @@ Widget build(BuildContext context) {
     
     if (currentStep.type == 'question' && allShortSteps[index]['showQuestion']) {
       return _buildQuestionCard(currentStep, allShortSteps[index]['level']);
+    }
+    
+    if (currentStep.type == 'points') {
+      return PointsScreen(
+        step: currentStep,
+        topic: isInCourseMode && currentCourse != null 
+            ? currentCourse!.topic 
+            : (widget.selectedTopic ?? 'Just Learn'),
+        onComplete: () {
+          // After a short delay to show the confetti, move to the next step
+          Future.delayed(Duration(seconds: 1), () {
+            if (mounted) {
+              nextPage();
+            }
+          });
+        },
+      );
     }
     
     return _buildVideoPlayer(index);

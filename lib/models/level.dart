@@ -76,6 +76,7 @@ class LevelStep {
   String? topic;
   final DateTime? createdAt;
   final int? duration;
+  List<Point>? points;
 
   LevelStep({
     required this.type,
@@ -90,6 +91,7 @@ class LevelStep {
     this.topic,
     this.createdAt,
     this.duration,
+    this.points,
   });
 
   factory LevelStep.fromMap(Map<String, dynamic> data) {
@@ -97,7 +99,7 @@ class LevelStep {
       type: data['type'] ?? '',
       content: data['content'] ?? '',
       videoUrl: data['videoUrl'],
-      choices: List<String>.from(data['choices'] ?? []),
+      choices: data['choices'] != null ? List<String>.from(data['choices']) : null,
       correctAnswer: data['correctAnswer'],
       explanation: data['explanation'],
       thumbnailUrl: data['thumbnailUrl'],
@@ -108,6 +110,9 @@ class LevelStep {
           ? (data['createdAt'] as Timestamp).toDate() 
           : null,
       duration: data['duration'],
+      points: data['points'] != null 
+          ? List<Point>.from(data['points'].map((point) => Point.fromMap(point)))
+          : null,
     );
   }
 
@@ -125,6 +130,7 @@ class LevelStep {
       'topic': topic,
       'createdAt': createdAt?.toIso8601String(),
       'duration': duration,
+      'points': points?.map((point) => point.toMap()).toList(),
     };
   }
 
@@ -145,4 +151,28 @@ class LevelStep {
       content.hashCode ^
       (videoUrl?.hashCode ?? 0) ^
       isShort.hashCode;
+}
+
+class Point {
+  String title;
+  bool completed;
+
+  Point({
+    required this.title,
+    this.completed = false,
+  });
+
+  factory Point.fromMap(Map<String, dynamic> data) {
+    return Point(
+      title: data['title'] ?? '',
+      completed: data['completed'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'completed': completed,
+    };
+  }
 }

@@ -501,7 +501,11 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                   Icon(
                     isLocked 
                         ? Icons.lock
-                        : (step.type == 'video' ? FontAwesomeIcons.play : FontAwesomeIcons.question),
+                        : (step.type == 'video' 
+                            ? FontAwesomeIcons.play 
+                            : step.type == 'points'
+                                ? FontAwesomeIcons.circle
+                                : FontAwesomeIcons.question),
                     color: baseColor,
                     size: 14,
                   ),
@@ -560,6 +564,8 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
       return isCompleted ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.play;
     } else if (type == 'question') {
       return isCompleted ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.question;
+    } else if (type == 'points') {
+      return isCompleted ? FontAwesomeIcons.circleCheck : FontAwesomeIcons.circle;
     }
     return FontAwesomeIcons.circle;
   }
@@ -570,6 +576,8 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         return step.content ?? 'Video lezione';
       case 'question':
         return 'Quiz';
+      case 'points':
+        return step.content ?? 'Points';
       default:
         return 'Contenuto';
     }

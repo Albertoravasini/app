@@ -702,7 +702,11 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
             title: Row(
               children: [
                 Icon(
-                  step.type == 'video' ? Icons.play_circle_outline : Icons.quiz_outlined,
+                  step.type == 'video' 
+                    ? Icons.play_circle_outline 
+                    : step.type == 'points'
+                      ? Icons.check_circle_outline
+                      : Icons.quiz_outlined,
                   color: Colors.yellowAccent,
                   size: 20,
                 ),
@@ -767,6 +771,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                         value: 'question',
                         child: Text('Question', style: TextStyle(color: Colors.white)),
                       ),
+                      DropdownMenuItem(
+                        value: 'points',
+                        child: Text('Points', style: TextStyle(color: Colors.white)),
+                      ),
                     ],
                     onChanged: (value) {
                       setState(() {
@@ -778,6 +786,7 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                           correctAnswer: step.correctAnswer,
                           explanation: step.explanation,
                           videoUrl: step.videoUrl,
+                          points: step.type == 'points' ? step.points : [],
                         );
                       });
                     },
@@ -1131,6 +1140,135 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                           );
                         });
                       },
+                    ),
+                  ] else if (step.type == 'points') ...[
+                    // Title field
+                    TextFormField(
+                      initialValue: step.content,
+                      decoration: _inputDecoration('Points Title'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: value,
+                            topic: step.topic,
+                            points: step.points ?? [],
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    
+                    // Points list
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Points',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        ...List.generate(
+                          ((step.points?.length ?? 0) + 1),
+                          (pointIndex) {
+                            final points = step.points ?? [];
+                            final isLastItem = pointIndex == points.length;
+                            
+                            if (isLastItem) {
+                              return Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.yellowAccent.withOpacity(0.1),
+                                    foregroundColor: Colors.yellowAccent,
+                                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: Colors.yellowAccent),
+                                    ),
+                                  ),
+                                  icon: Icon(Icons.add),
+                                  label: Text('Add Point'),
+                                  onPressed: () {
+                                    setState(() {
+                                      final newPoints = List<Point>.from(points);
+                                      newPoints.add(Point(title: ''));
+                                      _selectedSection!.steps[index] = LevelStep(
+                                        type: step.type,
+                                        content: step.content,
+                                        topic: step.topic,
+                                        points: newPoints,
+                                      );
+                                    });
+                                  },
+                                ),
+                              );
+                            }
+
+                            return Container(
+                              margin: EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black12,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      initialValue: points[pointIndex].title,
+                                      decoration: InputDecoration(
+                                        hintText: 'Enter point',
+                                        hintStyle: TextStyle(color: Colors.white38),
+                                        border: InputBorder.none,
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                                      ),
+                                      style: TextStyle(color: Colors.white),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          final newPoints = List<Point>.from(points);
+                                          newPoints[pointIndex] = Point(
+                                            title: value,
+                                            completed: points[pointIndex].completed,
+                                          );
+                                          _selectedSection!.steps[index] = LevelStep(
+                                            type: step.type,
+                                            content: step.content,
+                                            topic: step.topic,
+                                            points: newPoints,
+                                          );
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.delete_outline, color: Colors.white38),
+                                    onPressed: () {
+                                      setState(() {
+                                        final newPoints = List<Point>.from(points);
+                                        newPoints.removeAt(pointIndex);
+                                        _selectedSection!.steps[index] = LevelStep(
+                                          type: step.type,
+                                          content: step.content,
+                                          topic: step.topic,
+                                          points: newPoints,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ],
