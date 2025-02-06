@@ -1,6 +1,5 @@
 import 'package:Just_Learn/controllers/scroll_physics.dart';
 import 'package:Just_Learn/models/course.dart';
-import 'package:Just_Learn/screens/course_detail_screen.dart';
 import 'package:Just_Learn/services/shorts_service.dart';
 import 'package:Just_Learn/widgets/course_question_card.dart';
 import 'package:Just_Learn/widgets/video_player_widget.dart';
@@ -551,7 +550,7 @@ void dispose() {
       topic: level.topic,
       questionStep: null,
       onPageChanged: widget.onPageChanged,
-      videoTitle: videoTitle,
+      videoTitle: (allShortSteps[index]['step'] as LevelStep).content,
       course: course,
       onStartCourse: (course, section, {int? initialStepIndex}) => 
           startCourse(course, selectedSection: section, initialStepIndex: initialStepIndex),
@@ -562,7 +561,7 @@ void dispose() {
 
   Widget _buildQuestionCard(LevelStep step, Level level) {
     return Container(
-      padding: const EdgeInsets.only(top: 80, right: 16, left: 16),
+      padding: const EdgeInsets.only(top: 40, right: 16, left: 16),
       alignment: Alignment.center,
       child: CourseQuestionCard(
         step: step,
@@ -803,43 +802,45 @@ void dispose() {
   @override
 Widget build(BuildContext context) {
   return Scaffold(
-    body: allShortSteps.isEmpty
-        ? const Center(child: CircularProgressIndicator())
-        : PageView.custom(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            physics: const TikTokScrollPhysics(),
-            childrenDelegate: SliverChildBuilderDelegate(
-              (context, index) {
-                if (index < 0 || index >= allShortSteps.length) return null;
-                return RepaintBoundary(
-                  child: _buildPageContent(index),
+    body: SafeArea(
+      bottom: false,  // Non applicare il padding in basso
+      child: allShortSteps.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : PageView.custom(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              physics: const TikTokScrollPhysics(),
+              childrenDelegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index < 0 || index >= allShortSteps.length) return null;
+                  return RepaintBoundary(
+                    child: _buildPageContent(index),
+                  );
+                },
+                childCount: allShortSteps.length,
+                findChildIndexCallback: (Key key) {
+                  if (key is ValueKey<String>) {
+                    return int.tryParse(key.value.split('_')[1]);
+                  }
+                  return null;
+                },
+              ),
+              onPageChanged: (index) {
+                _onPageChanged(index);
+
+                scrollCount++;
+                
+                Posthog().capture(
+                  eventName: 'short_scroll',
+                  properties: {
+                    'scroll_count': scrollCount,
+                    'course_id': currentCourse?.id ?? 'no_course',
+                    'video_index': index,
+                  },
                 );
               },
-              childCount: allShortSteps.length,
-              findChildIndexCallback: (Key key) {
-                if (key is ValueKey<String>) {
-                  // Implementa la logica per trovare l'indice del video
-                  return int.tryParse(key.value.split('_')[1]);
-                }
-                return null;
-              },
             ),
-            onPageChanged: (index) {
-              _onPageChanged(index); // Aggiorna gli step
-
-              scrollCount++;
-              
-              Posthog().capture(
-                eventName: 'short_scroll',
-                properties: {
-                  'scroll_count': scrollCount,
-                  'course_id': currentCourse?.id ?? 'no_course',
-                  'video_index': index,
-                },
-              );
-            },
-          ),
+    ),
   );
 }
 

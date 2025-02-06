@@ -55,6 +55,15 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
           .map((doc) => Course.fromFirestore(doc))
           .toList();
 
+      // Get completedPoints from student data
+      final studentDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.student.uid)
+          .get();
+      
+      final studentData = studentDoc.data()!;
+      final completedPoints = List<String>.from(studentData['completedPoints'] ?? []);
+
       // 4. Carica i passi completati solo per i corsi filtrati
       for (var course in _completedCourses) {
         final topic = course.topic;
@@ -66,6 +75,7 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
               .where((video) => video.completed)
               .map((video) => video.videoId),
           ...answeredQuestions,
+          ...completedPoints,
         ];
       }
 
@@ -172,160 +182,176 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
       itemBuilder: (context, index) {
         final course = _completedCourses[index];
         
-        // Calcolo corretto del progresso totale
-        int totalSteps = 0;
-        int completedStepsCount = 0;
-        
-        for (var section in course.sections) {
-          for (var step in section.steps) {
-            totalSteps++;
-            if (_completedSteps[course.topic]?.contains(step.videoUrl ?? step.content) ?? false) {
-              completedStepsCount++;
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.student.uid)
+              .get(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+              ));
             }
-          }
-        }
-        
-        final progress = totalSteps > 0 ? completedStepsCount / totalSteps : 0.0;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFF282828),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+            final userData = snapshot.data!.data() as Map<String, dynamic>;
+            final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+            
+            // Calcolo corretto del progresso totale
+            int totalSteps = 0;
+            int completedStepsCount = 0;
+            
+            for (var section in course.sections) {
+              for (var step in section.steps) {
+                totalSteps++;
+                if (step.type == 'points') {
+                  if (completedPoints.contains(step.content)) {
+                    completedStepsCount++;
+                  }
+                } else if (_completedSteps[course.topic]?.contains(step.videoUrl ?? step.content) ?? false) {
+                  completedStepsCount++;
+                }
+              }
+            }
+            
+            final progress = totalSteps > 0 ? completedStepsCount / totalSteps : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF282828),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (course.coverImageUrl != null)
-                Image.network(
-                  course.coverImageUrl!,
-                  height: 120,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (course.coverImageUrl != null)
+                    Image.network(
+                      course.coverImageUrl!,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            course.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                course.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.yellowAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.yellowAccent),
+                              ),
+                              child: Text(
+                                '${(progress * 100).round()}%',
+                                style: const TextStyle(
+                                  color: Colors.yellowAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        _buildProgressStats(
+                          course, 
+                          completedStepsCount,
+                          totalSteps,
+                        ),
+                        const SizedBox(height: 16),
+
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            backgroundColor: Colors.white.withOpacity(0.1),
+                            valueColor: const AlwaysStoppedAnimation(Colors.yellowAccent),
+                            minHeight: 4,
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.yellowAccent.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.yellowAccent),
-                          ),
-                          child: Text(
-                            '${(progress * 100).round()}%',
-                            style: const TextStyle(
-                              color: Colors.yellowAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                        const SizedBox(height: 16),
+
+                        InkWell(
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              backgroundColor: Colors.transparent,
+                              isScrollControlled: true,
+                              builder: (context) => _buildCourseDetailsSheet(course, _completedSteps[course.topic] ?? []),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Vedi dettagli progresso',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  color: Colors.white70,
+                                  size: 16,
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-
-                    _buildProgressStats(
-                      course, 
-                      completedStepsCount,  // Numero corretto di step completati
-                      totalSteps,          // Numero totale di step
-                    ),
-                    const SizedBox(height: 16),
-
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(2),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.white.withOpacity(0.1),
-                        valueColor: const AlwaysStoppedAnimation(Colors.yellowAccent),
-                        minHeight: 4,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    InkWell(
-                      onTap: () {
-                        showModalBottomSheet(
-                          context: context,
-                          backgroundColor: Colors.transparent,
-                          isScrollControlled: true,
-                          builder: (context) => _buildCourseDetailsSheet(course, _completedSteps[course.topic] ?? []),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Vedi dettagli progresso',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.9),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.arrow_forward_ios_rounded,
-                              color: Colors.white70,
-                              size: 16,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
   Widget _buildCourseDetailsSheet(Course course, List<String> completedSteps) {
-    // Calcolo del progresso totale
-    int totalSteps = 0;
-    int completedStepsCount = 0;
-    for (var section in course.sections) {
-      totalSteps += section.steps.length;
-      completedStepsCount += section.steps.where(
-        (step) => completedSteps.contains(step.videoUrl ?? step.content)
-      ).length;
-    }
-    final totalProgress = totalSteps > 0 ? completedStepsCount / totalSteps : 0.0;
+    // Get completedPoints from user data
+    final userDoc = FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.student.uid)
+        .get();
 
     return DraggableScrollableSheet(
       initialChildSize: 0.9,
@@ -337,260 +363,293 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
             color: Color(0xFF1E1E1E),
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
-            children: [
-              // Header con progresso totale
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF282828),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                child: Column(
-                  children: [
-                    // Indicatore di drag
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
+          child: FutureBuilder<DocumentSnapshot>(
+            future: userDoc,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+                ));
+              }
+
+              final userData = snapshot.data!.data() as Map<String, dynamic>;
+              final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+
+              // Calcolo del progresso totale
+              int totalSteps = 0;
+              int completedStepsCount = 0;
+
+              for (var section in course.sections) {
+                totalSteps += section.steps.length;
+                completedStepsCount += section.steps.where((step) {
+                  if (step.type == 'points') {
+                    return completedPoints.contains(step.content);
+                  }
+                  return completedSteps.contains(step.videoUrl ?? step.content);
+                }).length;
+              }
+
+              final totalProgress = totalSteps > 0 ? completedStepsCount / totalSteps : 0.0;
+
+              return Column(
+                children: [
+                  // Header con progresso totale
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF282828),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                     ),
-                    const SizedBox(height: 20),
-                    // Progresso totale
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
                       children: [
-                        Row(
+                        // Indicatore di drag
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Progresso totale
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Text(
-                                course.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    course.title,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                const SizedBox(width: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.yellowAccent.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.yellowAccent),
+                                  ),
+                                  child: Text(
+                                    '${(totalProgress * 100).round()}%',
+                                    style: const TextStyle(
+                                      color: Colors.yellowAccent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '$completedStepsCount di $totalSteps step completati',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.yellowAccent.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.yellowAccent),
-                              ),
-                              child: Text(
-                                '${(totalProgress * 100).round()}%',
-                                style: const TextStyle(
-                                  color: Colors.yellowAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
+                            const SizedBox(height: 16),
+                            // Barra progresso totale
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: totalProgress,
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                valueColor: const AlwaysStoppedAnimation(Colors.yellowAccent),
+                                minHeight: 4,
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$completedStepsCount di $totalSteps step completati',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Barra progresso totale
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: totalProgress,
-                            backgroundColor: Colors.white.withOpacity(0.1),
-                            valueColor: const AlwaysStoppedAnimation(Colors.yellowAccent),
-                            minHeight: 4,
-                          ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              // Lista sezioni
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: course.sections.length,
-                  itemBuilder: (context, index) {
-                    final section = course.sections[index];
-                    final completedInSection = section.steps.where(
-                      (step) => completedSteps.contains(step.videoUrl ?? step.content)
-                    ).length;
-                    final sectionProgress = section.steps.isNotEmpty 
-                      ? completedInSection / section.steps.length 
-                      : 0.0;
+                  ),
+                  // Lista sezioni
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: course.sections.length,
+                      itemBuilder: (context, index) {
+                        final section = course.sections[index];
+                        final completedInSection = section.steps.where((step) {
+                          if (step.type == 'points') {
+                            return completedPoints.contains(step.content);
+                          }
+                          return completedSteps.contains(step.videoUrl ?? step.content);
+                        }).length;
+                        final sectionProgress = section.steps.isNotEmpty 
+                          ? completedInSection / section.steps.length 
+                          : 0.0;
 
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF282828),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          childrenPadding: EdgeInsets.zero,
-                          tilePadding: const EdgeInsets.all(16),
-                          title: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: sectionProgress == 1.0
-                                        ? Colors.yellowAccent.withOpacity(0.2)
-                                        : Colors.white.withOpacity(0.1),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      sectionProgress == 1.0
-                                        ? Icons.check
-                                        : Icons.play_arrow,
-                                      color: sectionProgress == 1.0
-                                        ? Colors.yellowAccent
-                                        : Colors.white70,
-                                      size: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          section.title,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        Text(
-                                          '$completedInSection di ${section.steps.length} step',
-                                          style: TextStyle(
-                                            color: Colors.white.withOpacity(0.5),
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.yellowAccent.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      '${(sectionProgress * 100).round()}%',
-                                      style: const TextStyle(
-                                        color: Colors.yellowAccent,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF282828),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          children: [
-                            ...section.steps.map((step) {
-                              final isCompleted = completedSteps.contains(
-                                step.videoUrl ?? step.content
-                              );
-                              return Container(
-                                color: const Color(0xFF1E1E1E),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 20,
-                                      height: 20,
-                                      margin: const EdgeInsets.only(right: 12),
-                                      decoration: BoxDecoration(
-                                        color: isCompleted
-                                          ? Colors.yellowAccent.withOpacity(0.2)
-                                          : Colors.white.withOpacity(0.1),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        isCompleted
-                                          ? Icons.check
-                                          : _getStepIcon(step.type),
-                                        color: isCompleted
-                                          ? Colors.yellowAccent
-                                          : Colors.white70,
-                                        size: 12,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        step.content ?? 'Step',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
-                                          fontSize: 14,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                            child: ExpansionTile(
+                              childrenPadding: EdgeInsets.zero,
+                              tilePadding: const EdgeInsets.all(16),
+                              title: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 24,
+                                        height: 24,
+                                        decoration: BoxDecoration(
+                                          color: sectionProgress == 1.0
+                                            ? Colors.yellowAccent.withOpacity(0.2)
+                                            : Colors.white.withOpacity(0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          sectionProgress == 1.0
+                                            ? Icons.check
+                                            : Icons.play_arrow,
+                                          color: sectionProgress == 1.0
+                                            ? Colors.yellowAccent
+                                            : Colors.white70,
+                                          size: 16,
                                         ),
                                       ),
-                                    ),
-                                    if (step.type == 'video' && step.duration != null)
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              section.title,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            Text(
+                                              '$completedInSection di ${section.steps.length} step',
+                                              style: TextStyle(
+                                                color: Colors.white.withOpacity(0.5),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
-                                          vertical: 2,
+                                          vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
+                                          color: Colors.yellowAccent.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          '${step.duration} min',
-                                          style: TextStyle(
-                                            color: Colors.white.withOpacity(0.7),
+                                          '${(sectionProgress * 100).round()}%',
+                                          style: const TextStyle(
+                                            color: Colors.yellowAccent,
                                             fontSize: 12,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              children: [
+                                ...section.steps.map((step) {
+                                  final isCompleted = step.type == 'points'
+                                    ? completedPoints.contains(step.content)
+                                    : completedSteps.contains(step.videoUrl ?? step.content);
+                                  return Container(
+                                    color: const Color(0xFF1E1E1E),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 20,
+                                          height: 20,
+                                          margin: const EdgeInsets.only(right: 12),
+                                          decoration: BoxDecoration(
+                                            color: isCompleted
+                                              ? Colors.yellowAccent.withOpacity(0.2)
+                                              : Colors.white.withOpacity(0.1),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            isCompleted
+                                              ? Icons.check
+                                              : _getStepIcon(step.type),
+                                            color: isCompleted
+                                              ? Colors.yellowAccent
+                                              : Colors.white70,
+                                            size: 12,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            step.content ?? 'Step',
+                                            style: TextStyle(
+                                              color: Colors.white.withOpacity(0.9),
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        if (step.type == 'video' && step.duration != null)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              '${step.duration} min',
+                                              style: TextStyle(
+                                                color: Colors.white.withOpacity(0.7),
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -603,6 +662,8 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
         return Icons.play_circle_outline;
       case 'question':
         return Icons.quiz_outlined;
+      case 'points':
+        return FontAwesomeIcons.listCheck;
       default:
         return Icons.circle_outlined;
     }
@@ -756,5 +817,60 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Future<Map<String, dynamic>> _getSectionProgress(Course course) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return {'progress': 0.0, 'remainingMinutes': 0};
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) return {'progress': 0.0, 'remainingMinutes': 0};
+
+    final userData = userDoc.data()!;
+    final userModel = UserModel.fromMap(userData);
+    
+    // Get completedPoints from userData
+    final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+    
+    int totalSteps = 0;
+    int completedSteps = 0;
+    int totalDuration = 0;
+
+    // Calcola per tutte le sezioni
+    for (var section in course.sections) {
+      for (var step in section.steps) {
+        totalSteps++;
+        totalDuration += step.duration ?? (step.type == 'video' ? 1 : 0);
+
+        if (step.type == 'video') {
+          final videoId = step.videoUrl ?? step.content;
+          final watchedVideos = userModel.WatchedVideos[course.topic] ?? [];
+          if (watchedVideos.any((v) => v.videoId == videoId && v.completed)) {
+            completedSteps++;
+          }
+        } else if (step.type == 'question') {
+          final answeredQuestions = userModel.answeredQuestions[course.topic] ?? [];
+          if (answeredQuestions.contains(step.content)) {
+            completedSteps++;
+          }
+        } else if (step.type == 'points') {
+          if (completedPoints.contains(step.content)) {
+            completedSteps++;
+          }
+        }
+      }
+    }
+
+    final progress = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
+    final remainingMinutes = (totalDuration * (1 - progress)).round();
+
+    return {
+      'progress': progress,
+      'remainingMinutes': remainingMinutes
+    };
   }
 } 

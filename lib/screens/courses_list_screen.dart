@@ -556,224 +556,278 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
 
   /// Card generica per un corso, con qualche tocco di UI e ombre
   Widget _buildCourseCard(Course course) {
-    int totalSteps = 0;
-    int completedStepsCount = 0;
-    int totalDuration = _calculateTotalDuration(course);
-    
-    for (var section in course.sections) {
-      for (var step in section.steps) {
-        totalSteps++;
-        if (_userStartedCourses.contains(course) && 
-            (_watchedVideos[course.topic] ?? [])
-              .contains(step.videoUrl ?? step.content)) {
-          completedStepsCount++;
-        }
-      }
-    }
-    
-    final progress = totalSteps > 0 ? completedStepsCount / totalSteps : 0.0;
-    final remainingMinutes = (totalDuration * (1 - progress)).round();
-    final isStarted = _userStartedCourses.contains(course);
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getCourseProgress(course),
+      builder: (context, snapshot) {
+        final progress = snapshot.data?['progress'] ?? 0.0;
+        final remainingMinutes = snapshot.data?['remainingMinutes'] ?? 0;
+        final isStarted = _userStartedCourses.contains(course);
+        final totalDuration = _calculateTotalDuration(course);
 
-    return Container(
-      width: 280,
-      height: isStarted ? 320 : 280,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () => _showCoursePreview(course),
-        child: Card(
-          color: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
+        return Container(
+          width: 280,
+          height: isStarted ? 320 : 280,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: Colors.white.withOpacity(0.05),
-              width: 1,
-            ),
-          ),
-          elevation: 8,
-          shadowColor: Colors.black45,
-          child: Column(
-            children: [
-              // Immagine con overlay
-              Stack(
+            onTap: () => _showCoursePreview(course),
+            child: Card(
+              color: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: Colors.white.withOpacity(0.05),
+                  width: 1,
+                ),
+              ),
+              elevation: 8,
+              shadowColor: Colors.black45,
+              child: Column(
                 children: [
-                  SizedBox(
-                    height: 160,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                      child: Hero(
-                        tag: 'course-${course.id}',
-                        child: Image.network(
-                          course.coverImageUrl ?? '',
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[900],
-                            child: Icon(
-                              Icons.school,
-                              color: Colors.white.withOpacity(0.2),
-                              size: 48,
+                  // Immagine con overlay
+                  Stack(
+                    children: [
+                      SizedBox(
+                        height: 160,
+                        child: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          child: Hero(
+                            tag: 'course-${course.id}',
+                            child: Image.network(
+                              course.coverImageUrl ?? '',
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[900],
+                                child: Icon(
+                                  Icons.school,
+                                  color: Colors.white.withOpacity(0.2),
+                                  size: 48,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  // Overlay scuro sfumato
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.6),
+                      // Overlay scuro sfumato
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.6),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Rating e durata
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.yellowAccent,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    course.rating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    FontAwesomeIcons.clock,
+                                    color: Colors.white70,
+                                    size: 12,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$totalDuration min',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                  // Rating e durata
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(12),
+
+                  // Contenuto
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            course.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              height: 1.2,
+                              letterSpacing: -0.3,
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                color: Colors.yellowAccent,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                course.rating.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  color: Colors.white,
+                          if (!isStarted) ...[
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: Text(
+                                course.description,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
                                   fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                                  height: 1.4,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                FontAwesomeIcons.clock,
-                                color: Colors.white70,
-                                size: 12,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$totalDuration min',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                          ] else ...[
+                            const Spacer(),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${(progress * 100).round()}% completato',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
+                                Text(
+                                  '$remainingMinutes min rimanenti',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                valueColor: const AlwaysStoppedAnimation(Colors.yellowAccent),
+                                minHeight: 4,
                               ),
-                            ],
-                          ),
-                        ),
-                      ],
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-
-              // Contenuto
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        course.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      if (!isStarted) ...[
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Text(
-                            course.description,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 13,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        const Spacer(),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '${(progress * 100).round()}% completato',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              '$remainingMinutes min rimanenti',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor: Colors.white.withOpacity(0.1),
-                            valueColor: const AlwaysStoppedAnimation(Colors.yellowAccent),
-                            minHeight: 4,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return {
+        'progress': 0.0,
+        'remainingMinutes': _calculateTotalDuration(course)
+      };
+    }
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!userDoc.exists) {
+      return {
+        'progress': 0.0,
+        'remainingMinutes': _calculateTotalDuration(course)
+      };
+    }
+
+    final userData = userDoc.data()!;
+    final userModel = UserModel.fromMap(userData);
+    final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+    
+    int totalSteps = 0;
+    int completedSteps = 0;
+    int totalDuration = 0;
+
+    // Calcola per tutte le sezioni
+    for (var section in course.sections) {
+      for (var step in section.steps) {
+        totalSteps++;
+        totalDuration += step.duration ?? (step.type == 'video' ? 1 : 0);
+
+        if (step.type == 'video') {
+          final videoId = step.videoUrl ?? step.content;
+          final watchedVideos = userModel.WatchedVideos[course.topic] ?? [];
+          if (watchedVideos.any((v) => v.videoId == videoId && v.completed)) {
+            completedSteps++;
+          }
+        } else if (step.type == 'question') {
+          final answeredQuestions = userModel.answeredQuestions[course.topic] ?? [];
+          if (answeredQuestions.contains(step.content)) {
+            completedSteps++;
+          }
+        } else if (step.type == 'points') {
+          if (completedPoints.contains(step.content)) {
+            completedSteps++;
+          }
+        }
+      }
+    }
+
+    final progress = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
+    final remainingMinutes = (totalDuration * (1 - progress)).round();
+
+    return {
+      'progress': progress,
+      'remainingMinutes': remainingMinutes
+    };
   }
 
   void _showCoursePreview(Course course) {

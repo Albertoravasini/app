@@ -444,19 +444,46 @@ Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
 
   final userData = userDoc.data() as Map<String, dynamic>;
   final completedSections = List<String>.from(userData['completedSections'] ?? []);
-  final currentSteps = Map<String, dynamic>.from(userData['currentSteps'] ?? {});
+  final watchedVideos = List<Map<String, dynamic>>.from(
+    (userData['WatchedVideos'] ?? {})[course.topic] ?? []
+  );
+  final answeredQuestions = List<String>.from(
+    (userData['answeredQuestions'] ?? {})[course.topic] ?? []
+  );
+  final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
 
   // Controlla se ci sono sezioni completate non ancora aggiunte
   for (var section in course.sections) {
-    final currentStep = currentSteps[section.title] ?? 0;
-    if (currentStep >= section.steps.length && !completedSections.contains(section.title)) {
+    bool isSectionCompleted = true;
+    
+    // Verifica che tutti gli step della sezione siano completati
+    for (var step in section.steps) {
+      bool isStepCompleted = false;
+      
+      if (step.type == 'video') {
+        isStepCompleted = watchedVideos.any((v) => 
+          v['videoId'] == step.videoUrl && v['completed'] == true);
+      } else if (step.type == 'question') {
+        isStepCompleted = answeredQuestions.contains(step.content);
+      } else if (step.type == 'points') {
+        isStepCompleted = completedPoints.contains(step.content);
+      }
+      
+      if (!isStepCompleted) {
+        isSectionCompleted = false;
+        break;
+      }
+    }
+    
+    // Se tutti gli step sono completati, aggiungi la sezione alla lista
+    if (isSectionCompleted && !completedSections.contains(section.title)) {
       completedSections.add(section.title);
     }
   }
 
   return {
     'completedSections': completedSections,
-    'currentSteps': currentSteps,
+    'currentSteps': userData['currentSteps'] ?? {},
   };
 }
 

@@ -201,6 +201,9 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     print('DEBUG: Totale step corso: $totalSteps');
     print('DEBUG: Limite sblocco (30%): $unlockLimit');
 
+    // Get completedPoints from userData
+    final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+
     return Future.wait(
       widget.course.sections.map((section) async {
         int completedSteps = 0;
@@ -226,6 +229,9 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
               ) ?? false;
             } else if (step.type == 'question') {
               isStepCompleted = userModel.answeredQuestions[widget.course.topic]?.contains(step.content) ?? false;
+            } else if (step.type == 'points') {
+              // Check if the points step is completed in completedPoints array
+              isStepCompleted = completedPoints.contains(step.content);
             }
           }
 

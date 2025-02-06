@@ -7,7 +7,7 @@ import '../models/course.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:Just_Learn/screens/course_screen.dart';
+import 'package:Just_Learn/screens/top_teachers_screen.dart';
 import 'package:Just_Learn/screens/profile_screen.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
@@ -650,9 +650,16 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     return FutureBuilder<Map<String, dynamic>>(
       future: _getSectionProgress(section),
       builder: (context, snapshot) {
-        final completedSteps = snapshot.data?['currentStep'] ?? 0;
-        final totalSteps = snapshot.data?['totalSteps'] ?? section.steps.length;
-        final isCompleted = snapshot.data?['isCompleted'] ?? false;
+        if (!snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+
+        final completedSteps = snapshot.data!['currentStep'] as int;
+        final totalSteps = snapshot.data!['totalSteps'] as int;
+        final isCompleted = snapshot.data!['isCompleted'] as bool;
+        final stepsCompleted = snapshot.data!['stepsCompleted'] as List<bool>;
+        final lockIndex = snapshot.data!['lockIndex'] as int;
+        final containsLockedSteps = snapshot.data!['containsLockedSteps'] as bool;
         final progress = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
 
         return Container(
@@ -703,6 +710,25 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
                 children: [
                   Row(
                     children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.yellowAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${section.sectionNumber}',
+                            style: const TextStyle(
+                              color: Colors.yellowAccent,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,10 +745,10 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
                             const SizedBox(height: 4),
                             Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   FontAwesomeIcons.clock,
                                   size: 10,
-                                  color: Colors.grey,
+                                  color: Colors.grey[500],
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -776,102 +802,98 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
                 ],
               ),
               children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(16),
-                    ),
-                  ),
-                  child: Column(
-                    children: section.steps.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final step = entry.value;
-                      final isStepCompleted = index < completedSteps;
-                      
-                      return _buildStepItem(
-                        step,
-                        isCompleted: isStepCompleted,
-                      );
-                    }).toList(),
-                  ),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: section.steps.length,
+                  itemBuilder: (context, index) {
+                    final step = section.steps[index];
+                    final isStepCompleted = stepsCompleted[index];
+                    final isLocked = containsLockedSteps && index >= lockIndex;
+                    
+                    return Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isLocked 
+                                  ? Colors.grey[800]!.withOpacity(0.15)
+                                  : (isStepCompleted 
+                                      ? Colors.yellowAccent.withOpacity(0.15)
+                                      : Colors.grey[800]!.withOpacity(0.3)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isLocked 
+                                  ? Icons.lock
+                                  : (step.type == 'video' 
+                                      ? FontAwesomeIcons.play 
+                                      : step.type == 'points'
+                                          ? FontAwesomeIcons.listCheck
+                                          : step.type == 'question'
+                                              ? FontAwesomeIcons.question
+                                              : FontAwesomeIcons.circle),
+                              color: isLocked 
+                                  ? Colors.grey[600]
+                                  : (isStepCompleted 
+                                      ? Colors.yellowAccent 
+                                      : Colors.white),
+                              size: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              step.content,
+                              style: TextStyle(
+                                color: isLocked 
+                                    ? Colors.white.withOpacity(0.3)
+                                    : (isStepCompleted 
+                                        ? Colors.yellowAccent 
+                                        : Colors.white),
+                                fontSize: 14,
+                                decoration: isLocked ? TextDecoration.lineThrough : null,
+                              ),
+                            ),
+                          ),
+                          if (step.duration != null)
+                            Text(
+                              '${step.duration} min',
+                              style: TextStyle(
+                                color: isLocked 
+                                    ? Colors.grey[700]
+                                    : (isStepCompleted 
+                                        ? Colors.yellowAccent 
+                                        : Colors.grey[500]),
+                                fontSize: 12,
+                              ),
+                            ),
+                          if (isStepCompleted && !isLocked)
+                            Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.yellowAccent.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                FontAwesomeIcons.check,
+                                color: Colors.yellowAccent,
+                                size: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildStepItem(LevelStep step, {required bool isCompleted}) {
-    IconData icon;
-    Color baseColor = isCompleted ? Colors.yellowAccent : Colors.white.withOpacity(0.7);
-    
-    switch (step.type) {
-      case 'video':
-        icon = FontAwesomeIcons.play;
-        break;
-      case 'question':
-        icon = FontAwesomeIcons.question;
-        break;
-      default:
-        icon = FontAwesomeIcons.circle;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isCompleted 
-                ? Colors.yellowAccent.withOpacity(0.15)
-                : Colors.grey[800]!.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: baseColor,
-              size: 14,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              step.content,
-              style: TextStyle(
-                color: baseColor,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-          ),
-          if (step.duration != null)
-            Text(
-              '${step.duration} min',
-              style: TextStyle(
-                color: isCompleted ? Colors.yellowAccent : Colors.grey[500],
-                fontSize: 12,
-              ),
-            ),
-          if (isCompleted)
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.yellowAccent.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                FontAwesomeIcons.check,
-                color: Colors.yellowAccent,
-                size: 12,
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -953,6 +975,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       return {
         'currentStep': 0,
         'isCompleted': false,
+        'stepsCompleted': <bool>[],
       };
     }
 
@@ -965,44 +988,70 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       return {
         'currentStep': 0,
         'isCompleted': false,
+        'stepsCompleted': <bool>[],
       };
     }
 
     final userData = userDoc.data() as Map<String, dynamic>;
     final userModel = UserModel.fromMap(userData);
+    final isPro = userData['isPro'] ?? false;
     
-    // Ottieni i video completati per il topic del corso
-    final watchedVideos = userModel.WatchedVideos[widget.course.topic] ?? [];
-    // Ottieni le domande risposte per il topic del corso
-    final answeredQuestions = userModel.answeredQuestions[widget.course.topic] ?? [];
-
+    // Calcola il numero totale di step nel corso
+    final totalCourseSteps = widget.course.sections
+        .map((s) => s.steps.length)
+        .reduce((a, b) => a + b);
+    
+    // Calcola il punto di blocco (30% del totale)
+    final unlockLimit = (totalCourseSteps * 0.3).round();
+    var stepCounter = 0;
+    
+    // Calcola l'indice di inizio per questa sezione
+    for (var s in widget.course.sections) {
+      if (s.title == section.title) break;
+      stepCounter += s.steps.length;
+    }
+    
+    // Get completedPoints from userData
+    final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+    
     int completedSteps = 0;
-    int totalSteps = section.steps.length;
-
-    // Controlla ogni step della sezione
-    for (var step in section.steps) {
+    List<bool> stepsCompleted = [];
+    
+    // Verifica se questa sezione contiene step oltre il limite del 30%
+    bool containsLockedSteps = !isPro && stepCounter + section.steps.length > unlockLimit;
+    int lockIndex = containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length;
+    
+    for (var i = 0; i < section.steps.length; i++) {
+      final step = section.steps[i];
       bool isStepCompleted = false;
+      bool isStepLocked = !isPro && i >= lockIndex;
 
-      if (step.type == 'video') {
-        final videoId = step.videoUrl ?? step.content;
-        isStepCompleted = watchedVideos.any((video) => 
-          video.videoId == videoId && 
-          video.completed
-        );
-      } else if (step.type == 'question') {
-        // Verifica se la domanda è stata risposta
-        isStepCompleted = answeredQuestions.contains(step.content);
+      if (!isStepLocked) {
+        if (step.type == 'video') {
+          final videoId = step.videoUrl ?? step.content;
+          isStepCompleted = userModel.WatchedVideos[widget.course.topic]?.any((video) => 
+            video.videoId == videoId && 
+            video.completed
+          ) ?? false;
+        } else if (step.type == 'question') {
+          isStepCompleted = userModel.answeredQuestions[widget.course.topic]?.contains(step.content) ?? false;
+        } else if (step.type == 'points') {
+          // Check if the points step is completed in completedPoints array
+          isStepCompleted = completedPoints.contains(step.content);
+        }
       }
 
-      if (isStepCompleted) {
-        completedSteps++;
-      }
+      stepsCompleted.add(isStepCompleted);
+      if (isStepCompleted) completedSteps++;
     }
 
     return {
       'currentStep': completedSteps,
-      'totalSteps': totalSteps,
-      'isCompleted': completedSteps == totalSteps
+      'totalSteps': section.steps.length,
+      'isCompleted': completedSteps == section.steps.length,
+      'stepsCompleted': stepsCompleted,
+      'lockIndex': lockIndex,
+      'containsLockedSteps': containsLockedSteps
     };
   }
 

@@ -627,15 +627,15 @@ class _CommentsScreenState extends State<CommentsScreen> {
                 hintText: _showAiChat ? 'Ask AI something...' : 'Write a comment...',
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: Colors.yellowAccent),
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(16),
                   borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
                 ),
                 filled: true,

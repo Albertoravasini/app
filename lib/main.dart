@@ -3,7 +3,7 @@ import 'package:Just_Learn/screens/access/login_screen.dart';
 import 'package:Just_Learn/screens/access/register_screen.dart';
 import 'package:Just_Learn/screens/access/topic_selection_screen.dart';
 import 'package:Just_Learn/screens/access/splash_screen.dart';
-import 'package:Just_Learn/screens/course_screen.dart';
+import 'package:Just_Learn/screens/top_teachers_screen.dart';
 import 'package:Just_Learn/screens/quiz_screen.dart';
 import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:Just_Learn/services/notification_service.dart';

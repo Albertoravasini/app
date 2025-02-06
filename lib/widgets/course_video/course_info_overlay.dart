@@ -403,7 +403,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No resources available for this chapter'),
-          backgroundColor: Colors.grey[800],
+          backgroundColor: Colors.white,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -551,14 +551,15 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                 child: Text(
                   widget.videoTitle,
                   textAlign: TextAlign.left,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 14,
                     fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.72,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                    height: 1.2,
                   ),
                 ),
               ),

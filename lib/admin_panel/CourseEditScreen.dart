@@ -807,6 +807,9 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                             content: value,
                             topic: step.topic,
                             videoUrl: step.videoUrl,
+                            thumbnailUrl: step.thumbnailUrl,
+                            isShort: step.isShort,
+                            duration: step.duration,
                           );
                         });
                       },
@@ -885,9 +888,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                                                   type: 'video',
                                                   content: step.content,
                                                   videoUrl: videoUrl,
-                                                  thumbnailUrl: null,
-                                                  isShort: false,
+                                                  thumbnailUrl: step.thumbnailUrl,
+                                                  isShort: step.isShort,
                                                   topic: widget.course?.topic ?? '',
+                                                  duration: step.duration,
                                                 );
                                               });
                                             }

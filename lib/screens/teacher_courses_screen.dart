@@ -52,8 +52,14 @@ class _TeacherCoursesScreenState extends State<TeacherCoursesScreen> {
       
       int totalStudents = 0;
       int totalStepsCompleted = 0;
+      int totalStepsAvailable = 0;
 
       final course = widget.courses.firstWhere((c) => c.id == courseId);
+
+      // Calcola il numero totale di step disponibili nel corso
+      for (var section in course.sections) {
+        totalStepsAvailable += section.steps.length;
+      }
 
       // Controlla ogni utente
       for (var userDoc in usersSnapshot.docs) {
@@ -67,12 +73,15 @@ class _TeacherCoursesScreenState extends State<TeacherCoursesScreen> {
         if (startedCourses.any((c) => c['courseId'] == courseId)) {
           totalStudents++;
           
-          // Ottieni i video guardati e le domande risposte
+          // Ottieni i video guardati, le domande risposte e i punti completati
           final watchedVideos = List<Map<String, dynamic>>.from(
             (userData['WatchedVideos'] ?? {})[course.topic] ?? []
           );
           final answeredQuestions = List<String>.from(
             (userData['answeredQuestions'] ?? {})[course.topic] ?? []
+          );
+          final completedPoints = List<String>.from(
+            userData['completedPoints'] ?? []
           );
           
           // Conta gli step completati per questo studente
@@ -80,15 +89,20 @@ class _TeacherCoursesScreenState extends State<TeacherCoursesScreen> {
           
           for (var section in course.sections) {
             for (var step in section.steps) {
-              if (step.videoUrl != null) {
+              if (step.type == 'video') {
                 // Controlla se il video è stato completato
                 if (watchedVideos.any((v) => 
                     v['videoId'] == step.videoUrl && v['completed'] == true)) {
                   completedStepsCount++;
                 }
-              } else if (step.content != null) {
+              } else if (step.type == 'question') {
                 // Controlla se la domanda è stata risposta
                 if (answeredQuestions.contains(step.content)) {
+                  completedStepsCount++;
+                }
+              } else if (step.type == 'points') {
+                // Controlla se i punti sono stati completati
+                if (completedPoints.contains(step.content)) {
                   completedStepsCount++;
                 }
               }
@@ -102,12 +116,18 @@ class _TeacherCoursesScreenState extends State<TeacherCoursesScreen> {
       return {
         'totalStudents': totalStudents,
         'totalStepsCompleted': totalStepsCompleted,
+        'totalStepsAvailable': totalStepsAvailable,
+        'averageCompletion': totalStudents > 0 
+          ? (totalStepsCompleted / (totalStepsAvailable * totalStudents)) * 100 
+          : 0.0,
       };
     } catch (e) {
       print('Error getting course stats: $e');
       return {
         'totalStudents': 0,
         'totalStepsCompleted': 0,
+        'totalStepsAvailable': 0,
+        'averageCompletion': 0.0,
       };
     }
   }
@@ -212,26 +232,56 @@ class _TeacherCoursesScreenState extends State<TeacherCoursesScreen> {
                           final stats = snapshot.data ?? {
                             'totalStudents': 0,
                             'totalStepsCompleted': 0,
+                            'totalStepsAvailable': 0,
+                            'averageCompletion': 0.0,
                           };
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+
+                          final totalStepsAvailable = stats['totalStepsAvailable'];
+                          final averageCompletion = stats['averageCompletion'].toStringAsFixed(1);
+
+                          return Column(
                             children: [
-                              _buildStat(
-                                Icons.people_outline,
-                                '${stats['totalStudents']}',
-                                'Studenti',
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildStat(
+                                    Icons.people_outline,
+                                    '${stats['totalStudents']}',
+                                    'Studenti',
+                                  ),
+                                  _buildDivider(),
+                                  _buildStat(
+                                    Icons.check_circle_outline,
+                                    '${stats['totalStepsCompleted']}',
+                                    'Step Completati',
+                                  ),
+                                  _buildDivider(),
+                                  _buildStat(
+                                    Icons.list_alt,
+                                    '$totalStepsAvailable',
+                                    'Step Totali',
+                                  ),
+                                ],
                               ),
-                              _buildDivider(),
-                              _buildStat(
-                                Icons.check_circle_outline,
-                                '${stats['totalStepsCompleted']}',
-                                'Step Completati',
-                              ),
-                              _buildDivider(),
-                              _buildStat(
-                                Icons.timer_outlined,
-                                '${_calculateTotalDuration(course)} min',
-                                'Durata',
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.yellowAccent.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.yellowAccent),
+                                ),
+                                child: Text(
+                                  'Completamento medio: $averageCompletion%',
+                                  style: const TextStyle(
+                                    color: Colors.yellowAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
                               ),
                             ],
                           );

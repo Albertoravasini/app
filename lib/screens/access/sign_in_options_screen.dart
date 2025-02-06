@@ -15,8 +15,43 @@ import 'topic_selection_screen.dart'; // Import the topic selection screen
 import 'package:sign_in_with_apple/sign_in_with_apple.dart'; // Import Sign in with Apple
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 
-class SignInOptionsScreen extends StatelessWidget {
+class SignInOptionsScreen extends StatefulWidget {
   const SignInOptionsScreen({Key? key}) : super(key: key);
+
+  @override
+  _SignInOptionsScreenState createState() => _SignInOptionsScreenState();
+}
+
+class _SignInOptionsScreenState extends State<SignInOptionsScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _slideController;
+  late Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1), // Start from bottom
+      end: Offset.zero,          // End at original position
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutQuart,
+    ));
+    
+    // Start the animation after a brief delay
+    Future.delayed(const Duration(milliseconds: 200), () {
+      _slideController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _slideController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,117 +135,43 @@ class SignInOptionsScreen extends StatelessWidget {
             
             // Contenitore principale con i pulsanti
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF181819),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 20,
-                      offset: const Offset(0, -5),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const Spacer(),
-                    // Sign In with Email button
-                    _buildSignInButton(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const RegisterScreen()),
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF181819),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 20,
+                        offset: const Offset(0, -5),
                       ),
-                      icon: 'assets/Vector.png',
-                      text: 'Sign In with Email',
-                      isOutlined: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Sign In with Google button
-                    _buildSignInButton(
-                      onTap: () async {
-                        try {
-                          final authService = Provider.of<AuthService>(context, listen: false);
-                          User? user = await authService.signInWithGoogle();
-
-                          if (user != null) {
-                            final userDoc = await FirebaseFirestore.instance
-                                .collection('users')
-                                .doc(user.uid)
-                                .get();
-
-                            if (userDoc.exists) {
-                              final userModel = UserModel.fromMap(userDoc.data()!);
-
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => MainScreen(userModel: userModel),
-                                ),
-                                (Route<dynamic> route) => false,
-                              );
-                            } else {
-                              // Crea un nuovo utente se non esiste
-                              await FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(user.uid)
-                                  .set({
-                                'uid': user.uid,
-                                'email': user.email ?? '',
-                                'name': user.displayName ?? '',
-                                'topics': [],
-                                'completedLevels': [],
-                                'consecutiveDays': 0,
-                                'role': 'user',
-                                'lastAccess': DateTime.now().toIso8601String(),
-                                'WatchedVideos': {},
-                                'answeredQuestions': {},
-                                'currentSteps': {},
-                                'completedSections': [],
-                                'notifications': [],
-                                'unlockedCourses': [],
-                                'coins': 0,
-                                'dailyVideosCompleted': 0,
-                                'dailyQuizFreeUses': 0,
-                                'hasSeenTutorial': false
-                              });
-
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TopicSelectionScreen(user: user),
-                                ),
-                                (Route<dynamic> route) => false,
-                              );
-                            }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Fallito il login con Google')),
-                            );
-                          }
-                        } catch (e) {
-                          print('Errore durante il login con Google: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Errore: $e')),
-                          );
-                        }
-                      },
-                      icon: 'assets/Vector1.png',
-                      text: 'Sign In with Google',
-                      isOutlined: true,
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Sign In with Apple button (iOS only)
-                    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      const Spacer(),
+                      // Sign In with Email button
+                      _buildSignInButton(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                        ),
+                        icon: 'assets/Vector.png',
+                        text: 'Sign In with Email',
+                        isOutlined: true,
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Sign In with Google button
                       _buildSignInButton(
                         onTap: () async {
                           try {
                             final authService = Provider.of<AuthService>(context, listen: false);
-                            User? user = await authService.signInWithApple();
-                            
+                            User? user = await authService.signInWithGoogle();
+
                             if (user != null) {
                               final userDoc = await FirebaseFirestore.instance
                                   .collection('users')
@@ -220,7 +181,6 @@ class SignInOptionsScreen extends StatelessWidget {
                               if (userDoc.exists) {
                                 final userModel = UserModel.fromMap(userDoc.data()!);
 
-                                
                                 Navigator.pushAndRemoveUntil(
                                   context,
                                   MaterialPageRoute(
@@ -264,87 +224,165 @@ class SignInOptionsScreen extends StatelessWidget {
                               }
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Fallito il login con Apple')),
+                                const SnackBar(content: Text('Fallito il login con Google')),
                               );
                             }
                           } catch (e) {
-                            print('Errore durante il login con Apple: $e');
+                            print('Errore durante il login con Google: $e');
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Errore: $e')),
                             );
                           }
                         },
-                        icon: '',
-                        text: 'Sign In with Apple',
+                        icon: 'assets/Vector1.png',
+                        text: 'Sign In with Google',
                         isOutlined: true,
-                        useAppleIcon: true,
                       ),
-                    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
                       const SizedBox(height: 16),
-                    
-                    // Divider
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'OR',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                      
+                      // Sign In with Apple button (iOS only)
+                      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+                        _buildSignInButton(
+                          onTap: () async {
+                            try {
+                              final authService = Provider.of<AuthService>(context, listen: false);
+                              User? user = await authService.signInWithApple();
+                              
+                              if (user != null) {
+                                final userDoc = await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(user.uid)
+                                    .get();
+
+                                if (userDoc.exists) {
+                                  final userModel = UserModel.fromMap(userDoc.data()!);
+
+                                  
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => MainScreen(userModel: userModel),
+                                    ),
+                                    (Route<dynamic> route) => false,
+                                  );
+                                } else {
+                                  // Crea un nuovo utente se non esiste
+                                  await FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(user.uid)
+                                      .set({
+                                    'uid': user.uid,
+                                    'email': user.email ?? '',
+                                    'name': user.displayName ?? '',
+                                    'topics': [],
+                                    'completedLevels': [],
+                                    'consecutiveDays': 0,
+                                    'role': 'user',
+                                    'lastAccess': DateTime.now().toIso8601String(),
+                                    'WatchedVideos': {},
+                                    'answeredQuestions': {},
+                                    'currentSteps': {},
+                                    'completedSections': [],
+                                    'notifications': [],
+                                    'unlockedCourses': [],
+                                    'coins': 0,
+                                    'dailyVideosCompleted': 0,
+                                    'dailyQuizFreeUses': 0,
+                                    'hasSeenTutorial': false
+                                  });
+
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => TopicSelectionScreen(user: user),
+                                    ),
+                                    (Route<dynamic> route) => false,
+                                  );
+                                }
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Fallito il login con Apple')),
+                                );
+                              }
+                            } catch (e) {
+                              print('Errore durante il login con Apple: $e');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Errore: $e')),
+                              );
+                            }
+                          },
+                          icon: '',
+                          text: 'Sign In with Apple',
+                          isOutlined: true,
+                          useAppleIcon: true,
                         ),
-                        Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Log in button
-                    _buildSignInButton(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const LoginScreen()),
-                      ),
-                      text: 'Log in to my Account',
-                      isPrimary: true,
-                    ),
-                    const Spacer(),
-                    
-                    // Privacy Policy
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            text: 'By continuing you agree to Justlearn ',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: 'Privacy Policy',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.underline,
-                                ),
+                      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+                        const SizedBox(height: 16),
+                      
+                      // Divider
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'OR',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.5),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Log in button
+                      _buildSignInButton(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        ),
+                        text: 'Log in to my Account',
+                        isPrimary: true,
+                      ),
+                      const Spacer(),
+                      
+                      // Privacy Policy
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: RichText(
+                            textAlign: TextAlign.center,
+                            text: TextSpan(
+                              text: 'By continuing you agree to Justlearn ',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

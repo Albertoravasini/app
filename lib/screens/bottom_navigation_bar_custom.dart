@@ -34,51 +34,68 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
 
     return Container(
       width: double.infinity,
-      height: 55 + (MediaQuery.of(context).padding.bottom / 2),
-      color: const Color(0xFF121212),
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom / 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.center,
+      height: 75 + MediaQuery.of(context).padding.bottom,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF121212),
+            Colors.black.withOpacity(0.8),
+          ],
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icona Insegnanti - MODIFICATA
-          _buildNavItem(
-            FontAwesomeIcons.chalkboardUser,
-            widget.selectedIndex == 0,
-            onTap: () => widget.onItemTapped(0),
-          ),
+          SizedBox(
+            height: 48,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Icona Insegnanti
+                _buildNavItem(
+                  FontAwesomeIcons.chalkboardUser,
+                  widget.selectedIndex == 0,
+                  onTap: () => widget.onItemTapped(0),
+                ),
 
-          // Icona Corsi
-          _buildNavItem(
-            FontAwesomeIcons.graduationCap,
-            widget.selectedIndex == 1,
-            onTap: () => widget.onItemTapped(1),
-            showDot: showQuizDot,
-            dotColor: Colors.yellowAccent,
-          ),
+                // Icona Corsi
+                _buildNavItem(
+                  FontAwesomeIcons.graduationCap,
+                  widget.selectedIndex == 1,
+                  onTap: () => widget.onItemTapped(1),
+                  showDot: showQuizDot,
+                  dotColor: Colors.yellowAccent,
+                ),
 
-          // Icona Home
-          _buildNavItem(
-            FontAwesomeIcons.house,
-            widget.selectedIndex == 2,
-            onTap: () => widget.onItemTapped(2),
-          ),
+                // Icona Home
+                _buildNavItem(
+                  FontAwesomeIcons.house,
+                  widget.selectedIndex == 2,
+                  onTap: () => widget.onItemTapped(2),
+                ),
 
-          // Icona Chat/Notifiche
-          _buildNavItem(
-            FontAwesomeIcons.solidComments,
-            widget.selectedIndex == 3,
-            onTap: () => widget.onItemTapped(3),
-            showDot: hasUnreadNotifications,
-            dotColor: Colors.redAccent,
-          ),
+                // Icona Chat/Notifiche
+                _buildNavItem(
+                  FontAwesomeIcons.solidComments,
+                  widget.selectedIndex == 3,
+                  onTap: () => widget.onItemTapped(3),
+                  showDot: hasUnreadNotifications,
+                  dotColor: Colors.redAccent,
+                ),
 
-          // Icona Profilo
-          _buildNavItem(
-            FontAwesomeIcons.solidUser,
-            widget.selectedIndex == 4,
-            onTap: () => widget.onItemTapped(4),
+                // Icona Profilo
+                _buildNavItem(
+                  FontAwesomeIcons.solidUser,
+                  widget.selectedIndex == 4,
+                  onTap: () => widget.onItemTapped(4),
+                ),
+              ],
+            ),
           ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
         ],
       ),
     );
@@ -93,30 +110,33 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Stack(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            child: FaIcon(
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: 48,
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            FaIcon(
               icon,
               color: isSelected ? Colors.white : const Color(0xFF434348),
-              size: 22,
+              size: 20,
             ),
-          ),
-          if (showDot)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: dotColor,
-                  shape: BoxShape.circle,
+            if (showDot)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

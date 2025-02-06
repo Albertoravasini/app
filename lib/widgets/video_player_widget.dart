@@ -336,10 +336,12 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             ),
           )
         : _controller.value.isInitialized
-            ? Container(
-                width: MediaQuery.of(context).size.width,
-                height: MediaQuery.of(context).size.height,
-                child: VideoPlayer(_controller),
+            ? Center(
+                child: Container(
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.width * 16/9,
+                  child: VideoPlayer(_controller),
+                ),
               )
             : const Center(child: CircularProgressIndicator()),
 

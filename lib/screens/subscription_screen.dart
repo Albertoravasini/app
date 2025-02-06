@@ -373,7 +373,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
   Widget _buildPremiumFeatures() {
     final features = [
       {
-        'icon': FontAwesomeIcons.infinity,
+        'icon': FontAwesomeIcons.unlock,
         'title': 'Unlimited Access',
         'description': 'Access 100% of all courses',
       },

@@ -2,7 +2,7 @@ name: Just_Learn
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 2.3.27+78
+version: 2.4.30+82
 
 environment:
   sdk: '>=3.4.3 <4.0.0'

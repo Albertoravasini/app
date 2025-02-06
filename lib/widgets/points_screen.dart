@@ -24,6 +24,7 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
   List<Point> _points = [];
   late AnimationController _controller;
   final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isAudioReady = false;
   
   @override
   void initState() {
@@ -37,8 +38,14 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
   }
 
   Future<void> _initAudio() async {
-    await _audioPlayer.setSource(AssetSource('mark.mp3'));
-    await _audioPlayer.setVolume(0.5);
+    try {
+      await _audioPlayer.setSource(AssetSource('mark.mp3'));
+      await _audioPlayer.setVolume(0.5);
+      _isAudioReady = true;
+    } catch (e) {
+      print('Error initializing audio: $e');
+      _isAudioReady = false;
+    }
   }
 
   @override
@@ -58,8 +65,14 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
 
     if (_points[index].completed) {
       _controller.forward(from: 0.0);
-      await _audioPlayer.seek(Duration.zero);
-      await _audioPlayer.resume();
+      if (_isAudioReady) {
+        try {
+          await _audioPlayer.seek(Duration.zero);
+          await _audioPlayer.resume();
+        } catch (e) {
+          print('Error playing audio: $e');
+        }
+      }
     }
 
     // Check if all points are completed
@@ -70,14 +83,30 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .collection('progress')
-              .doc(widget.topic)
-              .set({
-            'completedPoints': FieldValue.arrayUnion([widget.step.content]),
-          }, SetOptions(merge: true));
+          // Update the points progress
+          final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+          
+          // Get current user data
+          final userDoc = await userRef.get();
+          if (!userDoc.exists) return;
+          
+          final userData = userDoc.data()!;
+          
+          // Get the current completedPoints
+          List<String> completedPoints = List<String>.from(
+            userData['completedPoints'] ?? []
+          );
+          
+          // Add this step's content if not already present
+          if (!completedPoints.contains(widget.step.content)) {
+            completedPoints.add(widget.step.content);
+          }
+          
+          // Update Firestore with the new progress
+          await userRef.update({
+            'completedPoints': completedPoints,
+          });
+          
         } catch (e) {
           print('Error saving progress: $e');
         }
@@ -90,6 +119,7 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
     return SafeArea(
       bottom: false,
       child: Container(
+        padding: const EdgeInsets.only(top: 40),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -105,7 +135,6 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
               padding: EdgeInsets.only(
                 left: 24,
                 right: 24,
-                top: MediaQuery.of(context).padding.top + 20,
                 bottom: 32,
               ),
               decoration: const BoxDecoration(
@@ -134,9 +163,9 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
                     widget.step.content,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 24,
+                      fontSize: 26,
                       fontFamily: 'Montserrat',
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       height: 1.3,
                     ),
                   ),

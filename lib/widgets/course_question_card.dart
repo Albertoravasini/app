@@ -147,14 +147,14 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
                     opacity: value,
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: 24),
-                      child: GestureDetector(
-                        onTap: () => _onAnswered(choice),
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _onAnswered(choice),
+                          borderRadius: BorderRadius.circular(20),
+                          splashColor: Colors.white.withOpacity(0.1),
+                          highlightColor: Colors.white.withOpacity(0.05),
+                          child: Ink(
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E1E1E),
                               borderRadius: BorderRadius.circular(20),
@@ -170,43 +170,46 @@ class _CourseQuestionCardState extends State<CourseQuestionCard> with SingleTick
                                 width: 1,
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.white.withOpacity(0.1),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white.withOpacity(0.1),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        String.fromCharCode(65 + index), // A, B, C, D...
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontFamily: 'Montserrat',
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  child: Center(
+                                  const SizedBox(width: 16),
+                                  Expanded(
                                     child: Text(
-                                      String.fromCharCode(65 + index), // A, B, C, D...
+                                      choice,
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
                                         fontFamily: 'Montserrat',
                                         fontWeight: FontWeight.w700,
+                                        height: 1.4,
+                                        letterSpacing: 0.3,
                                       ),
+                                      textAlign: TextAlign.left,
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Text(
-                                    choice,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontFamily: 'Montserrat',
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.4,
-                                      letterSpacing: 0.3,
-                                    ),
-                                    textAlign: TextAlign.left,
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
