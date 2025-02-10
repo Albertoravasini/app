@@ -207,7 +207,7 @@ class ShortsScreenState extends State<ShortsScreen> {
 
 // Estrai la logica di creazione degli shortSteps in un metodo separato
 List<Map<String, dynamic>> _createShortSteps(List<Course> courses) {
-  return courses.map((course) {
+  var steps = courses.map((course) {
     final firstSection = course.sections.first;
     final firstVideoStep = firstSection.steps.firstWhere(
       (step) => step.type == 'video',
@@ -232,6 +232,11 @@ List<Map<String, dynamic>> _createShortSteps(List<Course> courses) {
       'isSaved': false,
     };
   }).toList();
+
+  // Randomize the order of videos when not in course mode
+  steps.shuffle();
+  
+  return steps;
 }
 
 void _initializeFirstController() {
@@ -679,7 +684,7 @@ void dispose() {
             subtopicOrder: 1,
           ),
           'course': course,
-          'section': section, // Aggiungiamo la sezione per riferimento diretto
+          'section': section,
           'showQuestion': step.type == 'question',
           'isLiked': false,
           'likeCount': 0,
@@ -687,6 +692,8 @@ void dispose() {
         });
       }
     }
+    
+    // Non randomizziamo i passi del corso per mantenere l'ordine didattico
     return steps;
   }
 
