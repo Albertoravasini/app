@@ -862,13 +862,44 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
     };
   }
 
-  void _showCoursePreview(Course course) {
-    showModalBottomSheet(
+  void _showCoursePreview(Course course) async {
+    // Mostra un indicatore di caricamento
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => CoursePreviewSheet(course: course),
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+        ),
+      ),
     );
+
+    try {
+      // Pre-carica i dati
+      await CoursePreviewSheet.preload(context, course);
+      
+      // Chiudi l'indicatore di caricamento
+      Navigator.pop(context);
+      
+      // Mostra il CoursePreviewSheet
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => CoursePreviewSheet(course: course),
+      );
+    } catch (e) {
+      // Chiudi l'indicatore di caricamento in caso di errore
+      Navigator.pop(context);
+      
+      // Mostra un messaggio di errore
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Errore nel caricamento del corso. Riprova.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   int _calculateTotalDuration(Course course) {
