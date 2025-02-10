@@ -529,6 +529,16 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
     );
   }
 
+  int _calculateTotalDuration() {
+    if (widget.course == null) return 0;
+    return widget.course!.sections.fold(0, (total, section) {
+      int totalVideos = section.steps.where((step) => step.type == 'video').length;
+      int totalQuestions = section.steps.where((step) => step.type == 'question').length;
+      double totalTime = totalVideos * 1 + totalQuestions * 0.5;
+      return total + totalTime.ceil();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (PlatformHelper.isWeb) {
@@ -802,16 +812,87 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text(
-                              widget.course?.title ?? 'Corso non disponibile',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontFamily: 'Montserrat',
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.course?.title ?? 'Corso non disponibile',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontFamily: 'Montserrat',
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    FutureBuilder<int>(
+                                      future: widget.course?.getStudentsCount(),
+                                      builder: (context, snapshot) {
+                                        return Row(
+                                          children: [
+                                            Icon(
+                                              Icons.people,
+                                              color: Colors.white70,
+                                              size: 12,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              '${snapshot.data ?? 0}',
+                                              style: TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.star_rounded,
+                                          color: Colors.yellowAccent,
+                                          size: 12,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${widget.course?.rating.toStringAsFixed(1) ?? '0.0'} (${widget.course?.totalRatings ?? 0})',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                      ],
+                                    ),
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          FontAwesomeIcons.clock,
+                                          color: Colors.white70,
+                                          size: 10,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${_calculateTotalDuration()} min',
+                                          style: TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
