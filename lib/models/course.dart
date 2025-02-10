@@ -139,30 +139,27 @@ class Course {
     }
 
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('unlockedCourses', arrayContains: id)
-          .get();
-
-      final subscribersSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('subscriptions', arrayContains: authorId)
-          .get();
-
-      final uniqueStudents = <String>{};
+      final userRef = FirebaseFirestore.instance.collection('users');
       
-      for (var doc in querySnapshot.docs) {
-        uniqueStudents.add(doc.id);
-      }
+      // Ottieni tutti gli utenti
+      final usersSnapshot = await userRef.get();
       
-      for (var doc in subscribersSnapshot.docs) {
-        uniqueStudents.add(doc.id);
+      // Conta gli utenti che hanno questo corso in startedCourses
+      int count = 0;
+      for (var userDoc in usersSnapshot.docs) {
+        final startedCourses = List<Map<String, dynamic>>.from(
+          userDoc.data()['startedCourses'] ?? []
+        );
+        
+        if (startedCourses.any((course) => course['courseId'] == id)) {
+          count++;
+        }
       }
       
       // Cache the result
-      _studentsCache[id] = uniqueStudents.length;
+      _studentsCache[id] = count;
       
-      return uniqueStudents.length;
+      return count;
     } catch (e) {
       print('Error getting students count: $e');
       return 0;
