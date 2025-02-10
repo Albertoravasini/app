@@ -34,7 +34,7 @@ class _BottomNavigationBarCustomState extends State<BottomNavigationBarCustom> {
 
     return Container(
       width: double.infinity,
-      height: 75 + MediaQuery.of(context).padding.bottom,
+      height: 60 + MediaQuery.of(context).padding.bottom,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,

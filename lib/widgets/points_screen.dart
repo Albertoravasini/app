@@ -119,7 +119,7 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
     return SafeArea(
       bottom: false,
       child: Container(
-        padding: const EdgeInsets.only(top: 40),
+        padding: const EdgeInsets.only(top: 60),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -175,82 +175,87 @@ class _PointsScreenState extends State<PointsScreen> with SingleTickerProviderSt
             
             // Points List
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                itemCount: _points.length,
-                itemBuilder: (context, index) {
-                  final point = _points[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _togglePoint(index),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: point.completed 
-                                ? Colors.green.withOpacity(0.2)
-                                : Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: point.completed
-                                  ? Colors.green
-                                  : Colors.white.withOpacity(0.1),
-                              width: 1,
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  itemCount: _points.length,
+                  itemBuilder: (context, index) {
+                    final point = _points[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _togglePoint(index),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: point.completed 
+                                  ? Colors.green.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: point.completed
+                                    ? Colors.green
+                                    : Colors.white.withOpacity(0.1),
+                                width: 1,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              // Checkbox
-                              Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: point.completed
-                                      ? Colors.green
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
+                            child: Row(
+                              children: [
+                                // Checkbox
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
                                     color: point.completed
                                         ? Colors.green
-                                        : Colors.white.withOpacity(0.3),
-                                    width: 2,
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: point.completed
+                                          ? Colors.green
+                                          : Colors.white.withOpacity(0.3),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: point.completed
+                                      ? const Icon(
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: 16,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 16),
+                                // Text
+                                Expanded(
+                                  child: Text(
+                                    point.title,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: point.completed
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      decoration: point.completed
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                    ),
                                   ),
                                 ),
-                                child: point.completed
-                                    ? const Icon(
-                                        Icons.check,
-                                        color: Colors.white,
-                                        size: 16,
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 16),
-                              // Text
-                              Expanded(
-                                child: Text(
-                                  point.title,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: point.completed
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    decoration: point.completed
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ],

@@ -451,7 +451,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                     ),
                     SizedBox(width: 12),
                     Text(
-                      'Chapter Resources',
+                      'Risorse Capitolo',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -555,10 +555,10 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 12,
                     fontFamily: 'Montserrat',
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.72,
                     height: 1.2,
                   ),
                 ),

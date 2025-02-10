@@ -35,6 +35,10 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   // Stato del corso con ValueNotifier per aggiornamenti reattivi
   late final ValueNotifier<CourseState> _courseState;
   
+  // Cache per i dati Firebase
+  Map<String, Future<Map<String, dynamic>>> _sectionProgressCache = {};
+  Future<Map<String, dynamic>>? _userDataFuture;
+  
   @override
   void initState() {
     super.initState();
@@ -59,6 +63,9 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     _courseState = ValueNotifier<CourseState>(CourseState.locked);
     // Poi verifica lo stato reale
     _checkCourseState();
+    
+    // Precarica i dati dell'utente
+    _userDataFuture = _loadUserData();
   }
 
   @override
@@ -66,6 +73,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     _animationController.dispose();
     _buttonController.dispose();
     _courseState.dispose();
+    _sectionProgressCache.clear();
     super.dispose();
   }
 
@@ -970,31 +978,31 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   }
 
   Future<Map<String, dynamic>> _getSectionProgress(Section section) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    // Usa la cache se disponibile
+    if (_sectionProgressCache.containsKey(section.title)) {
+      return _sectionProgressCache[section.title]!;
+    }
+
+    final progressFuture = _calculateSectionProgress(section);
+    _sectionProgressCache[section.title] = progressFuture;
+    return progressFuture;
+  }
+
+  Future<Map<String, dynamic>> _calculateSectionProgress(Section section) async {
+    final userData = await _userDataFuture;
+    if (userData == null || userData.isEmpty) {
       return {
         'currentStep': 0,
+        'totalSteps': section.steps.length,
         'isCompleted': false,
-        'stepsCompleted': <bool>[],
+        'stepsCompleted': List.generate(section.steps.length, (_) => false),
+        'lockIndex': section.steps.length,
+        'containsLockedSteps': false
       };
     }
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    if (!userDoc.exists) {
-      return {
-        'currentStep': 0,
-        'isCompleted': false,
-        'stepsCompleted': <bool>[],
-      };
-    }
-
-    final userData = userDoc.data() as Map<String, dynamic>;
     final userModel = UserModel.fromMap(userData);
-    final isPro = userData['isPro'] ?? false;
+    final isPro = userData['isPro'] as bool? ?? false;
     
     // Calcola il numero totale di step nel corso
     final totalCourseSteps = widget.course.sections
@@ -1012,7 +1020,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     }
     
     // Get completedPoints from userData
-    final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
+    final completedPoints = List<String>.from(userData['completedPoints'] as List? ?? []);
     
     int completedSteps = 0;
     List<bool> stepsCompleted = [];
@@ -1056,75 +1064,87 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   }
 
   Widget _buildStartButton() {
-    return ValueListenableBuilder<CourseState>(
-      valueListenable: _courseState,
-      builder: (context, state, child) {
-        return FutureBuilder<bool>(
-          future: _isCourseStarted(),
-          builder: (context, snapshot) {
-            final bool isStarted = snapshot.data ?? false;
-            
-            return GestureDetector(
-              onTapDown: (_) => _buttonController.forward(),
-              onTapUp: (_) {
-                _buttonController.reverse();
-                if (state == CourseState.unlocked) {
-                  _handleStartCourse();
-                } else if (state == CourseState.locked) {
-                  _showStartCourseOptions();
-                }
-              },
-              onTapCancel: () => _buttonController.reverse(),
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: Stack(
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: state == CourseState.locked
-                            ? Colors.transparent
-                            : isStarted 
-                              ? const Color(0xFFFFFF28).withOpacity(0.15)
-                              : const Color(0xFFFFFF28),
-                        borderRadius: BorderRadius.circular(12),
-                        border: isStarted 
-                          ? Border.all(
-                              color: const Color(0xFFFFFF28),
-                              width: 2,
-                            ) 
-                          : null,
-                      ),
-                      child: state == CourseState.locked
-                          ? _buildOptionButton(
-                              icon: Icons.workspace_premium_rounded,
-                              title: 'Subscribe to ${widget.course.authorName}',
-                              subtitle: 'Access all premium courses from this creator',
-                              onTap: () {
-                                Navigator.pop(context);
-                                
-                              },
-                            )
-                          : Center(
-                              child: Text(
-                                isStarted ? 'Continue' : 'Start Course',
-                                style: TextStyle(
-                                  color: isStarted ? const Color(0xFFFFFF28) : Colors.black,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                    ),
-                  ],
+    return FutureBuilder<Map<String, dynamic>>(
+      future: Future.wait([
+        _isCourseStarted(),
+        _checkSubscriptionStatus(),
+      ]).then((results) => {
+        'isStarted': results[0],
+        'isSubscribed': results[1],
+      }),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const SizedBox(height: 64); // Placeholder durante il caricamento
+        }
+
+        final bool isStarted = snapshot.data!['isStarted'];
+        final bool isSubscribed = snapshot.data!['isSubscribed'];
+
+        // Se il corso richiede subscription e l'utente non è iscritto, non mostrare il pulsante
+        if (widget.course.isSubscriptionRequired && !isSubscribed) {
+          return const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTapDown: (_) => _buttonController.forward(),
+          onTapUp: (_) {
+            _buttonController.reverse();
+            _handleStartCourse();
+          },
+          onTapCancel: () => _buttonController.reverse(),
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: 64,
+              decoration: BoxDecoration(
+                color: isStarted 
+                  ? const Color(0xFFFFFF28).withOpacity(0.15)
+                  : const Color(0xFFFFFF28),
+                borderRadius: BorderRadius.circular(12),
+                border: isStarted 
+                  ? Border.all(
+                      color: const Color(0xFFFFFF28),
+                      width: 2,
+                    ) 
+                  : null,
+              ),
+              child: Center(
+                child: Text(
+                  isStarted ? 'Continue' : 'Start Course',
+                  style: TextStyle(
+                    color: isStarted ? const Color(0xFFFFFF28) : Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-            );
-          }
+            ),
+          ),
         );
       },
     );
+  }
+
+  Future<bool> _checkSubscriptionStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) return false;
+
+      final userData = userDoc.data()!;
+      final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
+      return subscriptions.contains(widget.course.authorId);
+    } catch (e) {
+      print('Error checking subscription status: $e');
+      return false;
+    }
   }
 
   Future<bool> _isCourseStarted() async {
@@ -1202,6 +1222,29 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
         ),
       ),
     );
+  }
+
+  Future<Map<String, dynamic>> _loadUserData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return {};
+    }
+
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        return {};
+      }
+
+      return userDoc.data() ?? {};
+    } catch (e) {
+      print('Error loading user data: $e');
+      return {};
+    }
   }
 }
 

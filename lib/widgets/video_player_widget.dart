@@ -339,8 +339,13 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             ? Center(
                 child: Container(
                   width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.width * 16/9,
-                  child: VideoPlayer(_controller),
+                  height: MediaQuery.of(context).size.height - (60 + MediaQuery.of(context).padding.bottom + MediaQuery.of(context).padding.top),
+                  child: Center(
+                    child: AspectRatio(
+                      aspectRatio: 9/16,
+                      child: VideoPlayer(_controller),
+                    ),
+                  ),
                 ),
               )
             : const Center(child: CircularProgressIndicator()),
