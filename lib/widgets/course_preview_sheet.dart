@@ -19,10 +19,18 @@ class CoursePreviewSheet extends StatefulWidget {
     required this.course,
   }) : super(key: key);
 
-  // Aggiungiamo un metodo statico per pre-caricare i dati
+  // Aggiungiamo una cache statica per i dati del corso
+  static final Map<String, Map<String, dynamic>> _courseDataCache = {};
+
   static Future<void> preload(BuildContext context, Course course) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      // Verifica se i dati sono già in cache
+      if (_courseDataCache.containsKey(course.id)) {
+        _preloadedData = _courseDataCache[course.id];
+        return;
+      }
+
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -30,7 +38,16 @@ class CoursePreviewSheet extends StatefulWidget {
       
       if (userDoc.exists) {
         final userData = UserModel.fromMap(userDoc.data()!);
-        final studentsCount = await course.getStudentsCount();
+        
+        // Esegui tutte le query in parallelo
+        final futures = await Future.wait([
+          course.getStudentsCount(),
+          _calculateAllSectionsProgress(course, userData),
+        ]);
+
+        final studentsCount = futures[0] as int;
+        final sectionProgress = futures[1] as Map<String, Map<String, dynamic>>;
+        
         final isPro = userDoc.data()?['isPro'] ?? false;
         
         // Calcola il numero totale di step nel corso
@@ -40,58 +57,8 @@ class CoursePreviewSheet extends StatefulWidget {
         
         // Calcola il punto di blocco (30% del totale)
         final unlockLimit = (totalSteps * 0.3).round();
-        var stepCounter = 0;
         
-        // Pre-calcola il progresso delle sezioni
-        final sectionProgress = <String, Map<String, dynamic>>{};
-        for (var section in course.sections) {
-          int completedSteps = 0;
-          List<bool> stepsCompleted = [];
-          
-          // Se l'utente è pro, non bloccare nessuno step
-          bool containsLockedSteps = !isPro && stepCounter + section.steps.length > unlockLimit;
-          int lockIndex = isPro ? section.steps.length : (containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length);
-
-          for (var i = 0; i < section.steps.length; i++) {
-            final step = section.steps[i];
-            bool isCompleted = false;
-            bool isStepLocked = !isPro && containsLockedSteps && i >= lockIndex;
-
-            if (!isStepLocked) {
-              if (step.type == 'video') {
-                final videoId = step.videoUrl ?? step.content;
-                isCompleted = userData.WatchedVideos[course.topic]?.any(
-                  (v) => v.videoId == videoId && v.completed
-                ) ?? false;
-              } else if (step.type == 'question') {
-                isCompleted = userData.answeredQuestions[course.topic]?.contains(step.content) ?? false;
-              }
-            }
-
-            if (isCompleted) {
-              completedSteps++;
-            }
-
-            stepsCompleted.add(isCompleted);
-          }
-
-          stepCounter += section.steps.length;
-
-          sectionProgress[section.title] = {
-            'currentStep': completedSteps,
-            'totalSteps': section.steps.length,
-            'isCompleted': completedSteps == section.steps.length,
-            'stepsCompleted': stepsCompleted,
-            'lockIndex': lockIndex,
-            'containsLockedSteps': containsLockedSteps,
-            'stepCounter': stepCounter,
-            'unlockLimit': unlockLimit,
-            'isPro': isPro
-          };
-        }
-
-        // Salva i dati pre-caricati
-        _preloadedData = {
+        final cacheData = {
           'userData': userData,
           'studentsCount': studentsCount,
           'sectionProgress': sectionProgress,
@@ -99,8 +66,69 @@ class CoursePreviewSheet extends StatefulWidget {
           'totalSteps': totalSteps,
           'unlockLimit': unlockLimit
         };
+
+        // Salva in cache
+        _courseDataCache[course.id] = cacheData;
+        _preloadedData = cacheData;
       }
     }
+  }
+
+  // Nuovo metodo per calcolare il progresso di tutte le sezioni in una volta
+  static Future<Map<String, Map<String, dynamic>>> _calculateAllSectionsProgress(Course course, UserModel userData) async {
+    final sectionProgress = <String, Map<String, dynamic>>{};
+    var stepCounter = 0;
+    final isPro = userData.isPro;
+    final totalSteps = course.sections
+        .map((s) => s.steps.length)
+        .reduce((a, b) => a + b);
+    final unlockLimit = (totalSteps * 0.3).round();
+
+    for (var section in course.sections) {
+      int completedSteps = 0;
+      List<bool> stepsCompleted = [];
+      
+      bool containsLockedSteps = !isPro && stepCounter + section.steps.length > unlockLimit;
+      int lockIndex = isPro ? section.steps.length : (containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length);
+
+      for (var i = 0; i < section.steps.length; i++) {
+        final step = section.steps[i];
+        bool isCompleted = false;
+        bool isStepLocked = !isPro && containsLockedSteps && i >= lockIndex;
+
+        if (!isStepLocked) {
+          if (step.type == 'video') {
+            final videoId = step.videoUrl ?? step.content;
+            isCompleted = userData.WatchedVideos[course.topic]?.any(
+              (v) => v.videoId == videoId && v.completed
+            ) ?? false;
+          } else if (step.type == 'question') {
+            isCompleted = userData.answeredQuestions[course.topic]?.contains(step.content) ?? false;
+          } else if (step.type == 'points') {
+            isCompleted = userData.completedPoints.contains(step.content);
+          }
+        }
+
+        if (isCompleted) completedSteps++;
+        stepsCompleted.add(isCompleted);
+      }
+
+      stepCounter += section.steps.length;
+
+      sectionProgress[section.title] = {
+        'currentStep': completedSteps,
+        'totalSteps': section.steps.length,
+        'isCompleted': completedSteps == section.steps.length,
+        'stepsCompleted': stepsCompleted,
+        'lockIndex': lockIndex,
+        'containsLockedSteps': containsLockedSteps,
+        'stepCounter': stepCounter,
+        'unlockLimit': unlockLimit,
+        'isPro': isPro
+      };
+    }
+
+    return sectionProgress;
   }
 
   // Variabile statica per i dati pre-caricati
@@ -114,27 +142,22 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   late AnimationController _animationController;
   late AnimationController _buttonController;
   late Animation<double> _scaleAnimation;
-  bool isExpanded = false;
-  double _scrollOffset = 0;
-  String _startButtonText = 'Start Course';
-  bool _showUnlockOptions = false;
-
-  // Stato del corso con ValueNotifier per aggiornamenti reattivi
-  late final ValueNotifier<CourseState> _courseState;
+  final ValueNotifier<bool> _isExpanded = ValueNotifier<bool>(false);
+  final ValueNotifier<double> _scrollOffset = ValueNotifier<double>(0.0);
+  final ValueNotifier<String> _startButtonText = ValueNotifier<String>('Start Course');
+  final ValueNotifier<bool> _showUnlockOptions = ValueNotifier<bool>(false);
+  final ValueNotifier<CourseState> _courseState = ValueNotifier<CourseState>(CourseState.locked);
   
-  // Cache per i dati Firebase
-  Map<String, Future<Map<String, dynamic>>> _sectionProgressCache = {};
-  Future<Map<String, dynamic>>? _userDataFuture;
+  // Cache per i dati
+  final Map<String, Future<Map<String, dynamic>>> _sectionProgressCache = {};
+  final ValueNotifier<Map<String, Map<String, dynamic>>> _sectionProgressData = ValueNotifier<Map<String, Map<String, dynamic>>>({});
+  final ValueNotifier<UserModel?> _userData = ValueNotifier<UserModel?>(null);
+  final ValueNotifier<bool> _isLoadingUserData = ValueNotifier<bool>(true);
+  final ValueNotifier<int?> _studentsCount = ValueNotifier<int?>(null);
+  final ValueNotifier<bool> _isLoadingStudents = ValueNotifier<bool>(true);
   
   late int _totalDuration;
-  int? _studentsCount;
-  bool _isLoadingStudents = true;
-  
-  // Aggiungiamo cache per i progressi delle sezioni
-  Map<String, Map<String, dynamic>> _sectionProgressData = {};
-  UserModel? _userData;
-  bool _isLoadingUserData = true;
-  
+
   @override
   void initState() {
     super.initState();
@@ -156,16 +179,16 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       ),
     );
     
-    _courseState = ValueNotifier<CourseState>(CourseState.locked);
+    _courseState.value = CourseState.locked;
     _checkCourseState();
     
     // Usa i dati pre-caricati se disponibili
     if (CoursePreviewSheet._preloadedData != null) {
-      _userData = CoursePreviewSheet._preloadedData!['userData'];
-      _studentsCount = CoursePreviewSheet._preloadedData!['studentsCount'];
-      _sectionProgressData = CoursePreviewSheet._preloadedData!['sectionProgress'];
-      _isLoadingStudents = false;
-      _isLoadingUserData = false;
+      _userData.value = CoursePreviewSheet._preloadedData!['userData'];
+      _studentsCount.value = CoursePreviewSheet._preloadedData!['studentsCount'];
+      _sectionProgressData.value = CoursePreviewSheet._preloadedData!['sectionProgress'];
+      _isLoadingStudents.value = false;
+      _isLoadingUserData.value = false;
     } else {
       // Fallback al caricamento normale
       _initializeData();
@@ -177,6 +200,9 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       double totalTime = totalVideos * 1 + totalQuestions * 0.5;
       return total + totalTime.ceil();
     });
+
+    _loadUserData();
+    _precacheSectionProgress();
   }
 
   @override
@@ -308,6 +334,9 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
           } else if (step.type == 'question') {
             // Controlla se la domanda è stata risposta
             isCompleted = userModel.answeredQuestions[widget.course.topic]?.contains(step.content) ?? false;
+          } else if (step.type == 'points') {
+            // Check if the points step is completed in completedPoints array
+            isCompleted = userModel.completedPoints.contains(step.content);
           }
 
           if (isCompleted) {
@@ -390,12 +419,6 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       minChildSize: 0.6,
       maxChildSize: 0.9,
       builder: (context, scrollController) {
-        scrollController.addListener(() {
-          setState(() {
-            _scrollOffset = scrollController.offset;
-          });
-        });
-
         return Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
@@ -413,241 +436,201 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
             children: [
               // Immagine di copertina con effetto parallasse
               if (widget.course.coverImageUrl != null)
-                Positioned(
-                  top: -_scrollOffset * 0.5,
-                  left: 0,
-                  right: 0,
-                  height: 300,
-                  child: ShaderMask(
-                    shaderCallback: (rect) {
-                      return LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black,
-                          Colors.transparent,
-                        ],
-                      ).createShader(Rect.fromLTRB(0, 0, rect.width, rect.height));
-                    },
-                    blendMode: BlendMode.dstIn,
-                    child: Image.network(
-                      widget.course.coverImageUrl!,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                ValueListenableBuilder<double>(
+                  valueListenable: _scrollOffset,
+                  builder: (context, scrollOffset, _) {
+                    return Positioned(
+                      top: -scrollOffset * 0.5,
+                      left: 0,
+                      right: 0,
+                      height: 300,
+                      child: ShaderMask(
+                        shaderCallback: (rect) {
+                          return LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black,
+                              Colors.transparent,
+                            ],
+                          ).createShader(Rect.fromLTRB(0, 0, rect.width, rect.height));
+                        },
+                        blendMode: BlendMode.dstIn,
+                        child: Hero(
+                          tag: 'course-${widget.course.id}',
+                          child: Image.network(
+                            widget.course.coverImageUrl!,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey[900],
+                              child: Icon(
+                                Icons.school,
+                                color: Colors.white.withOpacity(0.2),
+                                size: 48,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
 
               // Contenuto principale
-              CustomScrollView(
-                controller: scrollController,
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  // Header con titolo e autore
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Indicatore di trascinamento
-                          Center(
-                            child: Container(
-                              width: 40,
-                              height: 4,
-                              margin: const EdgeInsets.only(bottom: 20),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(2),
+              NotificationListener<ScrollNotification>(
+                onNotification: (notification) {
+                  _scrollOffset.value = notification.metrics.pixels;
+                  return false;
+                },
+                child: CustomScrollView(
+                  controller: scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  slivers: [
+                    // Header con titolo e autore
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Indicatore di trascinamento
+                            Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                margin: const EdgeInsets.only(bottom: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
                               ),
                             ),
-                          ),
 
-                          // Titolo del corso
-                          Hero(
-                            tag: 'courseTitle${widget.course.id}',
-                            child: Text(
-                              widget.course.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: -0.5,
+                            // Titolo del corso
+                            Hero(
+                              tag: 'courseTitle${widget.course.id}',
+                              child: Text(
+                                widget.course.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
                             ),
-                          ),
 
-                          const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                          // Informazioni sull'autore
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundImage: widget.course.authorProfileUrl != null
-                                    ? NetworkImage(widget.course.authorProfileUrl!)
-                                    : null,
-                                child: widget.course.authorProfileUrl == null
-                                    ? Text(
-                                        widget.course.authorName[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.course.authorName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                            // Informazioni sull'autore
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundImage: widget.course.authorProfileUrl != null
+                                      ? NetworkImage(widget.course.authorProfileUrl!)
+                                      : null,
+                                  child: widget.course.authorProfileUrl == null
+                                      ? Text(
+                                          widget.course.authorName[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      widget.course.authorName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    'Course Creator',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 14,
+                                    Text(
+                                      'Course Creator',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.7),
+                                        fontSize: 14,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
 
-                  // Statistiche del corso
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: _buildCourseStats(),
-                    ),
-                  ),
-
-                  // Descrizione
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Description',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            widget.course.description,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 16,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
+                    // Statistiche del corso
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: ValueListenableBuilder<bool>(
+                          valueListenable: _isLoadingStudents,
+                          builder: (context, isLoading, _) {
+                            return _buildCourseStats(isLoading);
+                          },
+                        ),
                       ),
                     ),
-                  ),
 
-                  // Sezioni del corso
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Course Content',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          ...widget.course.sections.map((section) => 
-                            _buildSectionCard(section)),
-                        ],
+                    // Descrizione
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _buildDescription(),
                       ),
                     ),
-                  ),
 
-                  // Informazioni aggiuntive
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: _buildAdditionalInfo(),
+                    // Sezioni del corso
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          if (index >= widget.course.sections.length) return null;
+                          return ValueListenableBuilder<Map<String, Map<String, dynamic>>>(
+                            valueListenable: _sectionProgressData,
+                            builder: (context, progressData, _) {
+                              return _buildSectionCard(widget.course.sections[index]);
+                            },
+                          );
+                        },
+                      ),
                     ),
-                  ),
 
-                  // Spazio finale
-                  const SliverToBoxAdapter(
-                    child: SizedBox(height: 40),
-                  ),
-                ],
+                    // Informazioni aggiuntive
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: _buildAdditionalInfo(),
+                      ),
+                    ),
+
+                    const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+                  ],
+                ),
               ),
 
               // Pulsante di chiusura
               Positioned(
                 top: 20,
                 right: 20,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
+                child: _buildCloseButton(),
               ),
 
-              // Aggiungiamo il nuovo bottone in fondo
+              // Bottone in fondo
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black,
-                        Colors.black.withOpacity(0.9),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: _buildStartButton(),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                child: _buildBottomButton(),
               ),
             ],
           ),
@@ -656,7 +639,43 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     );
   }
 
-  Widget _buildCourseStats() {
+  Widget _buildCloseButton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.5),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.close, color: Colors.white),
+        onPressed: () => Navigator.pop(context),
+      ),
+    );
+  }
+
+  Widget _buildBottomButton() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.black,
+            Colors.black.withOpacity(0.9),
+            Colors.transparent,
+          ],
+        ),
+      ),
+      child: ValueListenableBuilder<CourseState>(
+        valueListenable: _courseState,
+        builder: (context, state, _) {
+          return _buildStartButton();
+        },
+      ),
+    );
+  }
+
+  Widget _buildCourseStats(bool isLoading) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -674,7 +693,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
           _buildVerticalDivider(),
           _buildStat(
             Icons.people_alt_rounded, 
-            _isLoadingStudents ? '...' : '${_studentsCount ?? 0}', 
+            isLoading ? '...' : '${_studentsCount.value ?? 0}', 
             'Students'
           ),
           _buildVerticalDivider(),
@@ -726,7 +745,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   }
 
   Widget _buildSectionCard(Section section) {
-    final progress = _sectionProgressData[section.title];
+    final progress = _sectionProgressData.value[section.title];
     
     if (progress == null) {
       return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()));
@@ -744,7 +763,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     final progressValue = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(16),
@@ -834,14 +853,6 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
                             const SizedBox(width: 4),
                             Text(
                               '${_calculateTotalTime(section)} min',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              '$completedSteps/$totalSteps lezioni',
                               style: TextStyle(
                                 color: Colors.grey[500],
                                 fontSize: 12,
@@ -959,7 +970,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
                             color: Colors.yellowAccent.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             FontAwesomeIcons.check,
                             color: Colors.yellowAccent,
                             size: 12,
@@ -1059,7 +1070,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      setState(() => _isLoadingUserData = false);
+      _isLoadingUserData.value = false;
       return;
     }
 
@@ -1070,81 +1081,36 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
           .get();
 
       if (!userDoc.exists) {
-        setState(() => _isLoadingUserData = false);
+        _isLoadingUserData.value = false;
         return;
       }
 
       setState(() {
-        _userData = UserModel.fromMap(userDoc.data()!);
-        _isLoadingUserData = false;
+        _userData.value = UserModel.fromMap(userDoc.data()!);
+        _isLoadingUserData.value = false;
       });
     } catch (e) {
       print('Error loading user data: $e');
-      setState(() => _isLoadingUserData = false);
+      setState(() => _isLoadingUserData.value = false);
     }
   }
 
   Future<void> _precacheSectionProgress() async {
-    if (_userData == null) return;
+    if (_userData.value == null) return;
 
-    for (var section in widget.course.sections) {
-      final progress = await _calculateSectionProgress(section);
-      _sectionProgressData[section.title] = progress;
-    }
+    final allProgress = await CoursePreviewSheet._calculateAllSectionsProgress(widget.course, _userData.value!);
     
-    if (mounted) setState(() {});
+    setState(() {
+      _sectionProgressData.value = allProgress;
+    });
   }
 
-  Future<Map<String, dynamic>> _calculateSectionProgress(Section section) async {
-    if (_userData == null) {
-      return {
-        'currentStep': 0,
-        'totalSteps': section.steps.length,
-        'isCompleted': false,
-        'stepsCompleted': List.filled(section.steps.length, false),
-        'lockIndex': 0,
-        'containsLockedSteps': true,
-        'isPro': false
-      };
+  @override
+  void didUpdateWidget(CoursePreviewSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.course != widget.course) {
+      _precacheSectionProgress();
     }
-
-    int completedSteps = 0;
-    List<bool> stepsCompleted = [];
-    int lockIndex = 0;
-    bool foundLock = false;
-
-    for (var i = 0; i < section.steps.length; i++) {
-      final step = section.steps[i];
-      bool isCompleted = false;
-
-      if (step.type == 'video') {
-        final videoId = step.videoUrl ?? step.content;
-        isCompleted = _userData!.WatchedVideos[widget.course.topic]?.any(
-          (v) => v.videoId == videoId && v.completed
-        ) ?? false;
-      } else if (step.type == 'question') {
-        isCompleted = _userData!.answeredQuestions[widget.course.topic]?.contains(step.content) ?? false;
-      }
-
-      if (isCompleted) {
-        completedSteps++;
-      } else if (!foundLock) {
-        lockIndex = i;
-        foundLock = true;
-      }
-
-      stepsCompleted.add(isCompleted);
-    }
-
-    return {
-      'currentStep': completedSteps,
-      'totalSteps': section.steps.length,
-      'isCompleted': completedSteps == section.steps.length,
-      'stepsCompleted': stepsCompleted,
-      'lockIndex': lockIndex,
-      'containsLockedSteps': foundLock,
-      'isPro': false
-    };
   }
 
   Widget _buildStartButton() {
@@ -1315,18 +1281,43 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       final count = await widget.course!.getStudentsCount();
       if (mounted) {
         setState(() {
-          _studentsCount = count;
-          _isLoadingStudents = false;
+          _studentsCount.value = count;
+          _isLoadingStudents.value = false;
         });
       }
     } catch (e) {
       print('Error loading students count: $e');
       if (mounted) {
         setState(() {
-          _isLoadingStudents = false;
+          _isLoadingStudents.value = false;
         });
       }
     }
+  }
+
+  Widget _buildDescription() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Description',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          widget.course.description,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.7),
+            fontSize: 16,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
   }
 }
 

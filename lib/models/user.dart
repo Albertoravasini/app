@@ -10,6 +10,7 @@ class UserModel {
   final Map<String, List<String>> answeredQuestions;
   final Map<String, int> currentSteps; // Memorizza lo step corrente per ogni sezione
   final List<String> completedSections; // Memorizza le sezioni completate
+  final List<String> completedPoints; // Memorizza i points completati
   int consecutiveDays;
   DateTime lastAccess;
   final String role;
@@ -43,6 +44,7 @@ class UserModel {
     required this.answeredQuestions,
     required this.currentSteps, // Inizializza lo stato dello step corrente
     required this.completedSections, // Inizializza lo stato delle sezioni completate
+    required this.completedPoints,
     required this.consecutiveDays,
     required this.lastAccess,
     required this.role,
@@ -106,6 +108,7 @@ class UserModel {
       answeredQuestions: answeredQuestions,
       currentSteps: currentStepsMap,
       completedSections: List<String>.from(data['completedSections'] ?? []), // Carica le sezioni completate
+      completedPoints: List<String>.from(data['completedPoints'] ?? []),
       consecutiveDays: data['consecutiveDays'] ?? 0,
       lastAccess: data['lastAccess'] != null ? DateTime.parse(data['lastAccess']) : DateTime.now(),
       role: data['role'] ?? 'user',
@@ -145,6 +148,7 @@ class UserModel {
       'answeredQuestions': answeredQuestions,
       'currentSteps': currentSteps, // Mappa lo step corrente
       'completedSections': completedSections, // Mappa le sezioni completate
+      'completedPoints': completedPoints,
       'consecutiveDays': consecutiveDays,
       'lastAccess': lastAccess.toIso8601String(),
       'role': role,

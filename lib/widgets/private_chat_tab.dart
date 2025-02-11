@@ -1,4 +1,5 @@
 import 'package:Just_Learn/models/message.dart';
+import 'package:Just_Learn/screens/subscription_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -157,7 +158,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
       );
     }
 
-    // Se non il proprietario e nessuna subscription, mostra il messaggio
+    // Se non il proprietario e non è pro, mostra il messaggio
     if (widget.currentUser.uid != widget.profileUser.uid && !_hasSubscription!) {
       return Center(
         child: Container(
@@ -194,7 +195,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Subscribe to unlock private chat with ${widget.profileUser.name} and get exclusive access to direct communication.',
+                'Upgrade to Pro to unlock private chat with ${widget.profileUser.name} and all other teachers.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.7),
@@ -202,6 +203,48 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                   fontFamily: 'Montserrat',
                   fontWeight: FontWeight.w500,
                   height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SubscriptionScreen(),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.yellowAccent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.yellowAccent.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.star,
+                        size: 20,
+                        color: Colors.yellowAccent.withOpacity(0.9),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Upgrade to Pro',
+                        style: TextStyle(
+                          color: Colors.yellowAccent.withOpacity(0.9),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -460,7 +503,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
     );
   }
 
-  // Add this new method to check subscription status
+  // Replace the _checkSubscriptionStatus method with this new version
   Future<bool> _checkSubscriptionStatus() async {
     if (widget.currentUser.uid == widget.profileUser.uid) {
       return true; // Owner always has access
@@ -474,9 +517,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
     if (!userDoc.exists) return false;
 
     final userData = userDoc.data() as Map<String, dynamic>;
-    final subscriptions = List<String>.from(userData['subscriptions'] ?? []);
-    
-    return subscriptions.contains(widget.profileUser.uid);
+    return userData['isPro'] ?? false;
   }
 
   Widget _buildSingleChat({String? userId}) {
