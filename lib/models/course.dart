@@ -15,6 +15,7 @@ class Course {
   String? thumbnailUrl;
   String? coverImageUrl;
   bool isSubscriptionRequired;
+  DateTime? releaseDate;
 
   // Additional fields
   List<String> sources;
@@ -56,6 +57,7 @@ class Course {
     this.authorProfileUrl,
     this.isSubscriptionRequired = false,
     this.enrolledStudents = const {},
+    this.releaseDate,
   });
 
   factory Course.fromFirestore(DocumentSnapshot doc) {
@@ -102,6 +104,7 @@ class Course {
       authorProfileUrl: data['authorProfileUrl'],
       isSubscriptionRequired: data['isSubscriptionRequired'] ?? false,
       enrolledStudents: enrolledStudentsMap,
+      releaseDate: data['releaseDate'] != null ? (data['releaseDate'] as Timestamp).toDate() : null,
     );
   }
 
@@ -129,6 +132,7 @@ class Course {
       'isSubscriptionRequired': isSubscriptionRequired,
       'enrolledStudents': enrolledStudents.map((key, value) => 
           MapEntry(key, Timestamp.fromDate(value))),
+      'releaseDate': releaseDate != null ? Timestamp.fromDate(releaseDate!) : null,
     };
   }
 

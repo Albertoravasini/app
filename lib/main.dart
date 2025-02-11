@@ -30,6 +30,8 @@ import 'screens/NotificationsScreen.dart';
 import 'web/screens/web_landing_screen.dart';
 import 'screens/courses_list_screen.dart';
 import 'services/purchase_service.dart';
+import 'services/course_service.dart';
+import 'dart:async';
 
 // Navigator key globale per accedere al contesto fuori dal MaterialApp
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -60,6 +62,13 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     ).then((app) async {
       print('Firebase inizializzato correttamente');
+      
+      // Initialize course release checker
+      final courseService = CourseService();
+      Timer.periodic(const Duration(minutes: 1), (timer) {
+        courseService.checkCoursesToRelease();
+      });
+      
     }).catchError((e) {
       if (e.toString().contains('duplicate-app')) {
         print('Firebase già inizializzato, continuo...');

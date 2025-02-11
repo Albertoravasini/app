@@ -1114,6 +1114,11 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
   }
 
   Widget _buildStartButton() {
+    // If the course has a future release date, don't show the button
+    if (widget.course.releaseDate != null && widget.course.releaseDate!.isAfter(DateTime.now())) {
+      return const SizedBox.shrink();
+    }
+
     return FutureBuilder<Map<String, dynamic>>(
       future: Future.wait([
         _isCourseStarted(),

@@ -695,6 +695,57 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         .toList();
   }
 
+  void _showAboutManager() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF282828),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.work_outline, color: Colors.white),
+              title: const Text(
+                'Gestisci Esperienze',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showExperienceManager();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.verified, color: Colors.white),
+              title: const Text(
+                'Gestisci Certificazioni',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showCertificationManager();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group, color: Colors.white),
+              title: const Text(
+                'Gestisci Social e Contatti',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showSocialManager();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     bool isTeacher = widget.currentUser.role == 'teacher';
@@ -1275,36 +1326,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                       },
                                     ),
                                     ListTile(
-                                      leading: const Icon(Icons.work_outline, color: Colors.white),
+                                      leading: const Icon(Icons.person_outline, color: Colors.white),
                                       title: const Text(
-                                        'Gestisci Esperienze',
+                                        'Gestisci About',
                                         style: TextStyle(color: Colors.white),
                                       ),
                                       onTap: () {
                                         Navigator.pop(context);
-                                        _showExperienceManager();
-                                      },
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(Icons.verified, color: Colors.white),
-                                      title: const Text(
-                                        'Gestisci Certificazioni',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _showCertificationManager();
-                                      },
-                                    ),
-                                    ListTile(
-                                      leading: const Icon(Icons.group, color: Colors.white),
-                                      title: const Text(
-                                        'Gestisci Social e Contatti',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
-                                      onTap: () {
-                                        Navigator.pop(context);
-                                        _showSocialManager();
+                                        _showAboutManager();
                                       },
                                     ),
                                     ListTile(

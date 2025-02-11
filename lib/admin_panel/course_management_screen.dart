@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/course.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:async';
 
 class CourseManagementScreen extends StatefulWidget {
   final String? userId;
@@ -140,6 +141,135 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  void _showReleaseDatePicker(Course course) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: course.releaseDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.yellowAccent,
+              onPrimary: Colors.black,
+              surface: Color(0xFF282828),
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: const Color(0xFF282828),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      try {
+        setState(() => _isLoading = true);
+
+        await FirebaseFirestore.instance
+            .collection('courses')
+            .doc(course.id)
+            .update({
+          'releaseDate': Timestamp.fromDate(picked),
+          'visible': false,
+        });
+
+        // Update local state
+        setState(() {
+          course.releaseDate = picked;
+          course.visible = false;
+          _isLoading = false;
+        });
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Course will be released on ${picked.day}/${picked.month}/${picked.year}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        setState(() => _isLoading = false);
+        
+        if (!mounted) return;
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error setting release date: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _cancelRelease(Course course) async {
+    try {
+      setState(() => _isLoading = true);
+
+      await FirebaseFirestore.instance
+          .collection('courses')
+          .doc(course.id)
+          .update({
+        'releaseDate': null,
+      });
+
+      // Update local state
+      setState(() {
+        course.releaseDate = null;
+        _isLoading = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Release date cancelled'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error cancelling release date: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _checkCoursesToRelease() async {
+    final now = DateTime.now();
+    for (var course in _courses) {
+      if (course.releaseDate != null && 
+          course.releaseDate!.isBefore(now) && 
+          !course.visible) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('courses')
+              .doc(course.id)
+              .update({
+            'visible': true,
+            'releaseDate': null,
+          });
+
+          setState(() {
+            course.visible = true;
+            course.releaseDate = null;
+          });
+        } catch (e) {
+          print('Error releasing course ${course.id}: $e');
+        }
+      }
     }
   }
 
@@ -392,32 +522,62 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                   // Badge stato
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: course.visible
-                            ? Colors.yellowAccent.withOpacity(0.2)
-                            : Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: course.visible
-                              ? Colors.yellowAccent
-                              : Colors.white.withOpacity(0.3),
-                          width: 1,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: course.visible
+                                ? Colors.yellowAccent.withOpacity(0.2)
+                                : Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: course.visible
+                                  ? Colors.yellowAccent
+                                  : Colors.white.withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            course.visible ? 'Published' : 'Draft',
+                            style: TextStyle(
+                              color: course.visible ? Colors.yellowAccent : Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Montserrat',
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        course.visible ? 'Published' : 'Draft',
-                        style: TextStyle(
-                          color: course.visible ? Colors.yellowAccent : Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'Montserrat',
-                        ),
-                      ),
+                        if (course.releaseDate != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.blue.withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              'Release: ${course.releaseDate!.day}/${course.releaseDate!.month}/${course.releaseDate!.year}',
+                              style: const TextStyle(
+                                color: Colors.lightBlue,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Montserrat',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
 
@@ -538,6 +698,27 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                         ],
                       ),
                     ),
+                    // Release
+                    PopupMenuItem<String>(
+                      value: 'release',
+                      child: Row(
+                        children: [
+                          Icon(
+                            course.releaseDate != null ? Icons.event_busy : Icons.event,
+                            size: 20,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            course.releaseDate != null ? 'Cancel Release' : 'Set Release Date',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     // Divider
                     const PopupMenuDivider(),
                     // Delete
@@ -571,20 +752,18 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                             builder: (context) => CourseEditScreen(course: course),
                           ),
                         );
-                        _loadCourses(); // Ricarica i corsi dopo la modifica
+                        _loadCourses();
                         break;
                         
                       case 'visibility':
                         try {
                           setState(() => _isLoading = true);
                           
-                          // Update visible field in database
                           await FirebaseFirestore.instance
                             .collection('courses')
                             .doc(course.id)
                             .update({'visible': !course.visible});
                           
-                          // Update local state
                           setState(() {
                             course.visible = !course.visible;
                             _isLoading = false;
@@ -609,6 +788,14 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                               backgroundColor: Colors.red,
                             ),
                           );
+                        }
+                        break;
+
+                      case 'release':
+                        if (course.releaseDate != null) {
+                          _cancelRelease(course);
+                        } else {
+                          _showReleaseDatePicker(course);
                         }
                         break;
                         

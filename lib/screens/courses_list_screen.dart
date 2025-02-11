@@ -40,17 +40,29 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAllCourses();
+    _loadCourses();
     _loadUserStartedCourses();
     _loadWatchedVideos();
   }
 
   // Carica tutti i corsi visibili
-  Future<void> _loadAllCourses() async {
+  Future<void> _loadCourses() async {
     try {
-      final courses = await _courseService.getVisibleCourses();
+      final coursesSnapshot = await FirebaseFirestore.instance
+          .collection('courses')
+          .where('visible', isEqualTo: true)
+          .get();
+
+      final comingSoonSnapshot = await FirebaseFirestore.instance
+          .collection('courses')
+          .where('releaseDate', isGreaterThan: Timestamp.fromDate(DateTime.now()))
+          .get();
+
       setState(() {
-        _allCourses = courses;
+        _allCourses = [
+          ...coursesSnapshot.docs.map((doc) => Course.fromFirestore(doc)),
+          ...comingSoonSnapshot.docs.map((doc) => Course.fromFirestore(doc)),
+        ];
         _isLoadingCourses = false;
       });
     } catch (e) {
@@ -154,12 +166,17 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
   Map<String, List<Course>> _getCoursesByTopic() {
     final Map<String, List<Course>> categorizedCourses = {};
 
-    // Piccolo filtro in base alla search query
+    // Filtra i corsi: solo quelli visibili e senza data di rilascio futura
     final filtered = _allCourses.where((course) {
       final query = _searchQuery.toLowerCase();
-      return course.title.toLowerCase().contains(query) ||
+      final matchesSearch = course.title.toLowerCase().contains(query) ||
              course.description.toLowerCase().contains(query) ||
              course.topic.toLowerCase().contains(query);
+      
+      final isNotComingSoon = course.releaseDate == null || 
+                             !course.releaseDate!.isAfter(DateTime.now());
+      
+      return matchesSearch && isNotComingSoon && course.visible;
     }).toList();
 
     for (var course in filtered) {
@@ -212,7 +229,12 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                     child: _buildStartedCoursesSection(),
                   ),
 
-                // 3) Corsi divisi per topic (filtrati)
+                // 3) Presto Disponibili
+                SliverToBoxAdapter(
+                  child: _buildComingSoonSection(),
+                ),
+
+                // 4) Corsi divisi per topic (filtrati)
                 ..._buildTopicSections(),
               ],
             ),
@@ -489,6 +511,229 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  /// Dopo il metodo _buildStartedCoursesSection()
+  Widget _buildComingSoonSection() {
+    final List<Course> comingSoonCourses = _allCourses
+        .where((course) => course.releaseDate != null && 
+                          course.releaseDate!.isAfter(DateTime.now()))
+        .toList();
+
+    if (comingSoonCourses.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Ordina i corsi per data di rilascio (i più vicini prima)
+    comingSoonCourses.sort((a, b) => a.releaseDate!.compareTo(b.releaseDate!));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 32),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.timer_outlined,
+                color: Colors.yellowAccent,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Presto Disponibili',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 300,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            scrollDirection: Axis.horizontal,
+            itemCount: comingSoonCourses.length,
+            itemBuilder: (context, index) {
+              final course = comingSoonCourses[index];
+              return _buildComingSoonCard(course);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildComingSoonCard(Course course) {
+    final daysUntilRelease = course.releaseDate!.difference(DateTime.now()).inDays;
+    
+    return Container(
+      width: 280,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _showCoursePreview(course),
+        child: Card(
+          color: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: Colors.yellowAccent.withOpacity(0.05),
+              width: 1,
+            ),
+          ),
+          elevation: 8,
+          shadowColor: Colors.black45,
+          child: Column(
+            children: [
+              Stack(
+                children: [
+                  // Immagine di copertina con effetto blur
+                  SizedBox(
+                    height: 160,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      child: Stack(
+                        children: [
+                          Hero(
+                            tag: 'course-${course.id}',
+                            child: Image.network(
+                              course.coverImageUrl ?? '',
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: Colors.grey[900],
+                                child: Icon(
+                                  Icons.school,
+                                  color: Colors.white.withOpacity(0.2),
+                                  size: 48,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Overlay sfumato
+                          Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.7),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Topic badge in alto a sinistra
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        course.topic,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Badge "Disponibile tra X giorni" in alto a destra
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.yellowAccent.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.timer_outlined,
+                            color: Colors.yellowAccent,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tra $daysUntilRelease giorni',
+                            style: const TextStyle(
+                              color: Colors.yellowAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        course.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Text(
+                          course.description,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
