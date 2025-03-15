@@ -225,7 +225,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                                 colors: [Colors.white, Colors.white70],
                               ).createShader(bounds),
                               child: const Text(
-                                'Unlock All Premium\nCourses Today',
+                                'Sblocca Tutti i Corsi\n e Molto Altro',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: Colors.white,
@@ -237,7 +237,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Learn from expert teachers',
+                              'Impara dai migliori insegnanti',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.7),
@@ -281,7 +281,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Cancel anytime · Secure payment',
+                            'Disdici quando vuoi · Pagamento sicuro',
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.5),
                               fontSize: 14,
@@ -298,9 +298,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                             fontSize: 14,
                           ),
                           children: [
-                            const TextSpan(text: 'By subscribing, you agree to our '),
+                            const TextSpan(text: 'Abbonandoti, accetti i nostri '),
                             TextSpan(
-                              text: 'Terms of Use',
+                              text: 'Termini di Utilizzo',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.7),
                                 fontSize: 14,
@@ -316,7 +316,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
                                   );
                                 },
                             ),
-                            const TextSpan(text: ' and '),
+                            const TextSpan(text: ' e la '),
                             TextSpan(
                               text: 'Privacy Policy',
                               style: TextStyle(
@@ -374,23 +374,23 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
     final features = [
       {
         'icon': FontAwesomeIcons.unlock,
-        'title': 'Unlimited Access',
-        'description': 'Access 100% of all courses',
+        'title': 'Accesso Illimitato',
+        'description': 'Accedi al 100% dei corsi',
+      },
+      {
+        'icon': FontAwesomeIcons.solidMessage,
+        'title': 'Chat con i Professori',
+        'description': 'Messaggi diretti con tutti gli insegnanti',
+      }, 
+      {
+        'icon': Icons.school,
+        'title': 'Compiti e Consulenze Private',
+        'description': 'Alla fine di ogni corso consegna il compito e fattelo correggere',
       },
       {
         'icon': FontAwesomeIcons.rocket,
-        'title': 'New Courses Weekly',
-        'description': 'Fresh content from top teachers',
-      },
-      {
-        'icon': Icons.school,
-        'title': 'Learn from the Best',
-        'description': 'Direct access to expert teachers',
-      },
-      {
-        'icon': FontAwesomeIcons.chartLine,
-        'title': 'Learn Every Day',
-        'description': 'Learn new skills every day',
+        'title': 'Nuovi Corsi Settimanali',
+        'description': 'Contenuti freschi dai migliori insegnanti',
       },
     ];
 
@@ -465,19 +465,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
       children: [
         // 6-month plan
         _buildPlanCard(
-          title: '6-Month Plan',
-          price: '\$29.99',
-          period: '6 months',
-          savings: 'SAVE 50%',
+          title: 'Piano 6 Mesi',
+          price: '€29.99',
+          period: '6 mesi',
+          savings: 'RISPARMI 50%',
           isSelected: selectedPlan == 'semiannual',
           onTap: () => setState(() => selectedPlan = 'semiannual'),
         ),
         const SizedBox(height: 12),
         // Monthly plan
         _buildPlanCard(
-          title: 'Monthly Plan',
-          price: '\$9.99',
-          period: 'month',
+          title: 'Piano Mensile',
+          price: '€9.99',
+          period: 'mese',
           isSelected: selectedPlan == 'monthly',
           onTap: () => setState(() => selectedPlan = 'monthly'),
           isPrimary: false,
@@ -624,7 +624,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
           ),
           const SizedBox(height: 12),
           const Text(
-            '4.9 out of 5',
+            '4.9 su 5',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
@@ -633,7 +633,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> with TickerProv
           ),
           const SizedBox(height: 4),
           Text(
-            'Joined by 1000+ learners',
+            'Scelto da più di 1000 studenti',
             style: TextStyle(
               color: Colors.white.withOpacity(0.7),
               fontSize: 14,

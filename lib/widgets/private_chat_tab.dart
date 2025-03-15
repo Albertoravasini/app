@@ -185,7 +185,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Private Chat Locked',
+                'Chat Privata Bloccata',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 24,
@@ -195,7 +195,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Upgrade to Pro to unlock private chat with ${widget.profileUser.name} and all other teachers.',
+                'Passa a Pro per sbloccare la chat privata con ${widget.profileUser.name} e tutti gli altri insegnanti.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.7),
@@ -236,7 +236,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Upgrade to Pro',
+                        'Passa a Pro',
                         style: TextStyle(
                           color: Colors.yellowAccent.withOpacity(0.9),
                           fontSize: 14,
@@ -296,7 +296,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'No messages yet',
+                  'Nessun messaggio',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.8),
                     fontSize: 18,
@@ -305,7 +305,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Start a conversation!',
+                  'Inizia una conversazione!',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.5),
                     fontSize: 14,
@@ -715,6 +715,40 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    if (message['type'] == 'assignment_comment') ...[
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.yellowAccent.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: Colors.yellowAccent.withOpacity(0.3),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.assignment_outlined,
+                                              size: 16,
+                                              color: Colors.yellowAccent,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'Feedback Compito',
+                                              style: TextStyle(
+                                                color: Colors.yellowAccent,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                     Text(
                                       message['message'] as String,
                                       style: TextStyle(
@@ -771,7 +805,7 @@ class _PrivateChatTabState extends State<PrivateChatTab> {
                       textInputAction: TextInputAction.send,
                       enableInteractiveSelection: true,
                       decoration: InputDecoration(
-                        hintText: 'Type a message...',
+                        hintText: 'Scrivi un messaggio...',
                         hintStyle: TextStyle(
                           color: Colors.white.withOpacity(0.5),
                         ),

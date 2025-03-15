@@ -706,7 +706,9 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                     ? Icons.play_circle_outline 
                     : step.type == 'points'
                       ? Icons.check_circle_outline
-                      : Icons.quiz_outlined,
+                      : step.type == 'compito'
+                        ? Icons.assignment_outlined
+                        : Icons.quiz_outlined,
                   color: Colors.yellowAccent,
                   size: 20,
                 ),
@@ -774,6 +776,10 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                       DropdownMenuItem(
                         value: 'points',
                         child: Text('Points', style: TextStyle(color: Colors.white)),
+                      ),
+                      DropdownMenuItem(
+                        value: 'compito',
+                        child: Text('Assignment', style: TextStyle(color: Colors.white)),
                       ),
                     ],
                     onChanged: (value) {
@@ -964,6 +970,86 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
                           ),
                         ],
                       ],
+                    ),
+                  ] else if (step.type == 'compito') ...[
+                    // Campo per il titolo del compito
+                    TextFormField(
+                      initialValue: step.content,
+                      decoration: _inputDecoration('Assignment Title'),
+                      style: TextStyle(color: Colors.white),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: value,
+                            topic: step.topic,
+                            explanation: step.explanation,
+                            assignmentStatus: 'pending',
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    
+                    // Descrizione del compito
+                    TextFormField(
+                      initialValue: step.explanation,
+                      decoration: _inputDecoration('Assignment Description').copyWith(
+                        hintText: 'Describe what students need to submit...',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                      maxLines: 3,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSection!.steps[index] = LevelStep(
+                            type: step.type,
+                            content: step.content,
+                            topic: step.topic,
+                            explanation: value,
+                            assignmentStatus: 'pending',
+                          );
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+
+                    // Accepted file types
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.yellowAccent.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Students can submit:',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.video_library_outlined, color: Colors.white70, size: 16),
+                              SizedBox(width: 8),
+                              Text('Videos', style: TextStyle(color: Colors.white70)),
+                              SizedBox(width: 16),
+                              Icon(Icons.image_outlined, color: Colors.white70, size: 16),
+                              SizedBox(width: 8),
+                              Text('Images', style: TextStyle(color: Colors.white70)),
+                              SizedBox(width: 16),
+                              Icon(Icons.picture_as_pdf_outlined, color: Colors.white70, size: 16),
+                              SizedBox(width: 8),
+                              Text('PDFs', style: TextStyle(color: Colors.white70)),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ] else if (step.type == 'question') ...[
                     // Campo per la domanda

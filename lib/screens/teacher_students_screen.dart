@@ -20,6 +20,7 @@ class _TeacherStudentsScreenState extends State<TeacherStudentsScreen> {
   List<UserModel> _allStudents = [];
   List<UserModel> _filteredStudents = [];
   Set<String> _subscribedStudentIds = {};
+  Map<String, int> _pendingAssignments = {};
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
 
@@ -27,6 +28,7 @@ class _TeacherStudentsScreenState extends State<TeacherStudentsScreen> {
   void initState() {
     super.initState();
     _loadStudents();
+    _loadPendingAssignments();
     _searchController.addListener(_filterStudents);
   }
 
@@ -86,6 +88,40 @@ class _TeacherStudentsScreenState extends State<TeacherStudentsScreen> {
     } catch (e) {
       print('Errore nel caricamento degli studenti: $e');
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadPendingAssignments() async {
+    try {
+      // Ottieni i corsi dell'insegnante
+      final coursesSnapshot = await FirebaseFirestore.instance
+          .collection('courses')
+          .where('authorId', isEqualTo: widget.teacherId)
+          .get();
+
+      Map<String, int> studentAssignments = {};
+
+      for (var courseDoc in coursesSnapshot.docs) {
+        final assignmentsSnapshot = await FirebaseFirestore.instance
+            .collection('courses')
+            .doc(courseDoc.id)
+            .collection('assignments')
+            .where('status', isEqualTo: 'submitted')
+            .get();
+            
+        for (var assignment in assignmentsSnapshot.docs) {
+          final userId = assignment.data()['userId'] as String;
+          studentAssignments[userId] = (studentAssignments[userId] ?? 0) + 1;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _pendingAssignments = studentAssignments;
+        });
+      }
+    } catch (e) {
+      print('Errore nel caricamento dei compiti: $e');
     }
   }
 
@@ -163,6 +199,7 @@ class _TeacherStudentsScreenState extends State<TeacherStudentsScreen> {
       itemBuilder: (context, index) {
         final student = _filteredStudents[index];
         final isSubscribed = _subscribedStudentIds.contains(student.uid);
+        final pendingCount = _pendingAssignments[student.uid] ?? 0;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -201,34 +238,63 @@ class _TeacherStudentsScreenState extends State<TeacherStudentsScreen> {
                     ),
                   ),
                 ),
-                if (isSubscribed)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.yellowAccent.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.yellowAccent),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: Colors.yellowAccent,
-                          size: 16,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isSubscribed)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.yellowAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.yellowAccent),
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          'PRO',
-                          style: TextStyle(
-                            color: Colors.yellowAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star,
+                              color: Colors.yellowAccent,
+                              size: 16,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'PRO',
+                              style: TextStyle(
+                                color: Colors.yellowAccent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                    if (isSubscribed)
+                      const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: pendingCount > 0 
+                            ? Colors.yellowAccent.withOpacity(0.2)
+                            : Colors.grey.withOpacity(0.1),
+                        border: Border.all(
+                          color: pendingCount > 0 
+                              ? Colors.yellowAccent.withOpacity(0.3)
+                              : Colors.grey.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.assignment_outlined,
+                        size: 14,
+                        color: pendingCount > 0 
+                            ? Colors.yellowAccent
+                            : Colors.grey.withOpacity(0.5),
+                      ),
                     ),
-                  ),
+                  ],
+                ),
               ],
             ),
             subtitle: Text(

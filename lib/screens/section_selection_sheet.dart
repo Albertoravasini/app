@@ -204,6 +204,20 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     // Get completedPoints from userData
     final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
 
+    // Fetch all assignments for this user in this course
+    final assignmentsSnapshot = await FirebaseFirestore.instance
+        .collection('courses')
+        .doc(widget.course.id)
+        .collection('assignments')
+        .where('userId', isEqualTo: user.uid)
+        .get();
+
+    // Create a set of completed assignment stepIds
+    final completedAssignments = assignmentsSnapshot.docs
+        .where((doc) => doc.data()['status'] == 'submitted')
+        .map((doc) => doc.data()['stepId'] as String)
+        .toSet();
+
     return Future.wait(
       widget.course.sections.map((section) async {
         int completedSteps = 0;
@@ -232,6 +246,9 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
             } else if (step.type == 'points') {
               // Check if the points step is completed in completedPoints array
               isStepCompleted = completedPoints.contains(step.content);
+            } else if (step.type == 'compito') {
+              // Check if this assignment is completed
+              isStepCompleted = completedAssignments.contains(step.content);
             }
           }
 

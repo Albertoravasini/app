@@ -81,6 +81,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         totalRevenue += amount;
       }
 
+      // 6. Ottieni i compiti da correggere
+      int pendingAssignments = 0;
+      for (var course in _courses) {
+        final assignmentsSnapshot = await FirebaseFirestore.instance
+            .collection('courses')
+            .doc(course.id)
+            .collection('assignments')
+            .where('status', isEqualTo: 'submitted')
+            .get();
+            
+        pendingAssignments += assignmentsSnapshot.docs.length;
+      }
+
       // Aggiungi anche la revenue totale dalle subscription
       totalRevenue += monthlyRevenue;
 
@@ -91,6 +104,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           'totalRevenue': totalRevenue,
           'monthlyRevenue': monthlyRevenue,
           'coursesCount': _courses.length,
+          'pendingAssignments': pendingAssignments,
         };
         _isLoading = false;
       });
@@ -104,6 +118,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           'totalRevenue': 0.0,
           'monthlyRevenue': 0.0,
           'coursesCount': 0,
+          'pendingAssignments': 0,
         };
         _isLoading = false;
       });
@@ -449,6 +464,39 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            if (title == 'Students' && _stats['pendingAssignments'] > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.yellowAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.yellowAccent.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.assignment_late_rounded,
+                      color: Colors.yellowAccent,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${_stats['pendingAssignments']} compiti',
+                      style: TextStyle(
+                        color: Colors.yellowAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

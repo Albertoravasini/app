@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../models/course.dart';
 import '../services/course_service.dart';
@@ -223,18 +224,12 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                     child: _buildLastCourse(_lastCourseStarted!),
                   ),
 
-                // 2) Corsi iniziati
-                if (_userStartedCourses.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: _buildStartedCoursesSection(),
-                  ),
-
-                // 3) Presto Disponibili
+                // 2) Presto Disponibili
                 SliverToBoxAdapter(
                   child: _buildComingSoonSection(),
                 ),
 
-                // 4) Corsi divisi per topic (filtrati)
+                // 3) Corsi divisi per topic (filtrati)
                 ..._buildTopicSections(),
               ],
             ),
@@ -290,10 +285,18 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                   tag: 'lastCourse-${course.id}',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: Image.network(
-                      course.coverImageUrl ?? '',
+                    child: CachedNetworkImage(
+                      imageUrl: course.coverImageUrl ?? '',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[900],
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent.withOpacity(0.5)),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         color: Colors.grey[800],
                         child: Icon(
                           Icons.school,
@@ -470,50 +473,6 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
     };
   }
 
-  /// Sezione con i corsi iniziati (meno l'ultimo)
-  Widget _buildStartedCoursesSection() {
-    final List<Course> otherStarted = [..._userStartedCourses];
-    if (_lastCourseStarted != null) {
-      otherStarted.removeWhere((c) => c.id == _lastCourseStarted!.id);
-    }
-    if (otherStarted.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Titolo
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            'Continue your courses',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Scroll orizzontale
-        SizedBox(
-          height: 300,
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            scrollDirection: Axis.horizontal,
-            itemCount: otherStarted.length,
-            itemBuilder: (context, index) {
-              final course = otherStarted[index];
-              return _buildCourseCard(course);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
   /// Dopo il metodo _buildStartedCoursesSection()
   Widget _buildComingSoonSection() {
     final List<Course> comingSoonCourses = _allCourses
@@ -603,11 +562,19 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                         children: [
                           Hero(
                             tag: 'course-${course.id}',
-                            child: Image.network(
-                              course.coverImageUrl ?? '',
+                            child: CachedNetworkImage(
+                              imageUrl: course.coverImageUrl ?? '',
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[900],
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent.withOpacity(0.5)),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey[900],
                                 child: Icon(
                                   Icons.school,
@@ -838,11 +805,19 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                           child: Hero(
                             tag: 'course-${course.id}',
-                            child: Image.network(
-                              course.coverImageUrl ?? '',
+                            child: CachedNetworkImage(
+                              imageUrl: course.coverImageUrl ?? '',
                               width: double.infinity,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[900],
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent.withOpacity(0.5)),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
                                 color: Colors.grey[900],
                                 child: Icon(
                                   Icons.school,

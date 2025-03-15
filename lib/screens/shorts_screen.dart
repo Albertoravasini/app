@@ -16,6 +16,7 @@ import '../services/course_service.dart';
 import 'package:Just_Learn/screens/section_selection_sheet.dart';
 import 'package:Just_Learn/controllers/video_player_manager.dart';
 import '../widgets/points_screen.dart';
+import '../screens/assignment_screen.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -84,25 +85,23 @@ class ShortsScreenState extends State<ShortsScreen> {
   void initState() {
     super.initState();
     
-    // Se ci sono dati iniziali del corso o un corso iniziale, avvialo
+    // Inizializzazione ottimizzata
+    _initializeScreen();
+  }
+
+  Future<void> _initializeScreen() async {
     if (widget.initialCourseData != null) {
       final course = widget.initialCourseData!['course'] as Course;
       final section = widget.initialCourseData!['section'] as Section;
       
-      Future.delayed(Duration(milliseconds: 100), () {
-        _initializeCourse(course, section);
-      });
+      await _initializeCourse(course, section);
     } else if (widget.initialCourse != null) {
-      // Gestione per il caso web quando viene selezionato un corso
       final course = widget.initialCourse!;
       final section = widget.initialSection ?? course.sections.first;
       
-      Future.delayed(Duration(milliseconds: 100), () {
-        startCourse(course, selectedSection: section);
-      });
+      await startCourse(course, selectedSection: section);
     } else {
-      // Carica i corsi normalmente se non ci sono dati iniziali
-      _loadCourses();
+      await _loadCourses();
     }
   }
 
@@ -163,7 +162,7 @@ class ShortsScreenState extends State<ShortsScreen> {
       
       if (mounted) {
         setState(() {
-          _updateCurrentSection(section, forceUpdate: true);
+          _updateCurrentSection(targetIndex);
         });
         
         // Usa WidgetsBinding per assicurarsi che il PageView sia costruito
@@ -287,74 +286,64 @@ void _preloadNextVideo(int index, String videoId) {
 void _onPageChanged(int index) async {
   if (!mounted) return;
 
-  // Verifica il paywall solo se siamo in modalità corso e l'utente non è Pro
+  // Gestione paywall
   if (isInCourseMode && currentCourse != null) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      
-      final userData = UserModel.fromMap(userDoc.data()!);
-      
-      // Verifica solo se l'utente NON è pro
-      if (!userData.isPro) {
-        final totalSteps = currentCourse!.sections.fold<int>(
-          0, (sum, section) => sum + section.steps.length);
-        final lockIndex = (totalSteps * 0.3).ceil();
+    if (!await _handlePaywall(index)) return;
+  }
 
-        if (index >= lockIndex) {
-          // Pausa il video e mostra il paywall immediatamente
-          _videoManager.pauseCurrentVideo();
-          
-          if (_pageController.hasClients) {
-            // Usa jumpToPage invece di animateToPage per una risposta immediata
-            _pageController.jumpToPage(lockIndex - 1);
-            
-            // Mostra immediatamente la schermata di abbonamento
-            if (mounted) {
-              await Navigator.of(context).pushNamed('/subscription');
-            }
-          }
-          return;
+  // Aggiorna sezione corrente
+  _updateCurrentSection(index);
+  
+  // Precarica il prossimo video
+  _preloadAdjacentVideos(index);
+
+  // Analytics
+  _trackPageChange(index);
+}
+
+Future<bool> _handlePaywall(int index) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return false;
+
+  final userDoc = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .get();
+  
+  final userData = UserModel.fromMap(userDoc.data()!);
+  
+  if (!userData.isPro) {
+    final totalSteps = currentCourse!.sections.fold<int>(
+      0, (sum, section) => sum + section.steps.length);
+    final lockIndex = (totalSteps * 0.3).ceil();
+
+    if (index >= lockIndex) {
+      await _videoManager.pauseCurrentVideo();
+      
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(lockIndex - 1);
+        
+        if (mounted) {
+          await Navigator.of(context).pushNamed('/subscription');
         }
       }
+      return false;
     }
   }
+  return true;
+}
 
-  // Aggiorna il titolo della sezione se siamo in modalità corso
-  if (isInCourseMode && currentCourse != null) {
-    // Trova la sezione corrente in base all'indice
-    int stepCount = 0;
-    Section? newSection;
-    int currentStepInSection = 0;
-    
-    for (var section in currentCourse!.sections) {
-      if (index >= stepCount && index < stepCount + section.steps.length) {
-        newSection = section;
-        currentStepInSection = index - stepCount;
-        break;
-      }
-      stepCount += section.steps.length;
-    }
-
-    // Aggiorna lo stato e notifica il parent dello stato degli step
-    if (newSection != null) {
-      setState(() {
-        currentSection = newSection;
-        currentStepIndex = index;
-      });
-      
-      // Notifica il parent del progresso della sezione
-      widget.onSectionProgressUpdate(
-        currentStepInSection,
-        newSection.steps.length,
-        true
-      );
+void _preloadAdjacentVideos(int currentIndex) {
+  // Precarica il video successivo
+  if (currentIndex < allShortSteps.length - 1) {
+    final nextStep = allShortSteps[currentIndex + 1]['step'] as LevelStep;
+    if (nextStep.type == 'video' && nextStep.videoUrl != null) {
+      _videoManager.preloadVideo(nextStep.videoUrl!);
     }
   }
+}
 
+void _trackPageChange(int index) {
   scrollCount++;
   
   Posthog().capture(
@@ -540,6 +529,14 @@ void dispose() {
         ),
       );
     }
+
+    // Se è uno step di tipo compito, mostra la schermata di assignment
+    if (currentStep.type == 'compito') {
+      return AssignmentScreen(
+        step: currentStep,
+        courseId: (allShortSteps[index]['course'] as Course).id,
+      );
+    }
     
     // Altrimenti mostra il video player
     final level = allShortSteps[index]['level'] as Level;
@@ -611,11 +608,36 @@ void dispose() {
   }
 
   // Aggiungiamo un metodo dedicato per gestire i cambiamenti di sezione
-  void _updateCurrentSection(Section newSection, {bool forceUpdate = false}) {
-    if (forceUpdate || currentSection?.title != newSection.title) {
+  void _updateCurrentSection(int index) {
+    if (!isInCourseMode || currentCourse == null) return;
+
+    // Trova la sezione corrente in base all'indice
+    int stepCount = 0;
+    Section? newSection;
+    int currentStepInSection = 0;
+    
+    for (var section in currentCourse!.sections) {
+      if (index >= stepCount && index < stepCount + section.steps.length) {
+        newSection = section;
+        currentStepInSection = index - stepCount;
+        break;
+      }
+      stepCount += section.steps.length;
+    }
+
+    // Aggiorna lo stato e notifica il parent dello stato degli step
+    if (newSection != null && mounted) {
       setState(() {
         currentSection = newSection;
+        currentStepIndex = index;
       });
+      
+      // Notifica il parent del progresso della sezione
+      widget.onSectionProgressUpdate(
+        currentStepInSection,
+        newSection.steps.length,
+        true
+      );
     }
   }
 
@@ -645,7 +667,7 @@ void dispose() {
       // Se abbiamo una sezione e uno step specifico selezionati
       if (selectedSection != null && initialStepIndex != null) {
         int globalIndex = _calculateGlobalIndex(course, selectedSection, initialStepIndex);
-        _updateCurrentSection(selectedSection, forceUpdate: true);
+        _updateCurrentSection(globalIndex);
         
         // Assicurati che i controller siano inizializzati prima di saltare
         await _initializeControllers();
@@ -712,7 +734,7 @@ void dispose() {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        _updateCurrentSection(course.sections.first, forceUpdate: true);
+        _updateCurrentSection(0);
         return 0;
       }
 
@@ -722,7 +744,7 @@ void dispose() {
           .get();
 
       if (!userDoc.exists) {
-        _updateCurrentSection(course.sections.first, forceUpdate: true);
+        _updateCurrentSection(0);
         return 0;
       }
 
@@ -735,18 +757,18 @@ void dispose() {
           final stepIndex = currentSteps[section.title] ?? 0;
           if (stepIndex >= 0) {
             int globalIndex = _calculateSectionStartIndex(course, section);
-            _updateCurrentSection(section, forceUpdate: true);
+            _updateCurrentSection(globalIndex);
             return globalIndex + stepIndex;
           }
         }
       }
 
       // Se non troviamo progressi, inizia dalla prima sezione
-      _updateCurrentSection(course.sections.first, forceUpdate: true);
+      _updateCurrentSection(0);
       return 0;
     } catch (e) {
       print('Error loading progress: $e');
-      _updateCurrentSection(course.sections.first, forceUpdate: true);
+      _updateCurrentSection(0);
       return 0;
     }
   }
@@ -759,7 +781,7 @@ void dispose() {
       final currentStep = allShortSteps[index];
       final section = currentStep['section'] as Section; // Usiamo il riferimento diretto
       
-      _updateCurrentSection(section);
+      _updateCurrentSection(index);
       
       final stepIndex = section.steps.indexOf(currentStep['step']);
       widget.onSectionProgressUpdate(stepIndex, section.steps.length, true);
@@ -785,13 +807,19 @@ void dispose() {
     _loadCourses(); // Ricarica i primi video di ogni corso
   }
 
-  Future<void> _initializeControllers() {
-    // Inizializza i controller necessari
-    if (allShortSteps.isNotEmpty) {
-      _ensureControllerExists(0);
-      _preloadAdjacentPages(0);
+  Future<void> _initializeControllers() async {
+    if (allShortSteps.isEmpty) return;
+
+    // Inizializza solo il primo controller
+    _ensureControllerExists(0);
+    
+    // Precarica il prossimo video in modo asincrono
+    if (allShortSteps.length > 1) {
+      final nextStep = allShortSteps[1]['step'] as LevelStep;
+      if (nextStep.type == 'video' && nextStep.videoUrl != null) {
+        _videoManager.preloadVideo(nextStep.videoUrl!);
+      }
     }
-    return Future.value();
   }
 
   void _handleQuitCourse() {
@@ -834,17 +862,6 @@ Widget build(BuildContext context) {
               ),
               onPageChanged: (index) {
                 _onPageChanged(index);
-
-                scrollCount++;
-                
-                Posthog().capture(
-                  eventName: 'short_scroll',
-                  properties: {
-                    'scroll_count': scrollCount,
-                    'course_id': currentCourse?.id ?? 'no_course',
-                    'video_index': index,
-                  },
-                );
               },
             ),
     ),
@@ -912,6 +929,13 @@ Widget build(BuildContext context) {
             }
           });
         },
+      );
+    }
+
+    if (currentStep.type == 'compito') {
+      return AssignmentScreen(
+        step: currentStep,
+        courseId: (allShortSteps[index]['course'] as Course).id,
       );
     }
     

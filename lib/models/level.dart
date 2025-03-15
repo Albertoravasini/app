@@ -77,6 +77,12 @@ class LevelStep {
   final DateTime? createdAt;
   final int? duration;
   List<Point>? points;
+  final String? assignmentSubmissionUrl;
+  final String? assignmentFileName;
+  final String? assignmentFileType;
+  final int? assignmentFileSize;
+  final DateTime? assignmentSubmissionDate;
+  final String? assignmentStatus;
 
   LevelStep({
     required this.type,
@@ -92,6 +98,12 @@ class LevelStep {
     this.createdAt,
     this.duration,
     this.points,
+    this.assignmentSubmissionUrl,
+    this.assignmentFileName,
+    this.assignmentFileType,
+    this.assignmentFileSize,
+    this.assignmentSubmissionDate,
+    this.assignmentStatus,
   });
 
   factory LevelStep.fromMap(Map<String, dynamic> data) {
@@ -113,6 +125,14 @@ class LevelStep {
       points: data['points'] != null 
           ? List<Point>.from(data['points'].map((point) => Point.fromMap(point)))
           : null,
+      assignmentSubmissionUrl: data['assignmentSubmissionUrl'],
+      assignmentFileName: data['assignmentFileName'],
+      assignmentFileType: data['assignmentFileType'],
+      assignmentFileSize: data['assignmentFileSize'],
+      assignmentSubmissionDate: data['assignmentSubmissionDate'] != null 
+          ? (data['assignmentSubmissionDate'] as Timestamp).toDate() 
+          : null,
+      assignmentStatus: data['assignmentStatus'],
     );
   }
 
@@ -131,6 +151,12 @@ class LevelStep {
       'createdAt': createdAt?.toIso8601String(),
       'duration': duration,
       'points': points?.map((point) => point.toMap()).toList(),
+      'assignmentSubmissionUrl': assignmentSubmissionUrl,
+      'assignmentFileName': assignmentFileName,
+      'assignmentFileType': assignmentFileType,
+      'assignmentFileSize': assignmentFileSize,
+      'assignmentSubmissionDate': assignmentSubmissionDate?.toIso8601String(),
+      'assignmentStatus': assignmentStatus,
     };
   }
 

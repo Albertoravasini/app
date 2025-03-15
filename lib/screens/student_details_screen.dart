@@ -5,6 +5,8 @@ import '../models/course.dart';
 import '../models/event.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/notification_service.dart';
 
 class StudentDetailsScreen extends StatefulWidget {
   final UserModel student;
@@ -23,11 +25,13 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
   List<Course> _completedCourses = [];
   List<Event> _attendedEvents = [];
   Map<String, List<String>> _completedSteps = {};
+  List<Map<String, dynamic>> _assignments = [];
 
   @override
   void initState() {
     super.initState();
     _loadStudentData();
+    _loadAssignments();
   }
 
   Future<void> _loadStudentData() async {
@@ -107,10 +111,67 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
     }
   }
 
+  Future<void> _loadAssignments() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get all courses by the current teacher
+      final coursesSnapshot = await FirebaseFirestore.instance
+          .collection('courses')
+          .where('authorId', isEqualTo: currentUser.uid)
+          .get();
+
+      List<Map<String, dynamic>> allAssignments = [];
+
+      // For each course, get the student's assignments
+      for (var courseDoc in coursesSnapshot.docs) {
+        final assignmentsSnapshot = await courseDoc
+            .reference
+            .collection('assignments')
+            .where('userId', isEqualTo: widget.student.uid)
+            .get();
+
+        print('Found ${assignmentsSnapshot.docs.length} assignments for course ${courseDoc.id}'); // Debug print
+
+        for (var assignmentDoc in assignmentsSnapshot.docs) {
+          final assignmentData = assignmentDoc.data();
+          
+          // Get the step data to get the description
+          String? description;
+          for (var section in (courseDoc.data()['sections'] as List<dynamic>)) {
+            for (var step in (section['steps'] as List<dynamic>)) {
+              if (step['content'] == assignmentData['stepId']) {
+                description = step['explanation'];
+                break;
+              }
+            }
+            if (description != null) break;
+          }
+
+          allAssignments.add({
+            ...assignmentData,
+            'courseId': courseDoc.id,
+            'courseName': courseDoc.data()['title'],
+            'description': description,
+          });
+        }
+      }
+
+      print('Total assignments loaded: ${allAssignments.length}'); // Debug print
+
+      setState(() {
+        _assignments = allAssignments;
+      });
+    } catch (e) {
+      print('Error loading assignments: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: const Color(0xFF121212),
         appBar: AppBar(
@@ -139,11 +200,15 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
             tabs: [
               Tab(
                 icon: Icon(Icons.school_outlined),
-                text: 'Corsi',
+                text: 'Courses',
               ),
               Tab(
                 icon: Icon(Icons.event_outlined),
-                text: 'Eventi',
+                text: 'Events',
+              ),
+              Tab(
+                icon: Icon(Icons.assignment_outlined),
+                text: 'Assignments',
               ),
             ],
             indicatorColor: Colors.yellowAccent,
@@ -161,6 +226,7 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
                 children: [
                   _buildCoursesTab(),
                   _buildEventsTab(),
+                  _buildAssignmentsTab(),
                 ],
               ),
       ),
@@ -872,5 +938,518 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
       'progress': progress,
       'remainingMinutes': remainingMinutes
     };
+  }
+
+  Widget _buildAssignmentsTab() {
+    if (_assignments.isEmpty) {
+      return _buildEmptyState(
+        'No assignments submitted',
+        Icons.assignment_outlined,
+        'This student hasn\'t submitted any assignments yet',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _assignments.length,
+      itemBuilder: (context, index) {
+        final assignment = _assignments[index];
+        final submissionDate = (assignment['submissionDate'] as Timestamp).toDate();
+        final fileSize = assignment['fileSize'] as int;
+        final fileSizeInMB = (fileSize / (1024 * 1024)).toStringAsFixed(1);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF282828),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                title: Text(
+                  assignment['courseName'] ?? 'Unknown Course',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                subtitle: Text(
+                  'Step: ${assignment['stepId']}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (String status) async {
+                    try {
+                      await FirebaseFirestore.instance
+                          .collection('courses')
+                          .doc(assignment['courseId'])
+                          .collection('assignments')
+                          .doc(widget.student.uid)
+                          .update({'status': status});
+
+                      // Update local state
+                      setState(() {
+                        _assignments[index]['status'] = status;
+                      });
+                    } catch (e) {
+                      print('Error updating status: $e');
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                    PopupMenuItem<String>(
+                      value: 'completed',
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text('Completed', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'reviewing',
+                      child: Row(
+                        children: [
+                          Icon(Icons.pending, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('In Review', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'pending',
+                      child: Row(
+                        children: [
+                          Icon(Icons.visibility, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('To Review', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(assignment['status']).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _getStatusColor(assignment['status'])),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getStatusIcon(assignment['status']),
+                          color: _getStatusColor(assignment['status']),
+                          size: 16,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          _getStatusText(assignment['status']),
+                          style: TextStyle(
+                            color: _getStatusColor(assignment['status']),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Divider(color: Colors.white.withOpacity(0.1)),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _getFileIcon(assignment['fileType']),
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            assignment['fileName'] ?? 'Unknown file',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '$fileSizeInMB MB',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Submitted on ${_formatDate(submissionDate)}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              launch(assignment['fileUrl']);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.yellowAccent.withOpacity(0.2),
+                              foregroundColor: Colors.yellowAccent,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(color: Colors.yellowAccent),
+                              ),
+                            ),
+                            icon: const Icon(Icons.visibility_outlined),
+                            label: const Text('View Submission'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => Dialog(
+                                backgroundColor: const Color(0xFF282828),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Assignment Description',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        assignment['description'] ?? 'No description available',
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.7),
+                                          fontSize: 14,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                      SizedBox(height: 24),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: Text(
+                                            'Close',
+                                            style: TextStyle(
+                                              color: Colors.yellowAccent,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.1),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          icon: Icon(
+                            Icons.description_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            _showCommentDialog(assignment);
+                          },
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.1),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          icon: Icon(
+                            Icons.comment_outlined,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCommentDialog(Map<String, dynamic> assignment) {
+    final TextEditingController commentController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF282828),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Add Comment',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                style: TextStyle(color: Colors.white),
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Write your feedback...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.1),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.yellowAccent),
+                  ),
+                ),
+              ),
+              SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (commentController.text.trim().isEmpty) return;
+                      
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      if (currentUser == null) return;
+
+                      try {
+                        // Get teacher's name
+                        final teacherDoc = await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(currentUser.uid)
+                            .get();
+                        final teacherName = teacherDoc.data()?['name'] ?? 'Teacher';
+
+                        // Create chat message
+                        final chatId = _getChatId(currentUser.uid, widget.student.uid);
+                        final messageRef = FirebaseFirestore.instance
+                            .collection('chats')
+                            .doc(chatId)
+                            .collection('messages')
+                            .doc();
+
+                        final message = {
+                          'id': messageRef.id,
+                          'message': commentController.text,
+                          'timestamp': FieldValue.serverTimestamp(),
+                          'senderId': currentUser.uid,
+                          'receiverId': widget.student.uid,
+                          'type': 'assignment_comment',
+                          'assignmentId': assignment['assignmentId'],
+                          'courseId': assignment['courseId'],
+                        };
+
+                        // Update or create chat document
+                        await FirebaseFirestore.instance
+                            .collection('chats')
+                            .doc(chatId)
+                            .set({
+                          'participants': [currentUser.uid, widget.student.uid],
+                          'lastMessage': commentController.text,
+                          'lastMessageTimestamp': FieldValue.serverTimestamp(),
+                        }, SetOptions(merge: true));
+
+                        // Save the message
+                        await messageRef.set(message);
+
+                        // Create notification
+                        final notification = {
+                          'id': DateTime.now().millisecondsSinceEpoch.toString(),
+                          'message': 'New feedback on your assignment',
+                          'timestamp': DateTime.now().toIso8601String(),
+                          'isRead': false,
+                          'isFromTeacher': true,
+                          'senderId': currentUser.uid,
+                          'type': 'teacherMessage',
+                          'assignmentId': assignment['assignmentId'],
+                          'courseId': assignment['courseId'],
+                        };
+
+                        // Add notification to student's notifications
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(widget.student.uid)
+                            .update({
+                          'notifications': FieldValue.arrayUnion([notification])
+                        });
+
+                        // Send push notification if FCM token exists
+                        final studentDoc = await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(widget.student.uid)
+                            .get();
+                        
+                        final fcmToken = studentDoc.data()?['fcmToken'];
+                        if (fcmToken != null) {
+                          final notificationService = NotificationService();
+                          await notificationService.sendSpecificNotification(
+                            fcmToken,
+                            'assignment_feedback',
+                            teacherName
+                          );
+                        }
+
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Comment sent successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } catch (e) {
+                        print('Error sending comment: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error sending comment'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.yellowAccent,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text('Send'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getChatId(String currentUserId, String otherUserId) {
+    final List<String> ids = [currentUserId, otherUserId]..sort();
+    return '${ids[0]}_${ids[1]}';
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return Colors.green;
+      case 'reviewing':
+        return Colors.orange;
+      case 'pending':
+        return Colors.blue;
+      default:
+        return Colors.yellowAccent;
+    }
+  }
+
+  IconData _getStatusIcon(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return Icons.check_circle;
+      case 'reviewing':
+        return Icons.pending;
+      case 'pending':
+        return Icons.visibility;
+      default:
+        return Icons.assignment_turned_in;
+    }
+  }
+
+  String _getStatusText(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return 'COMPLETED';
+      case 'reviewing':
+        return 'REVIEWING';
+      case 'pending':
+        return 'TO REVIEW';
+      default:
+        return 'SUBMITTED';
+    }
+  }
+
+  IconData _getFileIcon(String? fileType) {
+    if (fileType == null) return Icons.insert_drive_file_outlined;
+    switch (fileType.toLowerCase()) {
+      case '.pdf':
+        return Icons.picture_as_pdf_outlined;
+      case '.jpg':
+      case '.jpeg':
+      case '.png':
+        return Icons.image_outlined;
+      case '.mp4':
+        return Icons.video_library_outlined;
+      default:
+        return Icons.insert_drive_file_outlined;
+    }
   }
 } 

@@ -83,27 +83,53 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
       return;
     }
     
-    print('Inizializzazione video con URL: ${widget.videoUrl}');
     _audioPlayer = AudioPlayer();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
     
-    _controller = VideoPlayerController.network(widget.videoUrl)
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() {});
-          _controller.addListener(_videoListener);
-          print('DEBUG: Registrazione controller nel VideoPlayerManager');
-          _videoManager.setCurrentController(_controller);
-          if (widget.autoPlay) {
-            _controller.play();
-          }
-        }
-      }).catchError((error) {
-        print('Errore inizializzazione video: $error');
-      });
+    _initializeController();
+  }
+
+  Future<void> _initializeController() async {
+    try {
+      _controller = VideoPlayerController.network(
+        widget.videoUrl,
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: true,
+          allowBackgroundPlayback: false,
+        ),
+      );
+
+      _videoManager.setCurrentController(_controller);
+      
+      await _controller.initialize();
+      
+      if (!mounted) return;
+      
+      setState(() {});
+      _controller.addListener(_videoListener);
+      
+      if (widget.autoPlay) {
+        await _controller.play();
+      }
+      
+      widget.onReady?.call(true);
+    } catch (error) {
+      print('Errore inizializzazione video: $error');
+      widget.onReady?.call(false);
+    }
+  }
+
+  @override
+  void didUpdateWidget(VideoPlayerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _controller.dispose();
+      _initializeController();
+    }
   }
 
   void _videoListener() {
@@ -455,8 +481,17 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
   @override
   void dispose() {
     print('DEBUG: Disposing VideoPlayerWidget');
-    _controller.pause();
-    _controller.dispose();
+    Future.microtask(() async {
+      try {
+        if (_controller.value.isPlaying) {
+          await _controller.pause();
+        }
+        await _controller.dispose();
+      } catch (e) {
+        print('Error during controller cleanup: $e');
+      }
+    });
+    
     _animationController.dispose();
     _audioPlayer.dispose();
     super.dispose();

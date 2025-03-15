@@ -84,6 +84,20 @@ class CoursePreviewSheet extends StatefulWidget {
         .reduce((a, b) => a + b);
     final unlockLimit = (totalSteps * 0.3).round();
 
+    // Fetch all assignments for this user in this course
+    final assignmentsSnapshot = await FirebaseFirestore.instance
+        .collection('courses')
+        .doc(course.id)
+        .collection('assignments')
+        .where('userId', isEqualTo: userData.uid)
+        .get();
+
+    // Create a set of completed assignment stepIds
+    final completedAssignments = assignmentsSnapshot.docs
+        .where((doc) => doc.data()['status'] == 'submitted')
+        .map((doc) => doc.data()['stepId'] as String)
+        .toSet();
+
     for (var section in course.sections) {
       int completedSteps = 0;
       List<bool> stepsCompleted = [];
@@ -106,6 +120,9 @@ class CoursePreviewSheet extends StatefulWidget {
             isCompleted = userData.answeredQuestions[course.topic]?.contains(step.content) ?? false;
           } else if (step.type == 'points') {
             isCompleted = userData.completedPoints.contains(step.content);
+          } else if (step.type == 'compito') {
+            // Check if this assignment is completed
+            isCompleted = completedAssignments.contains(step.content);
           }
         }
 
