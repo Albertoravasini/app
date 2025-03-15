@@ -79,6 +79,7 @@ class CoursePreviewSheet extends StatefulWidget {
     final sectionProgress = <String, Map<String, dynamic>>{};
     var stepCounter = 0;
     final isPro = userData.isPro;
+    final isOwner = userData.uid == course.authorId; // Check if user is course owner
     final totalSteps = course.sections
         .map((s) => s.steps.length)
         .reduce((a, b) => a + b);
@@ -98,17 +99,18 @@ class CoursePreviewSheet extends StatefulWidget {
         .map((doc) => doc.data()['stepId'] as String)
         .toSet();
 
-    for (var section in course.sections) {
+    for (final section in course.sections) {
       int completedSteps = 0;
       List<bool> stepsCompleted = [];
       
-      bool containsLockedSteps = !isPro && stepCounter + section.steps.length > unlockLimit;
-      int lockIndex = isPro ? section.steps.length : (containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length);
+      // If user is owner, they have full access
+      bool containsLockedSteps = !isOwner && !isPro && stepCounter + section.steps.length > unlockLimit;
+      int lockIndex = (isOwner || isPro) ? section.steps.length : (containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length);
 
       for (var i = 0; i < section.steps.length; i++) {
         final step = section.steps[i];
         bool isCompleted = false;
-        bool isStepLocked = !isPro && containsLockedSteps && i >= lockIndex;
+        bool isStepLocked = !isOwner && !isPro && containsLockedSteps && i >= lockIndex;
 
         if (!isStepLocked) {
           if (step.type == 'video') {
@@ -141,7 +143,8 @@ class CoursePreviewSheet extends StatefulWidget {
         'containsLockedSteps': containsLockedSteps,
         'stepCounter': stepCounter,
         'unlockLimit': unlockLimit,
-        'isPro': isPro
+        'isPro': isPro,
+        'isOwner': isOwner
       };
     }
 
@@ -237,6 +240,12 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         _courseState.value = CourseState.error;
+        return;
+      }
+
+      // If user is the course owner, always grant access
+      if (user.uid == widget.course.authorId) {
+        _courseState.value = CourseState.unlocked;
         return;
       }
 
@@ -777,6 +786,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
     final stepCounter = progress['stepCounter'] as int;
     final unlockLimit = progress['unlockLimit'] as int;
     final isPro = progress['isPro'] as bool;
+    final isOwner = progress['isOwner'] as bool;
     final progressValue = totalSteps > 0 ? completedSteps / totalSteps : 0.0;
 
     return Container(
@@ -918,7 +928,7 @@ class _CoursePreviewSheetState extends State<CoursePreviewSheet> with TickerProv
               itemBuilder: (context, index) {
                 final step = section.steps[index];
                 final isStepCompleted = stepsCompleted[index];
-                final isLocked = !isPro && containsLockedSteps && index >= lockIndex;
+                final isLocked = !isOwner && !isPro && containsLockedSteps && index >= lockIndex;
                 
                 return Container(
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),

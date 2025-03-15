@@ -187,19 +187,21 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     final userData = userDoc.data() as Map<String, dynamic>;
     final userModel = UserModel.fromMap(userData);
     final isPro = userData['isPro'] ?? false;
+    final isOwner = user.uid == widget.course.authorId;
     
     // Calcola il numero totale di step nel corso
     final totalSteps = widget.course.sections
         .map((s) => s.steps.length)
         .reduce((a, b) => a + b);
     
-    // Calcola il punto di blocco (30% del totale)
-    final unlockLimit = (totalSteps * 0.3).round();
+    // Calcola il punto di blocco (30% del totale) solo se non è il proprietario
+    final unlockLimit = isOwner ? totalSteps : (totalSteps * 0.3).round();
     var stepCounter = 0;
     
     print('DEBUG: Stato Pro: $isPro');
+    print('DEBUG: Stato Owner: $isOwner');
     print('DEBUG: Totale step corso: $totalSteps');
-    print('DEBUG: Limite sblocco (30%): $unlockLimit');
+    print('DEBUG: Limite sblocco: $unlockLimit');
 
     // Get completedPoints from userData
     final completedPoints = List<String>.from(userData['completedPoints'] ?? []);
@@ -224,7 +226,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         List<bool> stepsCompleted = [];
         
         // Verifica se questa sezione contiene step oltre il limite del 30%
-        bool containsLockedSteps = !isPro && stepCounter + section.steps.length > unlockLimit;
+        bool containsLockedSteps = !isPro && !isOwner && stepCounter + section.steps.length > unlockLimit;
         int lockIndex = containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length;
         
         print('DEBUG: Sezione ${section.title} - Start at: $stepCounter, Lock at: $lockIndex');
@@ -232,7 +234,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         for (var i = 0; i < section.steps.length; i++) {
           final step = section.steps[i];
           bool isStepCompleted = false;
-          bool isStepLocked = !isPro && i >= lockIndex;
+          bool isStepLocked = !isPro && !isOwner && i >= lockIndex;
 
           if (!isStepLocked) {
             if (step.type == 'video') {
@@ -264,7 +266,9 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
           'isCompleted': completedSteps == section.steps.length,
           'stepsCompleted': stepsCompleted,
           'lockIndex': lockIndex,
-          'containsLockedSteps': containsLockedSteps
+          'containsLockedSteps': containsLockedSteps,
+          'isPro': isPro,
+          'isOwner': isOwner
         };
       }),
     );
@@ -278,10 +282,12 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     final progress = completedSteps / totalSteps;
     final lockIndex = progressData['lockIndex'] as int;
     final containsLockedSteps = progressData['containsLockedSteps'] as bool;
+    final isPro = progressData['isPro'] as bool;
+    final isOwner = progressData['isOwner'] as bool;
     
     // Calcola il numero totale di step nel corso
     int totalCourseSteps = widget.course.sections.fold(0, (sum, section) => sum + section.steps.length);
-    final lockedStepIndex = (totalCourseSteps * 0.3).floor();
+    final lockedStepIndex = isOwner ? totalCourseSteps : (totalCourseSteps * 0.3).floor();
     
     // Calcola l'indice globale del primo step di questa sezione
     int globalStartIndex = 0;
@@ -444,7 +450,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
                 final step = section.steps[stepIndex];
                 final isStepCompleted = stepsCompleted[stepIndex];
                 final lockIndex = progressData['lockIndex'] as int;
-                final isLocked = progressData['containsLockedSteps'] as bool && stepIndex >= lockIndex;
+                final isLocked = !isOwner && progressData['containsLockedSteps'] as bool && stepIndex >= lockIndex;
                 
                 return _buildStepItem(
                   step: step,

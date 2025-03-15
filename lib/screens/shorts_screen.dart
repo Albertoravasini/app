@@ -312,6 +312,11 @@ Future<bool> _handlePaywall(int index) async {
   
   final userData = UserModel.fromMap(userDoc.data()!);
   
+  // Allow full access if user is the course owner
+  if (currentCourse?.authorId == user.uid) {
+    return true;
+  }
+  
   if (!userData.isPro) {
     final totalSteps = currentCourse!.sections.fold<int>(
       0, (sum, section) => sum + section.steps.length);

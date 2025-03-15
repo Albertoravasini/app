@@ -496,13 +496,44 @@ Future<Map<String, dynamic>> _getCourseProgress(Course course) async {
     });
   }
 
-  void _showCoursePreview(BuildContext context, Course course) {
-    showModalBottomSheet(
+  void _showCoursePreview(BuildContext context, Course course) async {
+    // Show loading indicator
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => CoursePreviewSheet(course: course),
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+        ),
+      ),
     );
+
+    try {
+      // Preload data
+      await CoursePreviewSheet.preload(context, course);
+      
+      // Close loading indicator
+      Navigator.pop(context);
+      
+      // Show the CoursePreviewSheet
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) => CoursePreviewSheet(course: course),
+      );
+    } catch (e) {
+      // Close loading indicator in case of error
+      Navigator.pop(context);
+      
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error loading course. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<bool> _isCourseUnlocked(String courseId) async {
