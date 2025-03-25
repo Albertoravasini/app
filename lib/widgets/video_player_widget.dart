@@ -5,7 +5,7 @@ import 'package:Just_Learn/models/user.dart';
 import 'package:Just_Learn/screens/comments_screen.dart';
 import 'package:Just_Learn/screens/section_selection_sheet.dart';
 import 'package:Just_Learn/screens/topic_selection_sheet.dart';
-import 'package:audioplayers/audioplayers.dart'; // Importa aud
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
@@ -16,13 +16,13 @@ import '../screens/Articles_screen.dart';
 import '../screens/notes_screen.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:Just_Learn/models/course.dart'; // Aggiungi questa importazione in cima al file
+import 'package:Just_Learn/models/course.dart';
 import '../screens/profile_screen.dart';
 import '../controllers/follow_controller.dart';
 import '../controllers/video_player_manager.dart';
 import '../controllers/course_video_controller.dart';
 import '../widgets/course_video/course_info_overlay.dart';
-import 'package:video_player/video_player.dart';
+import 'package:better_player/better_player.dart';
 import 'package:Just_Learn/utils/platform_helper.dart';
 
 class VideoPlayerWidget extends StatefulWidget {
@@ -62,18 +62,12 @@ class VideoPlayerWidget extends StatefulWidget {
 }
 
 class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTickerProviderStateMixin {
-  late VideoPlayerController _controller;
-  late AnimationController _animationController;
+  late BetterPlayerController _controller;
   late AudioPlayer _audioPlayer;
-  bool _completionHandled = false;
-  bool _showCoinsCompletion = false;
-  double _progress = 0.0;
-  bool _isDragging = false;
-  double _dragStartX = 0.0;
-  Duration _initialPosition = Duration.zero;
-  Duration _seekOffset = Duration.zero;
   bool _showUnlockOptions = false;
   final VideoPlayerManager _videoManager = VideoPlayerManager();
+  final Map<String, BetterPlayerController> _adjacentControllers = {};
+  static const int _preloadDistance = 1; // Precarica 1 video prima e dopo
 
   @override
   void initState() {
@@ -84,261 +78,161 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     }
     
     _audioPlayer = AudioPlayer();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
     
+    // Initialize controller with minimal configuration
+    _controller = BetterPlayerController(
+      BetterPlayerConfiguration(
+        autoPlay: widget.autoPlay,
+        fit: BoxFit.cover,
+        aspectRatio: 9/16,
+        controlsConfiguration: const BetterPlayerControlsConfiguration(
+          enablePlayPause: false,
+          enableProgressBar: false,
+          enableFullscreen: false,
+          enableSkips: false,
+          enableOverflowMenu: false,
+          enableQualities: false,
+          enablePip: false,
+          enableRetry: false,
+          controlsHideTime: Duration(seconds: 0),
+          showControlsOnInitialize: false,
+        ),
+      ),
+    );
+
+    // Start loading immediately
     _initializeController();
   }
 
   Future<void> _initializeController() async {
     try {
-      _controller = VideoPlayerController.network(
+      final betterPlayerDataSource = BetterPlayerDataSource(
+        BetterPlayerDataSourceType.network,
         widget.videoUrl,
-        videoPlayerOptions: VideoPlayerOptions(
-          mixWithOthers: true,
-          allowBackgroundPlayback: false,
+        cacheConfiguration: const BetterPlayerCacheConfiguration(
+          useCache: true,
+          maxCacheSize: 100 * 1024 * 1024, // 100MB
+          maxCacheFileSize: 20 * 1024 * 1024, // 20MB
+          preCacheSize: 10 * 1024 * 1024, // 10MB
         ),
       );
 
+      await _controller.setupDataSource(betterPlayerDataSource);
       _videoManager.setCurrentController(_controller);
       
-      await _controller.initialize();
-      
-      if (!mounted) return;
-      
-      setState(() {});
-      _controller.addListener(_videoListener);
-      
-      if (widget.autoPlay) {
-        await _controller.play();
+      if (mounted) {
+        setState(() {});
+        widget.onReady?.call(true);
+        
+        // Preload adjacent videos
+        _preloadAdjacentVideos();
       }
-      
-      widget.onReady?.call(true);
     } catch (error) {
       print('Errore inizializzazione video: $error');
       widget.onReady?.call(false);
     }
   }
 
-  @override
-  void didUpdateWidget(VideoPlayerWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    
-    if (oldWidget.videoUrl != widget.videoUrl) {
-      _controller.dispose();
-      _initializeController();
-    }
-  }
+  Future<void> _preloadAdjacentVideos() async {
+    if (widget.course == null) return;
 
-  void _videoListener() {
-    if (!mounted) return;
-    if (_controller.value.isPlaying) {
-      final duration = _controller.value.duration;
-      final position = _controller.value.position;
-      if (duration.inMilliseconds > 0) {
-        setState(() {
-          _progress = position.inMilliseconds / duration.inMilliseconds;
-          
-          // Segna il video come completato quando raggiunge il 95% della durata
-          if (_progress >= 0.95 && !_completionHandled) {
-            _handleVideoCompletion();
-          }
-        });
+    final currentIndex = widget.currentSection?.steps.indexWhere(
+      (step) => step.videoUrl == widget.videoUrl
+    ) ?? 0;
+
+    // Preload previous video
+    if (currentIndex > 0) {
+      final prevStep = widget.currentSection?.steps[currentIndex - 1];
+      if (prevStep?.type == 'video' && prevStep?.videoUrl != null) {
+        await _initializeAdjacentController(prevStep!.videoUrl!, 'prev');
+      }
+    }
+
+    // Preload next video
+    if (currentIndex < (widget.currentSection?.steps.length ?? 0) - 1) {
+      final nextStep = widget.currentSection?.steps[currentIndex + 1];
+      if (nextStep?.type == 'video' && nextStep?.videoUrl != null) {
+        await _initializeAdjacentController(nextStep!.videoUrl!, 'next');
       }
     }
   }
 
-  Future<void> _handleVideoCompletion() async {
-    if (_completionHandled) return;
-    _completionHandled = true;
-    
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _initializeAdjacentController(String videoUrl, String position) async {
+    if (_adjacentControllers.containsKey(position)) {
+      return; // Controller already exists
+    }
 
     try {
-      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final userDoc = await userRef.get();
-      final userModel = UserModel.fromMap(userDoc.data()!);
-      
-      // Controlla se il video è già stato completato
-      final watchedVideos = userModel.WatchedVideos[widget.topic] ?? [];
-      final videoAlreadyCompleted = watchedVideos.any((video) => 
-        video.videoId.contains(widget.videoUrl.split('?')[0]) && 
-        video.completed
+      final controller = BetterPlayerController(
+        BetterPlayerConfiguration(
+          autoPlay: false,
+          fit: BoxFit.cover,
+          aspectRatio: 9/16,
+          controlsConfiguration: const BetterPlayerControlsConfiguration(
+            enablePlayPause: false,
+            enableProgressBar: false,
+            enableFullscreen: false,
+            enableSkips: false,
+            enableOverflowMenu: false,
+            enableQualities: false,
+            enablePip: false,
+            enableRetry: false,
+            controlsHideTime: Duration(seconds: 0),
+            showControlsOnInitialize: false,
+          ),
+        ),
       );
-      // Aggiorna l'UI per mostrare il video come completato
-      setState(() {
-        // Qui puoi aggiungere logica per mostrare un indicatore di completamento
-      });
 
-      // Traccia l'evento con Posthog
-      Posthog().capture(
-        eventName: 'video_completed',
-        properties: {
-          'videoId': widget.videoUrl,
-          'topic': widget.topic,
-          
-        },
+      final betterPlayerDataSource = BetterPlayerDataSource(
+        BetterPlayerDataSourceType.network,
+        videoUrl,
+        cacheConfiguration: const BetterPlayerCacheConfiguration(
+          useCache: true,
+          maxCacheSize: 100 * 1024 * 1024,
+          maxCacheFileSize: 20 * 1024 * 1024,
+          preCacheSize: 10 * 1024 * 1024,
+        ),
       );
-      
-      if (!videoAlreadyCompleted) {
-        await userRef.update({
-          'WatchedVideos.${widget.topic}': FieldValue.arrayUnion([{
-            'videoId': widget.videoUrl,
-            'title': widget.videoTitle ?? '',
-            'watchedAt': DateTime.now().toIso8601String(),
-            'completed': true,
-          }])
-        });
-      }
-    } catch (e) {
-      print('Error marking video as completed: $e');
+
+      await controller.setupDataSource(betterPlayerDataSource);
+      _adjacentControllers[position] = controller;
+
+      // Start buffering but don't play
+      controller.setVolume(0);
+      controller.play();
+      controller.pause();
+    } catch (error) {
+      print('Error preloading adjacent video: $error');
     }
   }
 
-  Future<bool> _isVideoCompleted() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return false;
-
-    final watchedVideo = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('watchedVideos')
-        .doc(widget.videoUrl)
-        .get();
-
-    return watchedVideo.exists && watchedVideo.data()?['completed'] == true;
-  }
-
-  Future<void> _handleProgressCompletion() async {
-    if (_completionHandled) return;
-    
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      // Genera un ID sicuro usando un hash dell'URL
-      final videoId = widget.videoUrl.hashCode.toString();
-
-      // Verifica se il video è già stato completato
-      final watchedVideo = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('watchedVideos')
-          .doc(videoId)
-          .get();
-
-      if (watchedVideo.exists && watchedVideo.data()?['completed'] == true) {
-        _completionHandled = true;
-        return;
-      }
-
-      _completionHandled = true;
-
-      // Riproduci il suono di successo
-      try {
-        await _audioPlayer.play(AssetSource('success_sound.mp3'));
-      } catch (audioError) {
-        print('Errore riproduzione audio: $audioError');
-      }
-      
-      if (mounted) {
-        setState(() {
-          _showCoinsCompletion = true;
-        });
-        _animationController.forward(from: 0.0);
-      }
-
-      // Aggiorna i coins
-      await _addCoinsToUser(5);
-
-      // Marca il video come visto
-      if (mounted) {
-        await ShortsController().markVideoAsWatched(
-          videoId,
-          widget.videoTitle ?? '',
-          widget.topic,
-          completed: true,
-        );
-      }
-    } catch (e) {
-      print('Errore durante il completamento del video: $e');
-      _completionHandled = true; // Previene ulteriori tentativi
+  void _cleanupAdjacentControllers() {
+    for (var controller in _adjacentControllers.values) {
+      controller.dispose();
     }
-  }
-
-  Future<void> _addCoinsToUser(int coinsToAdd) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
-    
-    try {
-      // Prima ottieni il documento corrente
-      final doc = await docRef.get();
-      if (!doc.exists) return;
-
-      // Calcola i nuovi coins
-      final currentCoins = doc.data()?['coins'] ?? 0;
-      final updatedCoins = currentCoins + coinsToAdd;
-      
-      // Aggiorna il documento
-      await docRef.update({'coins': updatedCoins});
-      
-      // Notifica il widget padre del nuovo valore
-      if (mounted) {
-        widget.onCoinsUpdate(updatedCoins);
-      }
-
-      print('Coins aggiornati: $updatedCoins'); // Debug
-
-    } catch (e) {
-      print('Errore aggiornamento coins: $e');
-    }
+    _adjacentControllers.clear();
   }
 
   void _onHorizontalDragStart(DragStartDetails details) {
     setState(() {
-      _isDragging = true;
-      _dragStartX = details.localPosition.dx;
-      _initialPosition = _controller.value.position;
-      _seekOffset = Duration.zero;
+      _showUnlockOptions = true;
     });
   }
 
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
-    final deltaX = details.localPosition.dx - _dragStartX;
-    const double seekSecondsPerPixel = 0.05;
-    final seekDuration = Duration(
-      milliseconds: (deltaX * seekSecondsPerPixel * 1000).toInt(),
-    );
-    Duration newPosition = _initialPosition + seekDuration;
-    final duration = _controller.value.duration;
-    
-    if (newPosition < Duration.zero) {
-      newPosition = Duration.zero;
-    } else if (newPosition > duration) {
-      newPosition = duration;
-    }
-
-    setState(() {
-      _seekOffset = newPosition - _initialPosition;
-    });
-    _controller.seekTo(newPosition);
+    // This method is now empty as the _showUnlockOptions flag is set directly
   }
 
   void _onHorizontalDragEnd(DragEndDetails details) {
     setState(() {
-      _isDragging = false;
-      _seekOffset = Duration.zero;
+      _showUnlockOptions = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     print('DEBUG: VideoPlayerWidget - videoTitle: ${widget.videoTitle}');
+    
     return Stack(
       children: [
         PlatformHelper.isWeb 
@@ -356,110 +250,82 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
             child: ClipRRect(
               borderRadius: BorderRadius.circular(24),
               child: AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: VideoPlayer(_controller),
+                aspectRatio: 9/16,
+                child: _controller.videoPlayerController != null
+                    ? BetterPlayer(controller: _controller)
+                    : const Center(child: CircularProgressIndicator()),
               ),
             ),
           )
-        : _controller.value.isInitialized
+        : _controller.videoPlayerController != null
             ? Center(
                 child: Container(
                   width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height - (60 + MediaQuery.of(context).padding.bottom + MediaQuery.of(context).padding.top),
-                  child: Center(
-                    child: AspectRatio(
-                      aspectRatio: 9/16,
-                      child: VideoPlayer(_controller),
-                    ),
+                  height: MediaQuery.of(context).size.height,
+                  child: AspectRatio(
+                    aspectRatio: 9/16,
+                    child: BetterPlayer(controller: _controller),
                   ),
                 ),
               )
             : const Center(child: CircularProgressIndicator()),
 
-        if (!PlatformHelper.isWeb) ...[
-          GestureDetector(
-            onTap: () {
-              if (_controller.value.isPlaying) {
-                _controller.pause();
-              } else {
-                _controller.play();
-              }
-            },
-            onHorizontalDragStart: _onHorizontalDragStart,
-            onHorizontalDragUpdate: _onHorizontalDragUpdate,
-            onHorizontalDragEnd: _onHorizontalDragEnd,
-            child: Container(
-              color: Colors.transparent,
-              width: double.infinity,
-              height: double.infinity,
-            ),
+        GestureDetector(
+          onTap: () {
+            if (_controller.isPlaying() == true) {
+              _controller.pause();
+            } else {
+              _controller.play();
+            }
+          },
+          onHorizontalDragStart: _onHorizontalDragStart,
+          onHorizontalDragUpdate: _onHorizontalDragUpdate,
+          onHorizontalDragEnd: _onHorizontalDragEnd,
+          child: Container(
+            color: Colors.transparent,
+            width: double.infinity,
+            height: double.infinity,
           ),
+        ),
 
-          if (widget.course != null)
-            CourseInfoOverlay(
+        if (widget.course != null)
+          CourseInfoOverlay(
+            course: widget.course,
+            isInCourse: widget.isInCourse,
+            onShowArticles: widget.onShowArticles,
+            onShowNotes: widget.onShowNotes,
+            openComments: widget.openComments,
+            videoTitle: widget.videoTitle ?? 'Video senza titolo',
+            controller: CourseVideoController(
+              videoManager: VideoPlayerManager(),
               course: widget.course,
-              isInCourse: widget.isInCourse,
-              onShowArticles: widget.onShowArticles,
-              onShowNotes: widget.onShowNotes,
-              openComments: widget.openComments,
-              videoTitle: widget.videoTitle ?? 'Video senza titolo',
-              controller: CourseVideoController(
-                videoManager: VideoPlayerManager(),
-                course: widget.course,
-                onStartCourse: widget.onStartCourse,
-                onUnlockOptionsChanged: (show) => setState(() => _showUnlockOptions = show),
-                onCoinsUpdate: widget.onCoinsUpdate,
-              ),
-              currentSection: widget.currentSection,
-              topic: widget.topic,
+              onStartCourse: widget.onStartCourse,
+              onUnlockOptionsChanged: (show) => setState(() => _showUnlockOptions = show),
+              onCoinsUpdate: widget.onCoinsUpdate,
             ),
-          
+            currentSection: widget.currentSection,
+            topic: widget.topic,
+          ),
+        
+        if (_showUnlockOptions)
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
+            top: 20,
+            right: 20,
             child: Container(
-              height: 4,
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1F1F1F),
-                    ),
-                  ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: MediaQuery.of(context).size.width * _progress,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Unlock Options',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
-          
-          if (_isDragging)
-            Positioned(
-              top: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${_seekOffset.isNegative ? '-' : '+'} ${_seekOffset.abs().inSeconds} s',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-        ],
       ],
     );
   }
@@ -470,7 +336,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     
     ModalRoute.of(context)?.addScopedWillPopCallback(() async {
       print('DEBUG: WillPop callback - Tentativo di pausa video');
-      if (_controller.value.isPlaying) {
+      if (_controller.isPlaying() == true) {
         await _controller.pause();
         print('DEBUG: WillPop callback - Video in pausa');
       }
@@ -483,16 +349,16 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> with SingleTicker
     print('DEBUG: Disposing VideoPlayerWidget');
     Future.microtask(() async {
       try {
-        if (_controller.value.isPlaying) {
+        if (_controller.isPlaying() == true) {
           await _controller.pause();
         }
-        await _controller.dispose();
+        _controller.dispose();
+        _cleanupAdjacentControllers();
       } catch (e) {
         print('Error during controller cleanup: $e');
       }
     });
     
-    _animationController.dispose();
     _audioPlayer.dispose();
     super.dispose();
   }

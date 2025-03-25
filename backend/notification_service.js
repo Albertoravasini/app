@@ -11,10 +11,10 @@ const { getNextNotificationDelay } = require('./utils/notification_utils');
 
 class NotificationService {
   constructor() {
-    this.TIME_ZONE = 'America/New_York';
+    this.TIME_ZONE = 'Europe/Rome';
     this.TIME_FORMAT = {
-      timeZone: 'America/New_York',
-      hour12: true,
+      timeZone: 'Europe/Rome',
+      hour12: false,
       hour: 'numeric',
       minute: 'numeric',
       month: 'numeric',
@@ -25,36 +25,36 @@ class NotificationService {
 
   async scheduleNotification(token, title, body, delay) {
     try {
-      const EST_OFFSET = -5; // Fuso orario EST (New York)
+      const CET_OFFSET = 1; // Fuso orario CET (Italia)
       
-      const currentTimeEST = new Date(Date.now() + (EST_OFFSET * 60 * 60 * 1000));
-      const scheduledTimeEST = new Date(Date.now() + delay + (EST_OFFSET * 60 * 60 * 1000));
+      const currentTimeCET = new Date(Date.now() + (CET_OFFSET * 60 * 60 * 1000));
+      const scheduledTimeCET = new Date(Date.now() + delay + (CET_OFFSET * 60 * 60 * 1000));
       
       console.log(`Current time:
-      - EST: ${currentTimeEST.toLocaleString('en-US', this.TIME_FORMAT)}`);
+      - CET: ${currentTimeCET.toLocaleString('it-IT', this.TIME_FORMAT)}`);
 
-      // Controlla se l'orario programmato è tra le 10:00 PM e le 8:00 AM EST
-      const scheduledHour = scheduledTimeEST.getHours();
+      // Controlla se l'orario programmato è tra le 22:00 e le 8:00 CET
+      const scheduledHour = scheduledTimeCET.getHours();
       
       if (scheduledHour >= 22 || scheduledHour < 8) {
-        // Calcola le 8:00 AM EST del giorno appropriato
-        const nextMorning = new Date(scheduledTimeEST);
+        // Calcola le 8:00 CET del giorno appropriato
+        const nextMorning = new Date(scheduledTimeCET);
         nextMorning.setHours(8, 0, 0, 0);
         
         if (scheduledHour >= 22) {
           nextMorning.setDate(nextMorning.getDate() + 1);
         }
         
-        // Calcola il nuovo delay per arrivare alle 8:00 AM EST
-        delay = nextMorning.getTime() - currentTimeEST.getTime();
+        // Calcola il nuovo delay per arrivare alle 8:00 CET
+        delay = nextMorning.getTime() - currentTimeCET.getTime();
         
         console.log(`Notification rescheduled:
-        - Original time (EST): ${scheduledTimeEST.toLocaleString('en-US', this.TIME_FORMAT)}
-        - New time (EST): ${nextMorning.toLocaleString('en-US', this.TIME_FORMAT)}`);
+        - Original time (CET): ${scheduledTimeCET.toLocaleString('it-IT', this.TIME_FORMAT)}
+        - New time (CET): ${nextMorning.toLocaleString('it-IT', this.TIME_FORMAT)}`);
       }
 
       console.log(`Notification scheduled for:
-      - EST: ${new Date(Date.now() + delay).toLocaleString('en-US', this.TIME_FORMAT)}
+      - CET: ${new Date(Date.now() + delay).toLocaleString('it-IT', this.TIME_FORMAT)}
       - Delay: ${delay / (1000 * 60 * 60)} hours`);
 
       setTimeout(async () => {
@@ -77,7 +77,7 @@ class NotificationService {
             }
           });
           console.log(`Notification sent successfully to ${token.substring(0, 10)}...
-          EST time of sending: ${new Date().toLocaleString('en-US', this.TIME_FORMAT)}`);
+          CET time of sending: ${new Date().toLocaleString('it-IT', this.TIME_FORMAT)}`);
         } catch (error) {
           console.error('Error sending notification:', error);
         }
@@ -92,10 +92,6 @@ class NotificationService {
     try {
       console.log('Starting notification scheduling for uid:', uid);
       
-      // Force reset - Remove after testing
-      await redisClient.del(`user_last_notification_delay_${uid}`);
-      console.log('Forced reset of previous delay');
-      
       // Check last delay used
       let lastNotificationDelay = await redisClient.get(`user_last_notification_delay_${uid}`);
       console.log('Last delay:', lastNotificationDelay ? `${parseInt(lastNotificationDelay)/3600000} hours` : 'none');
@@ -109,7 +105,7 @@ class NotificationService {
       const messageKey = hoursDelay <= 6 ? 6 : hoursDelay <= 12 ? 12 : 24;
       const messages = this.getNotificationMessages(messageKey);
       
-      // Assicuriamoci di selezionare un solo messaggio casuale
+      // Seleziona un messaggio casuale
       const randomIndex = Math.floor(Math.random() * messages.length);
       const selectedMessage = messages[randomIndex];
       console.log('Selected message index:', randomIndex);
@@ -117,8 +113,8 @@ class NotificationService {
       // Schedule notification with the single selected message
       await this.scheduleNotification(token, selectedMessage.title, selectedMessage.body, nextNotificationDelay);
       
-      // Save new delay
-      await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay.toString());
+      // Save new delay only after successful scheduling
+      await redisClient.set(`user_last_notification_delay_${uid}`, nextNotificationDelay.toString(), 'EX', 7 * 24 * 60 * 60); // Expires in 7 days
       console.log('New delay saved in Redis:', nextNotificationDelay/3600000, 'hours');
 
     } catch (error) {
@@ -131,32 +127,32 @@ class NotificationService {
     const messages = {
       6: [  // 6 ore
         {
-          title: '🧠 Missing Out on Learning?',
-          body: `While others scroll mindlessly, you could be learning something amazing.`
+          title: '🧠 Ti stai perdendo qualcosa?',
+          body: `Mentre altri scorrono senza meta, tu potresti imparare qualcosa di straordinario.`
         },
         {
-          title: '💫 Quick Learning Break?',
-          body: 'Turn your scrolling time into growth time. New content waiting for you.'
+          title: '💫 Pausa di apprendimento?',
+          body: 'Trasforma il tuo tempo in crescita personale. Nuovi contenuti ti aspettano.'
         }
       ],
       12: [  // 12 ore
         {
-          title: '🎯 Feed Your Mind',
-          body: 'Transform your scroll breaks into power moves. Your personalized learning feed is ready.'
+          title: '🎯 Nutri la tua mente',
+          body: 'Trasforma le tue pause in momenti di crescita. Il tuo feed personalizzato è pronto.'
         },
         {
-          title: '⚡ Procrastinating?',
-          body: 'Turn FOMO into GOMO - Growth Over Missing Out. Your learning feed is fresh.'
+          title: '⚡ Stai procrastinando?',
+          body: 'Non perdere l\'occasione di imparare. Il tuo feed di apprendimento è aggiornato.'
         }
       ],
       24: [  // 24 ore
         {
-          title: '🔥 Feeling Unproductive?',
-          body: 'Others are learning while scrolling. Jump back into your educational feed.'
+          title: '🔥 Ti senti improduttivo?',
+          body: 'Altri stanno imparando mentre scrollano. Torna al tuo feed educativo.'
         },
         {
-          title: '✨ Miss That Learning Dopamine?',
-          body: 'Get your daily dose of smart scrolling. New content waiting for you.'
+          title: '✨ Ti manca quella sensazione?',
+          body: 'Ottieni la tua dose quotidiana di apprendimento intelligente. Nuovi contenuti ti aspettano.'
         }
       ]
     };
@@ -187,6 +183,10 @@ class NotificationService {
     switch(type) {
       case 'teacher_message':
         title = '📚 Nuovo messaggio dal docente';
+        body = `${senderName} ti ha inviato un messaggio`;
+        break;
+      case 'student_message':
+        title = '👨‍🎓 Nuovo messaggio da studente';
         body = `${senderName} ti ha inviato un messaggio`;
         break;
       case 'comment_reply':

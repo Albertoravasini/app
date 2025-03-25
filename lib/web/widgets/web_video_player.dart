@@ -55,7 +55,6 @@ class _WebVideoPlayerState extends State<WebVideoPlayer> {
       _controller = VideoPlayerController.network(videoUrl);
       
       await _controller.initialize();
-      widget.videoManager.setCurrentController(_controller);
       
       if (mounted) {
         setState(() {

@@ -1,22 +1,22 @@
-import 'package:Just_Learn/controllers/scroll_physics.dart';
-import 'package:Just_Learn/models/course.dart';
-import 'package:Just_Learn/services/shorts_service.dart';
-import 'package:Just_Learn/widgets/course_question_card.dart';
-import 'package:Just_Learn/widgets/video_player_widget.dart';
-import 'package:Just_Learn/controllers/shorts_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:posthog_flutter/posthog_flutter.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:Just_Learn/models/user.dart';
-import 'package:Just_Learn/models/level.dart';
-import 'package:Just_Learn/widgets/page_view_container.dart';
-import '../services/course_service.dart';
-import 'package:Just_Learn/screens/section_selection_sheet.dart';
-import 'package:Just_Learn/controllers/video_player_manager.dart';
-import '../widgets/points_screen.dart';
+import '../models/course.dart';
+import '../models/level.dart';
+import '../models/user.dart';
 import '../screens/assignment_screen.dart';
+import '../widgets/points_screen.dart';
+import '../widgets/page_view_container.dart';
+import '../services/course_service.dart';
+import '../screens/section_selection_sheet.dart';
+import '../controllers/video_player_manager.dart';
+import '../controllers/scroll_physics.dart';
+import '../services/shorts_service.dart';
+import '../widgets/course_question_card.dart';
+import '../widgets/video_player_widget.dart';
+import '../controllers/shorts_controller.dart';
 
 class ShortsScreen extends StatefulWidget {
   final String? selectedTopic;
@@ -118,7 +118,7 @@ class ShortsScreenState extends State<ShortsScreen> {
       // Verifica se l'utente può accedere all'indice richiesto
       final totalSteps = course.sections.fold<int>(
         0, (sum, section) => sum + section.steps.length);
-      final lockIndex = (totalSteps * 0.3).floor();
+      final lockIndex = (totalSteps * 0.4).floor();
       
       int targetIndex = await _loadLastProgress(course);
       
@@ -294,11 +294,14 @@ void _onPageChanged(int index) async {
   // Aggiorna sezione corrente
   _updateCurrentSection(index);
   
-  // Precarica il prossimo video
-  _preloadAdjacentVideos(index);
-
   // Analytics
   _trackPageChange(index);
+
+  // Precarica i video adiacenti
+  _preloadAdjacentVideos(index);
+
+  // Cleanup controllers
+  _cleanupControllers(index);
 }
 
 Future<bool> _handlePaywall(int index) async {
@@ -320,10 +323,10 @@ Future<bool> _handlePaywall(int index) async {
   if (!userData.isPro) {
     final totalSteps = currentCourse!.sections.fold<int>(
       0, (sum, section) => sum + section.steps.length);
-    final lockIndex = (totalSteps * 0.3).ceil();
+    final lockIndex = (totalSteps * 0.4).ceil();
 
     if (index >= lockIndex) {
-      await _videoManager.pauseCurrentVideo();
+      _videoManager.pause();
       
       if (_pageController.hasClients) {
         _pageController.jumpToPage(lockIndex - 1);
@@ -343,7 +346,23 @@ void _preloadAdjacentVideos(int currentIndex) {
   if (currentIndex < allShortSteps.length - 1) {
     final nextStep = allShortSteps[currentIndex + 1]['step'] as LevelStep;
     if (nextStep.type == 'video' && nextStep.videoUrl != null) {
-      _videoManager.preloadVideo(nextStep.videoUrl!);
+      _ensureControllerExists(currentIndex + 1, mute: true);
+      // Inizia il buffering del video successivo
+      if (currentIndex + 1 < _youtubeControllers.length) {
+        _youtubeControllers[currentIndex + 1].load(nextStep.content);
+      }
+    }
+  }
+  
+  // Precarica il video precedente
+  if (currentIndex > 0) {
+    final prevStep = allShortSteps[currentIndex - 1]['step'] as LevelStep;
+    if (prevStep.type == 'video' && prevStep.videoUrl != null) {
+      _ensureControllerExists(currentIndex - 1, mute: true);
+      // Inizia il buffering del video precedente
+      if (currentIndex - 1 < _youtubeControllers.length) {
+        _youtubeControllers[currentIndex - 1].load(prevStep.content);
+      }
     }
   }
 }
@@ -425,6 +444,8 @@ void _cleanupControllers(int currentIndex) {
             mute: true,
             hideThumbnail: true,
             disableDragSeek: true,
+            enableCaption: false,
+            useHybridComposition: true,
           ),
         );
       }
@@ -548,6 +569,9 @@ void dispose() {
     final course = allShortSteps[index]['course'] as Course;
     final videoId = currentStep.content;
     final videoTitle = level.title;
+
+    // Precarica il video adiacente quando si costruisce il player
+    _preloadAdjacentVideos(index);
 
     return PageViewContainer(
       key: ValueKey('video_$index'),
@@ -815,15 +839,28 @@ void dispose() {
   Future<void> _initializeControllers() async {
     if (allShortSteps.isEmpty) return;
 
-    // Inizializza solo il primo controller
+    // Initialize only the first controller
     _ensureControllerExists(0);
-    
-    // Precarica il prossimo video in modo asincrono
-    if (allShortSteps.length > 1) {
-      final nextStep = allShortSteps[1]['step'] as LevelStep;
-      if (nextStep.type == 'video' && nextStep.videoUrl != null) {
-        _videoManager.preloadVideo(nextStep.videoUrl!);
-      }
+  }
+
+  void _ensureControllerExists(int index, {bool mute = false}) {
+    if (index >= _youtubeControllers.length) {
+      final videoId = (allShortSteps[index]['step'] as LevelStep).content;
+      _youtubeControllers.add(
+        YoutubePlayerController(
+          initialVideoId: videoId,
+          flags: YoutubePlayerFlags(
+            autoPlay: false,
+            mute: mute,
+            disableDragSeek: true,
+            hideControls: true,
+            hideThumbnail: true,
+            forceHD: false,
+            enableCaption: false,
+            useHybridComposition: true,
+          ),
+        ),
+      );
     }
   }
 
@@ -887,25 +924,6 @@ Widget build(BuildContext context) {
       if (prevStep.type == 'video') {
         _ensureControllerExists(currentIndex - 1, mute: true);
       }
-    }
-  }
-
-  void _ensureControllerExists(int index, {bool mute = false}) {
-    if (index >= _youtubeControllers.length) {
-      final videoId = (allShortSteps[index]['step'] as LevelStep).content;
-      _youtubeControllers.add(
-        YoutubePlayerController(
-          initialVideoId: videoId,
-          flags: YoutubePlayerFlags(
-            autoPlay: false,
-            mute: mute,
-            disableDragSeek: true,
-            hideControls: true,
-            hideThumbnail: true,
-            forceHD: false,
-          ),
-        ),
-      );
     }
   }
 

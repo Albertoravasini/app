@@ -196,64 +196,81 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
-              ),
-            )
-          : CustomScrollView(
-              slivers: [
-                // AppBar personalizzata senza back button
-                SliverAppBar(
-                  floating: true,
-                  snap: true,
-                  pinned: false,
-                  backgroundColor: const Color(0xFF121212),
-                  automaticallyImplyLeading: false, // Rimuove il tasto indietro
-                  toolbarHeight: 80,
-                  flexibleSpace: FlexibleSpaceBar(
-                    titlePadding: const EdgeInsets.all(16),
-                    title: _buildSearchField(),
-                  ),
-                ),
-
-                // 1) Ultimo corso iniziato
-                if (_lastCourseStarted != null)
-                  SliverToBoxAdapter(
-                    child: _buildLastCourse(_lastCourseStarted!),
-                  ),
-
-                // 2) Presto Disponibili
-                SliverToBoxAdapter(
-                  child: _buildComingSoonSection(),
-                ),
-
-                // 3) Corsi divisi per topic (filtrati)
-                ..._buildTopicSections(),
-              ],
+      body: CustomScrollView(
+        slivers: [
+          // AppBar personalizzata senza back button
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            pinned: false,
+            backgroundColor: const Color(0xFF121212),
+            automaticallyImplyLeading: false,
+            toolbarHeight: 80,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: const EdgeInsets.all(16),
+              title: _buildSearchField(),
             ),
+          ),
+
+          // 1) Ultimo corso iniziato (skeleton se in caricamento)
+          SliverToBoxAdapter(
+            child: isLoading 
+              ? _buildLastCourseSkeletonLoader()
+              : (_lastCourseStarted != null 
+                  ? _buildLastCourse(_lastCourseStarted!)
+                  : const SizedBox.shrink()),
+          ),
+
+          // 2) Presto Disponibili (skeleton se in caricamento)
+          SliverToBoxAdapter(
+            child: isLoading
+              ? _buildComingSoonSkeletonLoader()
+              : _buildComingSoonSection(),
+          ),
+
+          // 3) Corsi divisi per topic (skeleton se in caricamento)
+          if (isLoading) ...[
+            SliverToBoxAdapter(
+              child: _buildTopicSectionsSkeletonLoader(),
+            ),
+          ] else ...[
+            ..._buildTopicSections(),
+          ],
+        ],
+      ),
     );
   }
 
   /// SearchField con bordi arrotondati e icona
   Widget _buildSearchField() {
-    return Container(
-      child: Material(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(24),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+      child: Container(
+        height: 50,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+          ),
+        ),
         child: TextField(
           controller: _searchController,
           style: const TextStyle(color: Colors.white),
-          cursorColor: Colors.yellowAccent,
+          textAlignVertical: TextAlignVertical.center,
           decoration: InputDecoration(
-            hintText: 'Search courses...',
-            hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-            prefixIcon: const Icon(Icons.search, color: Colors.yellowAccent),
+            hintText: 'Cerca corsi...',
+            hintStyle: TextStyle(
+              color: Colors.white.withOpacity(0.3),
+            ),
+            prefixIcon: Icon(
+              Icons.search,
+              color: Colors.white.withOpacity(0.3),
+            ),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 14,
+              horizontal: 20,
+              vertical: 0,
             ),
           ),
           onChanged: (value) {
@@ -1129,5 +1146,259 @@ class _CoursesListScreenState extends State<CoursesListScreen> {
       double totalTime = totalVideos * 1 + totalQuestions * 0.5;
       return total + totalTime.ceil();
     });
+  }
+
+  Widget _buildLastCourseSkeletonLoader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  width: 120,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 200,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    Container(
+                      width: 80,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComingSoonSkeletonLoader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 32),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 160,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 300,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: 3,
+            itemBuilder: (context, index) {
+              return Container(
+                width: 280,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      height: 160,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 200,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[800],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopicSectionsSkeletonLoader() {
+    return Column(
+      children: List.generate(3, (topicIndex) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              child: Container(
+                width: 120,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 300,
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                scrollDirection: Axis.horizontal,
+                itemCount: 3,
+                itemBuilder: (context, index) {
+                  return Container(
+                    width: 280,
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[800],
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: 200,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[800],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      }),
+    );
   }
 }

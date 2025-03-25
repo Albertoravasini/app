@@ -9,6 +9,7 @@ const aiSummaryRouter = require('./ai_summary');
 const aiChatRouter = require('./ai_chat');
 const cors = require('cors');
 const NotificationService = require('./notification_service');
+const videoCompressionRouter = require('./video_compression');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -86,7 +87,8 @@ function getNextNotificationDelay(lastNotificationDelay) {
 function scheduleNotification(token, title, body, delay) {
   let sendTime = Date.now() + delay;
   let sendDate = new Date(sendTime);
-  let hours = sendDate.getHours();
+  // Converti l'ora in CET aggiungendo l'offset
+  let hours = new Date(sendTime + (1 * 60 * 60 * 1000)).getHours(); // +1 per CET
 
   // Se l'ora è tra le 22 e le 8 del mattino, posticipa la notifica alle 8 del mattino successivo
   if (hours >= 22 || hours < 8) {
@@ -99,10 +101,10 @@ function scheduleNotification(token, title, body, delay) {
     delay = nextMorning.getTime() - Date.now();
   }
 
-  console.log(`Scheduling notification: "${title}" to be sent after ${delay / 1000} seconds`);
+  console.log(`Scheduling notification: "${title}" to be sent after ${delay / 1000} seconds (${new Date(Date.now() + delay).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })})`);
 
   setTimeout(() => {
-    console.log(`Sending notification: "${title}" now`);
+    console.log(`Sending notification: "${title}" now (${new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome' })})`);
     sendPushNotification(token, title, body);
   }, delay);
 }
@@ -142,8 +144,8 @@ async function schedulePushNotification(uid, token) {
   }
 
   // Personalizza il messaggio della notifica
-  const notificationTitle = `⏰ Time’s Ticking!`;
-  const notificationBody = `Don’t let another minute go to waste. Enhance your skills now! 💡📱`;
+  const notificationTitle = `⏰ È ora di imparare!`;
+  const notificationBody = `Non perdere altro tempo prezioso. Migliora le tue competenze ora! 💡📱`;
 
   // Programma la notifica
   scheduleNotification(
@@ -164,6 +166,9 @@ app.use('/ai', aiChatRouter);
 
 // Abilita CORS
 app.use(cors());
+
+// Add video compression routes
+app.use('/video', videoCompressionRouter);
 
 const notificationService = new NotificationService();
 
@@ -188,11 +193,14 @@ app.post('/update_last_access', async (req, res) => {
 
     if (isNewDay) {
       // Aggiorna l'ultimo accesso solo se è un nuovo giorno
-      await redisClient.set(`user_last_access_${uid}`, lastAccessTime);
+      await redisClient.set(`user_last_access_${uid}`, lastAccessTime, 'EX', 30 * 24 * 60 * 60); // 30 days expiry
       await admin.firestore().collection('users').doc(uid).update({
         lastAccess: lastAccessTime,
         fcmToken: fcmToken
       });
+
+      // Reset notification delay for new day
+      await redisClient.del(`user_last_notification_delay_${uid}`);
     } else {
       // Aggiorna solo il token FCM se non è un nuovo giorno
       await admin.firestore().collection('users').doc(uid).update({

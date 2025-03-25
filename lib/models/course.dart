@@ -179,6 +179,10 @@ class Course {
           'enrolledStudents.$userId': Timestamp.fromDate(DateTime.now())
         });
   }
+
+  int getTotalResourcesCount() {
+    return sections.fold(0, (total, section) => total + section.links.length);
+  }
 }
 
 class Section {

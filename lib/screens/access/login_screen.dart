@@ -7,6 +7,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'register_screen.dart'; // Import your Register screen
 
 
@@ -21,6 +23,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isAppleSignInAvailable = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      SignInWithApple.isAvailable().then((isAvailable) {
+        setState(() {
+          _isAppleSignInAvailable = isAvailable;
+        });
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +141,53 @@ class _LoginScreenState extends State<LoginScreen> {
                           },
                         ),
                         const SizedBox(height: 32),
+                        
+                        // Sign in with Apple button (iOS only)
+                        if (_isAppleSignInAvailable)
+                          _buildSocialButton(
+                            onTap: () async {
+                              try {
+                                final authService = Provider.of<AuthService>(context, listen: false);
+                                User? user = await authService.signInWithApple();
+                                
+                                if (user != null) {
+                                  final userDoc = await FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(user.uid)
+                                      .get();
+
+                                  if (userDoc.exists) {
+                                    final userModel = UserModel.fromMap(userDoc.data()!);
+                                    
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => MainScreen(userModel: userModel),
+                                      ),
+                                      (Route<dynamic> route) => false,
+                                    );
+                                  } else {
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => TopicSelectionScreen(user: user),
+                                      ),
+                                      (Route<dynamic> route) => false,
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                print('Error during Apple sign in: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            },
+                            text: 'Sign in with Apple',
+                            useAppleIcon: true,
+                          ),
+                        if (_isAppleSignInAvailable)
+                          const SizedBox(height: 16),
                         
                         // Sign In with Google
                         _buildSocialButton(
@@ -293,8 +355,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildSocialButton({
     required VoidCallback onTap,
-    required String icon,
+    String? icon,
     required String text,
+    bool useAppleIcon = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -310,12 +373,19 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              icon,
-              height: 24,
-              width: 24,
-              color: Colors.white,
-            ),
+            if (icon != null && !useAppleIcon)
+              Image.asset(
+                icon,
+                height: 24,
+                width: 24,
+                color: Colors.white,
+              )
+            else if (useAppleIcon)
+              const Icon(
+                Icons.apple,
+                color: Colors.white,
+                size: 24,
+              ),
             const SizedBox(width: 12),
             Text(
               text,

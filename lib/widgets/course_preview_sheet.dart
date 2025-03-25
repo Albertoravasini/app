@@ -55,8 +55,8 @@ class CoursePreviewSheet extends StatefulWidget {
             .map((s) => s.steps.length)
             .reduce((a, b) => a + b);
         
-        // Calcola il punto di blocco (30% del totale)
-        final unlockLimit = (totalSteps * 0.3).round();
+        // Calcola il punto di blocco (40% del totale)
+        final unlockLimit = (totalSteps * 0.4).round();
         
         final cacheData = {
           'userData': userData,
@@ -83,7 +83,7 @@ class CoursePreviewSheet extends StatefulWidget {
     final totalSteps = course.sections
         .map((s) => s.steps.length)
         .reduce((a, b) => a + b);
-    final unlockLimit = (totalSteps * 0.3).round();
+    final unlockLimit = (totalSteps * 0.4).round();
 
     // Fetch all assignments for this user in this course
     final assignmentsSnapshot = await FirebaseFirestore.instance

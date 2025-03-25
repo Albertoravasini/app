@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:Just_Learn/utils/platform_helper.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 
 class CourseInfoOverlay extends StatefulWidget {
   final Course? course;
@@ -51,6 +52,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
   late Animation<double> _scaleAnimation;
   bool _showUnlockOptions = false;
   bool _isAnimating = false;
+  final Map<String, ImageProvider> _imageCache = {};
 
   final List<Map<String, IconData>> _availableIcons = [
     {'link': FontAwesomeIcons.link},
@@ -81,6 +83,48 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
         curve: Curves.easeInOut,
       ),
     );
+    
+    // Preload images when widget initializes
+    _preloadImages();
+  }
+
+  Future<void> _preloadImages() async {
+    if (widget.course == null) return;
+
+    // Preload author profile image
+    if (widget.course!.authorId != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.course!.authorId)
+          .get();
+      
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>?;
+        final authorProfileUrl = userData?['profileImageUrl'] as String?;
+        if (authorProfileUrl != null) {
+          _preloadImage(authorProfileUrl);
+        }
+      }
+    }
+
+    // Preload course cover image
+    if (widget.course!.coverImageUrl != null) {
+      _preloadImage(widget.course!.coverImageUrl!);
+    }
+  }
+
+  Future<void> _preloadImage(String url) async {
+    if (_imageCache.containsKey(url)) return;
+
+    try {
+      final imageProvider = NetworkImage(url);
+      _imageCache[url] = imageProvider;
+      
+      // Force image to be loaded into memory
+      await precacheImage(imageProvider, context);
+    } catch (e) {
+      print('Error preloading image: $e');
+    }
   }
 
   @override
@@ -332,7 +376,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
     print('DEBUG: Tentativo di mettere in pausa il video prima della navigazione');
     
     try {
-      widget.controller.videoManager.pauseCurrentVideo();
+      widget.controller.videoManager.pause();
       print('DEBUG: Video messo in pausa con successo');
     } catch (e) {
       print('ERROR: Errore durante la pausa del video: $e');
@@ -364,7 +408,7 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
     print('DEBUG: Tentativo di mettere in pausa il video (tap autore)');
     
     try {
-      widget.controller.videoManager.pauseCurrentVideo();
+      widget.controller.videoManager.pause();
       print('DEBUG: Video messo in pausa con successo (tap autore)');
     } catch (e) {
       print('ERROR: Errore durante la pausa del video (tap autore): $e');
@@ -399,9 +443,20 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
     print('DEBUG - currentSection links: ${widget.currentSection?.links}');
     print('DEBUG - currentSection links length: ${widget.currentSection?.links.length}');
     
+    if (!widget.isInCourse) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Start the course to access resources'),
+          backgroundColor: Colors.white,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (widget.currentSection == null || widget.currentSection!.links.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('No resources available for this chapter'),
           backgroundColor: Colors.white,
           behavior: SnackBarBehavior.floating,
@@ -537,6 +592,45 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
       double totalTime = totalVideos * 1 + totalQuestions * 0.5;
       return total + totalTime.ceil();
     });
+  }
+
+  Widget _buildAuthorProfileImage(String? authorProfileUrl) {
+    if (authorProfileUrl == null) return _buildPlaceholder(false);
+
+    final imageProvider = _imageCache[authorProfileUrl] ?? NetworkImage(authorProfileUrl);
+    
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(21),
+      child: Image(
+        image: imageProvider,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildPlaceholder(true);
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return _buildPlaceholder(false);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCourseCoverImage(String? coverImageUrl) {
+    if (coverImageUrl == null) return _buildPlaceholder(false);
+
+    final imageProvider = _imageCache[coverImageUrl] ?? NetworkImage(coverImageUrl);
+    
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        image: DecorationImage(
+          image: imageProvider,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
   }
 
   @override
@@ -927,7 +1021,9 @@ class _CourseInfoOverlayState extends State<CourseInfoOverlay> with SingleTicker
                       ),
                     ),
                     Text(
-                      '${widget.currentSection?.links.length ?? 0}',
+                      widget.isInCourse 
+                        ? '${widget.currentSection?.links.length ?? 0}'
+                        : '${widget.course?.getTotalResourcesCount() ?? 0}',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 14,

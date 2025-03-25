@@ -64,7 +64,7 @@ class _CourseScreenState extends State<CourseScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Discover the Best',
+                    'Scopri i Migliori',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.7),
                       fontSize: 16,
@@ -73,7 +73,7 @@ class _CourseScreenState extends State<CourseScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Teachers',
+                    'Insegnanti',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 32,

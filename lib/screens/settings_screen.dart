@@ -296,7 +296,7 @@ class SettingsScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
-                        'SAVE 50%',
+                        'SCONTO 50%',
                         style: TextStyle(
                           color: Color(0xFFFFFF28),
                           fontWeight: FontWeight.bold,
@@ -308,7 +308,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Upgrade to Premium',
+                  'Passa a Premium',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -317,7 +317,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Get unlimited access to all courses',
+                  'Accesso illimitato a tutti i corsi',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 14,
@@ -335,7 +335,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '/month',
+                      '/mese',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: 14,
@@ -352,7 +352,7 @@ class SettingsScreen extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Get Started',
+                            'Inizia Ora',
                             style: TextStyle(
                               color: Colors.black,
                               fontWeight: FontWeight.bold,

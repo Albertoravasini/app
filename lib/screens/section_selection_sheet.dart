@@ -194,8 +194,8 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         .map((s) => s.steps.length)
         .reduce((a, b) => a + b);
     
-    // Calcola il punto di blocco (30% del totale) solo se non è il proprietario
-    final unlockLimit = isOwner ? totalSteps : (totalSteps * 0.3).round();
+    // Calcola il punto di blocco (40% del totale) solo se non è il proprietario
+    final unlockLimit = isOwner ? totalSteps : (totalSteps * 0.4).round();
     var stepCounter = 0;
     
     print('DEBUG: Stato Pro: $isPro');
@@ -225,7 +225,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
         int completedSteps = 0;
         List<bool> stepsCompleted = [];
         
-        // Verifica se questa sezione contiene step oltre il limite del 30%
+        // Verifica se questa sezione contiene step oltre il limite del 40%
         bool containsLockedSteps = !isPro && !isOwner && stepCounter + section.steps.length > unlockLimit;
         int lockIndex = containsLockedSteps ? (unlockLimit - stepCounter).clamp(0, section.steps.length) : section.steps.length;
         
@@ -287,7 +287,7 @@ class _SectionSelectionSheetState extends State<SectionSelectionSheet> with Sing
     
     // Calcola il numero totale di step nel corso
     int totalCourseSteps = widget.course.sections.fold(0, (sum, section) => sum + section.steps.length);
-    final lockedStepIndex = isOwner ? totalCourseSteps : (totalCourseSteps * 0.3).floor();
+    final lockedStepIndex = isOwner ? totalCourseSteps : (totalCourseSteps * 0.4).floor();
     
     // Calcola l'indice globale del primo step di questa sezione
     int globalStartIndex = 0;

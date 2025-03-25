@@ -13,6 +13,8 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:video_compress/video_compress.dart';
+import '../services/video_compression_service.dart';
 
 class CourseEditScreen extends StatefulWidget {
   final Course? course;
@@ -2509,13 +2511,77 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
     Function(double) onProgress,
   ) async {
     try {
+      // Show compression progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E1E1E),
+            title: Row(
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.yellowAccent),
+                ),
+                SizedBox(width: 16),
+                Text(
+                  'Compressing Video',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+            content: Text(
+              'Please wait while we optimize your video for better performance...',
+              style: TextStyle(color: Colors.white70),
+            ),
+          );
+        },
+      );
+
+      // Get original file size
+      final originalSize = await videoFile.length();
+      print('Original video size: ${(originalSize / (1024 * 1024)).toStringAsFixed(2)} MB');
+
+      // Get video info
+      final videoInfo = await VideoCompressionService().getVideoInfo(videoFile);
+      print('Video info: $videoInfo');
+
+      // Compress video using FFmpeg
+      final compressedFile = await VideoCompressionService().compressVideo(
+        videoFile,
+        quality: 28, // Adjust quality (0-51, lower is better)
+        maxWidth: 1080, // Max width in pixels (vertical format)
+        maxHeight: 1920, // Max height in pixels (vertical format)
+        fps: 30, // Target FPS
+        audioBitrate: 128, // Audio bitrate in kbps
+        onProgress: (progress) {
+          // Update progress if needed
+          print('Compression progress: ${(progress * 100).toStringAsFixed(1)}%');
+        },
+      );
+
+      // Close compression dialog
+      Navigator.of(context).pop();
+
+      if (compressedFile == null) {
+        throw Exception('Video compression failed');
+      }
+
+      // Get compressed file size
+      final compressedSize = await compressedFile.length();
+      print('Compressed video size: ${(compressedSize / (1024 * 1024)).toStringAsFixed(2)} MB');
+
+      // Calculate compression ratio
+      final compressionRatio = (1 - (compressedSize / originalSize)) * 100;
+      print('Compression ratio: ${compressionRatio.toStringAsFixed(2)}%');
+
       final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final videoRef = firebase_storage.FirebaseStorage.instance
           .ref()
           .child('course_videos')
           .child(fileName);
 
-      final bytes = await videoFile.readAsBytes();
+      final bytes = await compressedFile.readAsBytes();
       
       final uploadTask = videoRef.putData(
         bytes,
@@ -2538,6 +2604,9 @@ class _CourseEditScreenState extends State<CourseEditScreen> {
 
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      // Clean up compressed file
+      await compressedFile.delete();
       
       onSuccess(downloadUrl);
       
